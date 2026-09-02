@@ -1,0 +1,13 @@
+{
+  "name": "Northstar Financial & Market Copilot",
+  "short_name": "Northstar",
+  "description": "A disciplined household finance, investing, and market intelligence copilot.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f5f4ef",
+  "theme_color": "#172a24",
+  "orientation": "portrait-primary",
+  "icons": [
+    { "src": "/favicon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}

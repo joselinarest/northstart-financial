@@ -1,0 +1,2150 @@
+"use client";
+
+import { useEffect, useMemo, useState } from "react";
+import { createClient } from "@supabase/supabase-js";
+import { patternLibrary, probabilityEngine } from "@/lib/technical-analysis";
+
+const opportunities = [
+  {
+    ticker: "NVDA",
+    name: "NVIDIA",
+    score: 84,
+    setup: "Pullback + confirmation",
+    price: 181.46,
+    trend: "Bullish",
+    support: "176–179",
+    resistance: "188",
+    volume: "1.3×",
+    catalyst: "Earnings in 18 days",
+  },
+  {
+    ticker: "SPY",
+    name: "S&P 500 ETF",
+    score: 78,
+    setup: "Breakout retest",
+    price: 644.82,
+    trend: "Bullish",
+    support: "638–641",
+    resistance: "648",
+    volume: "1.1×",
+    catalyst: "Jobs report Friday",
+  },
+  {
+    ticker: "CRWD",
+    name: "CrowdStrike",
+    score: 71,
+    setup: "Base breakout watch",
+    price: 426.12,
+    trend: "Neutral",
+    support: "411–416",
+    resistance: "432",
+    volume: "0.9×",
+    catalyst: "No near catalyst",
+  },
+];
+const scannerOpportunities = [
+  ...opportunities,
+  {ticker:"GOOGL",name:"Alphabet",score:86,setup:"Trend continuation watch",price:201.34,trend:"Bullish",support:"194–198",resistance:"205",volume:"1.2×",catalyst:"Cloud and AI demand"},
+  {ticker:"JPM",name:"JPMorgan Chase",score:82,setup:"Relative-strength pullback",price:296.41,trend:"Bullish",support:"286–290",resistance:"301",volume:"1.1×",catalyst:"Rate and credit sensitivity"},
+  {ticker:"META",name:"Meta Platforms",score:80,setup:"Support reclaim watch",price:748.20,trend:"Bullish",support:"720–732",resistance:"760",volume:"1.0×",catalyst:"Advertising and AI capex"},
+  {ticker:"AMZN",name:"Amazon",score:77,setup:"Range breakout watch",price:231.09,trend:"Neutral",support:"220–224",resistance:"234",volume:"0.9×",catalyst:"AWS growth expectations"},
+  {ticker:"XOM",name:"Exxon Mobil",score:74,setup:"Commodity confirmation",price:112.88,trend:"Neutral",support:"108–110",resistance:"116",volume:"1.0×",catalyst:"Oil-price sensitivity"},
+  {ticker:"AAPL",name:"Apple",score:70,setup:"Base recovery watch",price:228.74,trend:"Neutral",support:"218–222",resistance:"233",volume:"0.8×",catalyst:"Product and services cycle"},
+  {ticker:"LLY",name:"Eli Lilly",score:68,setup:"High-valuation pullback",price:732.55,trend:"Neutral",support:"690–705",resistance:"755",volume:"1.2×",catalyst:"Drug-trial and regulatory risk"},
+  {ticker:"COST",name:"Costco",score:61,setup:"Valuation reset required",price:982.15,trend:"Bullish",support:"910–930",resistance:"1,000",volume:"0.9×",catalyst:"Premium valuation limits margin of safety"},
+  {ticker:"QQQ",name:"Nasdaq-100 ETF",score:75,setup:"Index trend retest",price:578.26,trend:"Bullish",support:"565–570",resistance:"584",volume:"1.0×",catalyst:"Technology concentration and rates"},
+];
+
+const modules = [
+  "Market basics",
+  "Candles & structure",
+  "Risk & position size",
+  "Entries & invalidation",
+  "Fundamentals",
+  "Trading psychology",
+];
+
+const candles = [
+  [177.2,179.4,176.4,178.8,42],[178.8,180.1,177.6,179.2,51],[179.2,180.4,177.9,178.3,38],[178.3,181.2,177.8,180.7,63],
+  [180.7,182.4,179.8,181.9,58],[181.9,182.7,180.2,180.9,45],[180.9,183.1,180.4,182.6,74],[182.6,184.2,181.6,183.4,66],
+  [183.4,184.0,181.1,181.8,59],[181.8,183.0,180.5,182.4,48],[182.4,185.1,182.0,184.6,82],[184.6,186.2,183.5,185.4,77],
+  [185.4,186.0,183.2,184.0,54],[184.0,184.8,181.9,182.7,69],[182.7,184.1,181.7,183.8,50],[183.8,186.3,183.1,185.9,87],
+  [185.9,187.0,184.4,186.4,73],[186.4,187.2,184.8,185.2,61],[185.2,186.5,183.9,184.7,55],[184.7,187.8,184.2,187.1,94],
+  [187.1,188.4,186.0,186.6,71],[186.6,188.1,185.6,187.5,64],[187.5,188.8,186.2,188.2,79],[188.2,189.1,186.8,187.4,68],
+];
+const fiveYearSeries = Array.from({ length: 60 }, (_, month) => {
+  const cycle = Math.sin(month / 5.2) * 9 + Math.sin(month / 2.1) * 3;
+  const shock = month >= 19 && month <= 24 ? -(24 - Math.abs(22 - month) * 4) : 0;
+  return Math.round((100 + month * 1.42 + cycle + shock) * 10) / 10;
+});
+const cycleYears = [
+  { year: "2021", phase: "Expansion", portfolio: 22.4, benchmark: 26.9, drawdown: -5.2 },
+  { year: "2022", phase: "Contraction", portfolio: -14.8, benchmark: -19.4, drawdown: -22.1 },
+  { year: "2023", phase: "Recovery", portfolio: 28.1, benchmark: 24.2, drawdown: -9.6 },
+  { year: "2024", phase: "Expansion", portfolio: 24.7, benchmark: 23.3, drawdown: -7.4 },
+  { year: "2025", phase: "Late cycle", portfolio: 12.8, benchmark: 9.4, drawdown: -11.2 },
+];
+const academyWeeks = ["What investing means","How the stock market works","How to read a chart","Trend, support and resistance","Japanese candlesticks","Moving averages","Volume and confirmation","Bollinger Bands and volatility","Multiple timeframe analysis","Momentum: RSI and MACD","Breakouts, retests and fakeouts","Risk/reward and position size","Financial statements","Business valuation","ETFs and diversification","Economy, rates and indexes","Advanced market structure","Options from zero","Psychology and discipline","Build and test your system"];
+const academyLessons = [
+  {simple:"Saving preserves a seed; investing plants it with risk and time.",professional:"Compare stocks, ETFs, bonds and indexes using return, inflation, compounding and time horizon.",assignment:"Calculate the return from $2,000 to $2,300 and explain why diversification matters.",question:"If $1,000 becomes $1,100, what is the return?",options:["1%","10%","100%"],correct:1,reading:"The Little Book of Common Sense Investing"},
+  {simple:"The market is an electronic auction connecting buyers and sellers.",professional:"Use bid, ask, spread, liquidity and slippage to choose between market and limit orders.",assignment:"Compare a liquid ETF spread with a small stock spread; do not place a real order.",question:"A limit order does what?",options:["Guarantees execution","Controls price but may not execute","Guarantees profit"],correct:1,reading:"Broker education: order types"},
+  {simple:"Each candle tells where price opened, traveled and closed.",professional:"Declare timeframe and read OHLC, gaps, daily range and volume before adding indicators.",assignment:"Describe the same ticker on 15m, 1H and 1D charts.",question:"On a 1D chart, one candle usually represents?",options:["One minute","One session day","One year"],correct:1,reading:"Japanese Candlestick Charting Techniques"},
+  {simple:"Support is a floor area and resistance is a ceiling area, but either can break.",professional:"Classify HH/HL, LH/LL or range and write a falsifiable invalidation condition.",assignment:"Mark one support zone, one resistance zone and the condition that invalidates your idea.",question:"HH plus HL usually describes?",options:["Uptrend","Downtrend","No liquidity"],correct:0,reading:"Technical Analysis of the Financial Markets"},
+  {simple:"Bodies and wicks show a struggle between buyers and sellers.",professional:"Interpret doji, hammer, shooting star and engulfing patterns only with trend, location and volume.",assignment:"Find five long-wick candles and describe their context.",question:"A hammer by itself is?",options:["An automatic buy","Contextual information","A guaranteed reversal"],correct:1,reading:"Japanese Candlestick Charting Techniques"},
+  {simple:"A moving average smooths noisy prices.",professional:"Compare SMA and EMA speed, slope and whipsaw risk; averages summarize the past.",assignment:"Add 20- and 50-period averages and describe—not predict—the structure.",question:"Which average weights recent prices more?",options:["SMA","EMA","Neither uses prices"],correct:1,reading:"Technical Analysis of the Financial Markets"},
+  {simple:"Volume shows how much participation accompanied a move.",professional:"Use relative volume to evaluate confirmation, exhaustion and false-breakout risk.",assignment:"Compare volume on three successful and three failed breakouts.",question:"High volume guarantees continuation?",options:["Yes","No","Only for ETFs"],correct:1,reading:"A Complete Guide to Volume Price Analysis"},
+  {simple:"Bollinger Bands expand and contract as price becomes more or less volatile.",professional:"Treat a squeeze as compression, not a directional prediction; demand price confirmation.",assignment:"Find one squeeze and document both bullish and bearish expansion scenarios.",question:"A Bollinger squeeze predicts direction?",options:["Always up","Always down","No, only compression"],correct:2,reading:"Bollinger on Bollinger Bands"},
+  {simple:"Zoom out for the map, then zoom in for execution.",professional:"Use top-down 1D → 1H → 15m analysis to align context, setup, trigger and risk.",assignment:"Create a three-timeframe decision sheet for one ticker.",question:"Which timeframe should define broad context first?",options:["1D","1m","Tick chart"],correct:0,reading:"Trading in the Zone"},
+  {simple:"Momentum measures how forcefully price is moving.",professional:"Interpret RSI and MACD with structure; overbought is not an automatic sell signal.",assignment:"Find an example where RSI stayed above 70 during a strong trend.",question:"RSI above 70 means?",options:["Sell automatically","Strong momentum that needs context","Guaranteed crash"],correct:1,reading:"Technical Analysis of the Financial Markets"},
+  {simple:"A breakout must prove it can stay outside the old boundary.",professional:"Separate breakout, confirmation, retest and fakeout using closes, participation and acceptance.",assignment:"Annotate one valid breakout and one false breakout.",question:"A failed breakout usually does what?",options:["Returns into the range","Guarantees continuation","Removes volatility"],correct:0,reading:"How to Make Money in Stocks"},
+  {simple:"Decide how much you can lose before deciding how much to buy.",professional:"Position size equals allowed monetary risk divided by entry-to-stop risk per unit.",assignment:"For a $10,000 account at 0.5% risk and $2 risk/share, calculate size.",question:"The correct size in that example is?",options:["25 shares","50 shares","500 shares"],correct:0,reading:"Trade Your Way to Financial Freedom"},
+  {simple:"Financial statements tell how a business earns, owns, owes and moves cash.",professional:"Connect income statement, balance sheet and cash flow; calculate free cash flow.",assignment:"Review one annual filing and record revenue, net income, debt and operating cash flow.",question:"Free cash flow is commonly approximated as?",options:["Revenue minus tax","Operating cash flow minus CapEx","Assets plus debt"],correct:1,reading:"Warren Buffett and the Interpretation of Financial Statements"},
+  {simple:"A wonderful company can still be a poor investment at an extreme price.",professional:"Compare P/E, growth, margins, balance sheet, quality and expectations with suitable peers.",assignment:"Compare the valuation of three companies in the same industry.",question:"A low P/E always means cheap?",options:["Yes","No, risk or falling earnings may explain it","Only above $1B market cap"],correct:1,reading:"The Little Book of Valuation"},
+  {simple:"Diversification avoids depending on a single seed.",professional:"Evaluate allocation, correlation, costs, tracking and rebalancing—not only the number of holdings.",assignment:"Design a hypothetical diversified allocation and identify remaining correlated risks.",question:"Diversification eliminates all market risk?",options:["Yes","No","Only with ten stocks"],correct:1,reading:"The Intelligent Asset Allocator"},
+  {simple:"Rates change the price of borrowing and the value of future money.",professional:"Trace inflation, Fed expectations, yields, currencies and discount rates into sectors and valuations.",assignment:"Explain one CPI surprise through a complete cause-and-effect chain.",question:"Higher discount rates generally do what to distant cash flows?",options:["Raise present value","Lower present value","Have no relationship"],correct:1,reading:"A Random Walk Down Wall Street"},
+  {simple:"Strong assets often behave better than their market even on difficult days.",professional:"Study relative strength, prior highs/lows, gaps, VWAP and index/sector confirmation.",assignment:"Find one stock outperforming its sector and write what would invalidate leadership.",question:"Relative strength compares an asset with?",options:["A benchmark","Its employee count","Only its dividend"],correct:0,reading:"Market Wizards"},
+  {simple:"Options are contracts whose value depends on price, time and volatility.",professional:"Understand calls, puts, strike, expiration, premium, Delta, Theta, Vega and maximum loss.",assignment:"Calculate the cost and expiration breakeven of one hypothetical call; use no real money.",question:"A standard equity option commonly represents?",options:["1 share","100 shares","1,000 shares"],correct:1,reading:"Options as a Strategic Investment"},
+  {simple:"A good outcome can come from a bad decision, and a loss can follow a good process.",professional:"Recognize FOMO, revenge trading, recency bias and outcome bias; grade rule compliance separately.",assignment:"Write a cooling-off rule and review three past emotional decisions.",question:"After a loss, increasing size to recover quickly is?",options:["Risk management","Revenge trading","Diversification"],correct:1,reading:"The Psychology of Money"},
+  {simple:"A system is a checklist you can test, follow and improve.",professional:"Define market, setup, entry, invalidation, size, exit, costs, expectancy, drawdown and review cadence.",assignment:"Write your complete system and test it on a meaningful paper-trade sample.",question:"When no setup meets the written rules, the correct action is?",options:["Force one trade","No trade","Increase leverage"],correct:1,reading:"Trading in the Zone"},
+];
+const candleExam = [
+  ["A long lower wick after a decline is most useful when…",["It appears anywhere","Support, volume and follow-through confirm rejection","The candle is green"],1],
+  ["A doji proves that price will reverse.",["True","False—indecision still needs context","Only on a 1-minute chart"],1],
+  ["A bullish engulfing pattern requires…",["A body that engulfs the prior bearish body","A higher nominal share price","No volume"],0],
+  ["A shooting star is strongest when it forms…",["Near resistance after an advance","At random in a range","After the market closes"],0],
+  ["A liquidity sweep above a prior high closes…",["Back below the swept level","At any price","Exactly at VWAP"],0],
+  ["Pattern Quality should include…",["Only the candle name","Trend, location, volume and confirmation","Social sentiment only"],1],
+  ["A breakout candle is validated by…",["Intrabar excitement","Close, acceptance, participation and follow-through","A guarantee of profit"],1],
+  ["When higher and lower timeframes disagree…",["Increase size","Lower confidence and wait for confirmation","Ignore the higher timeframe"],1],
+] as const;
+const marketAssets = [
+  {symbol:"NVDA",name:"NVIDIA",sector:"Technology",price:181.46,pe:52.8,marketCap:4460,growth5y:1950,score:88,risk:"High"},{symbol:"MSFT",name:"Microsoft",sector:"Technology",price:506.12,pe:37.4,marketCap:3760,growth5y:142,score:84,risk:"Medium"},{symbol:"GOOGL",name:"Alphabet",sector:"Communication",price:201.34,pe:21.7,marketCap:2480,growth5y:118,score:86,risk:"Medium"},{symbol:"AMZN",name:"Amazon",sector:"Consumer",price:231.09,pe:34.8,marketCap:2460,growth5y:89,score:81,risk:"Medium"},{symbol:"META",name:"Meta Platforms",sector:"Communication",price:748.20,pe:27.1,marketCap:1880,growth5y:220,score:85,risk:"Medium"},{symbol:"AAPL",name:"Apple",sector:"Technology",price:228.74,pe:34.2,marketCap:3400,growth5y:97,score:73,risk:"Medium"},{symbol:"JPM",name:"JPMorgan Chase",sector:"Financials",price:296.41,pe:15.3,marketCap:815,growth5y:168,score:82,risk:"Medium"},{symbol:"LLY",name:"Eli Lilly",sector:"Healthcare",price:732.55,pe:48.9,marketCap:694,growth5y:510,score:78,risk:"High"},{symbol:"XOM",name:"Exxon Mobil",sector:"Energy",price:112.88,pe:14.9,marketCap:486,growth5y:171,score:76,risk:"Medium"},{symbol:"COST",name:"Costco",sector:"Consumer",price:982.15,pe:55.1,marketCap:436,growth5y:210,score:75,risk:"Medium"},{symbol:"SPY",name:"S&P 500 ETF",sector:"ETF",price:644.82,pe:26.4,marketCap:593,growth5y:92,score:80,risk:"Lower"},{symbol:"QQQ",name:"Nasdaq-100 ETF",sector:"ETF",price:578.26,pe:32.2,marketCap:351,growth5y:112,score:79,risk:"Medium"},
+];
+// Illustrative model outputs until a live fundamentals/valuation provider is connected.
+const modelFairValues: Record<string,number> = {NVDA:142,MSFT:390,GOOGL:188,AMZN:205,META:690,AAPL:190,JPM:270,LLY:545,XOM:118,COST:720,SPY:570,QQQ:485};
+const indicatedDividendYields: Record<string,number> = {NVDA:.02,MSFT:.65,GOOGL:.41,AMZN:0,META:.29,AAPL:.44,JPM:1.9,LLY:.7,XOM:3.4,COST:.5,SPY:1.2,QQQ:.5};
+const investmentCatalog = [
+  {id:"SPY",symbol:"SPY",name:"SPDR S&P 500 ETF",category:"Stocks & ETFs",subcategory:"Broad market ETF",score:88,risk:"Medium",cost:"0.09% expense",metric:"500 large U.S. companies",horizon:"5+ years",minimum:"1 share or fractional",fit:["Balanced","Growth","Active"],why:"Low-cost access to profitable large U.S. companies with strong liquidity.",caution:"Concentrated in U.S. large caps and can decline sharply during bear markets.",next:"Compare valuation, breadth, earnings trend and your existing U.S. exposure."},
+  {id:"VTI",symbol:"VTI",name:"Vanguard Total Stock Market ETF",category:"Stocks & ETFs",subcategory:"Total market ETF",score:91,risk:"Medium",cost:"0.03% expense",metric:"Broad U.S. equity market",horizon:"7+ years",minimum:"1 share or fractional",fit:["Balanced","Growth"],why:"Very broad U.S. diversification at a low ongoing cost.",caution:"Still carries full equity-market risk and meaningful mega-cap exposure.",next:"Review whether international stocks and bonds are needed beside it."},
+  {id:"VXUS",symbol:"VXUS",name:"Vanguard Total International Stock ETF",category:"Stocks & ETFs",subcategory:"International ETF",score:82,risk:"Medium",cost:"0.05% expense",metric:"Developed + emerging markets",horizon:"7+ years",minimum:"1 share or fractional",fit:["Balanced","Growth"],why:"Diversifies a portfolio that is overly dependent on the United States.",caution:"Currency, geopolitical and country-governance risks can increase volatility.",next:"Measure current international allocation before adding it."},
+  {id:"MSFT",symbol:"MSFT",name:"Microsoft",category:"Stocks & ETFs",subcategory:"Individual stock",score:79,risk:"Medium",cost:"No fund expense",metric:"Large-cap technology",horizon:"5+ years",minimum:"1 share or fractional",fit:["Growth","Active"],why:"High-quality recurring revenue and strong balance-sheet characteristics.",caution:"Single-company concentration and valuation risk require a smaller position.",next:"Analyze valuation, cloud growth, margins, competition and portfolio concentration."},
+  {id:"GOOGL",symbol:"GOOGL",name:"Alphabet",category:"Stocks & ETFs",subcategory:"Individual stock",score:86,risk:"Medium",cost:"No fund expense",metric:"Digital advertising + cloud",horizon:"5+ years",minimum:"1 share or fractional",fit:["Balanced","Growth","Active"],why:"Strong cash generation, leading digital platforms and a comparatively moderate earnings multiple.",caution:"Advertising cyclicality, regulation and AI competition can weaken the thesis.",next:"Compare search durability, cloud margins, AI spending and valuation with peers."},
+  {id:"AMZN",symbol:"AMZN",name:"Amazon",category:"Stocks & ETFs",subcategory:"Individual stock",score:80,risk:"Medium",cost:"No fund expense",metric:"Commerce + cloud",horizon:"5+ years",minimum:"1 share or fractional",fit:["Growth","Active"],why:"Multiple growth engines and improving operating leverage can support long-term compounding.",caution:"High investment needs, retail margins and valuation create execution risk.",next:"Analyze AWS growth, retail margins, free cash flow and capital spending."},
+  {id:"META",symbol:"META",name:"Meta Platforms",category:"Stocks & ETFs",subcategory:"Individual stock",score:83,risk:"Medium",cost:"No fund expense",metric:"Digital advertising",horizon:"5+ years",minimum:"1 share or fractional",fit:["Growth","Active"],why:"High margins and strong cash flow support investment and shareholder returns.",caution:"Regulation, platform shifts and heavy AI spending can pressure returns.",next:"Review engagement, ad pricing, capex, margins and regulatory exposure."},
+  {id:"AAPL",symbol:"AAPL",name:"Apple",category:"Stocks & ETFs",subcategory:"Individual stock",score:72,risk:"Medium",cost:"No fund expense",metric:"Devices + services",horizon:"5+ years",minimum:"1 share or fractional",fit:["Balanced","Growth"],why:"Durable ecosystem, brand strength and recurring services revenue support quality.",caution:"Premium valuation, hardware cycles and geographic supply-chain exposure matter.",next:"Compare unit growth, services margins, China exposure and valuation history."},
+  {id:"JPM",symbol:"JPM",name:"JPMorgan Chase",category:"Stocks & ETFs",subcategory:"Individual stock",score:84,risk:"Medium",cost:"No fund expense",metric:"Diversified banking",horizon:"5+ years",minimum:"1 share or fractional",fit:["Balanced","Growth"],why:"Diversified earnings, scale and capital strength can support resilience across cycles.",caution:"Credit losses, regulation and interest-rate shifts can reduce profitability.",next:"Review credit quality, capital ratios, net interest income and economic sensitivity."},
+  {id:"XOM",symbol:"XOM",name:"Exxon Mobil",category:"Stocks & ETFs",subcategory:"Individual stock",score:78,risk:"Medium",cost:"No fund expense",metric:"Integrated energy",horizon:"3–7 years",minimum:"1 share or fractional",fit:["Balanced","Growth","Active"],why:"Cash generation and dividends can benefit from disciplined energy-market exposure.",caution:"Commodity prices, cyclicality and transition risks can reverse results quickly.",next:"Analyze oil assumptions, breakeven costs, capital returns and balance sheet."},
+  {id:"COST",symbol:"COST",name:"Costco",category:"Stocks & ETFs",subcategory:"Individual stock",score:68,risk:"Medium",cost:"No fund expense",metric:"Membership retail",horizon:"5+ years",minimum:"1 share or fractional",fit:["Growth"],why:"Membership loyalty and execution quality make the business attractive.",caution:"The market price is far above the illustrative fair-value estimate, creating valuation risk.",next:"Wait for valuation support or stronger earnings that justify the premium."},
+  {id:"NVDA",symbol:"NVDA",name:"NVIDIA",category:"Stocks & ETFs",subcategory:"Individual stock",score:74,risk:"High",cost:"No fund expense",metric:"AI semiconductors",horizon:"5+ years",minimum:"1 share or fractional",fit:["Growth","Active"],why:"AI infrastructure leadership creates exceptional growth potential.",caution:"Very high expectations, competition and a greater-than-25% illustrative valuation premium demand caution.",next:"Verify data-center growth, margins, supply, competition and fair-value assumptions."},
+  {id:"QQQ",symbol:"QQQ",name:"Invesco QQQ ETF",category:"Stocks & ETFs",subcategory:"Growth ETF",score:76,risk:"Medium",cost:"0.20% expense",metric:"Nasdaq-100",horizon:"7+ years",minimum:"1 share or fractional",fit:["Growth","Active"],why:"Provides diversified access to large innovative growth companies.",caution:"Technology concentration and an elevated valuation can amplify drawdowns.",next:"Compare concentration, valuation and overlap with current holdings."},
+  {id:"FXAIX",symbol:"FXAIX",name:"Fidelity 500 Index Fund",category:"Mutual Funds",subcategory:"Index mutual fund",score:89,risk:"Medium",cost:"0.015% expense",metric:"S&P 500 index",horizon:"5+ years",minimum:"Provider dependent",fit:["Balanced","Growth"],why:"Low-cost index exposure with automatic contribution support at many brokers.",caution:"End-of-day pricing only and the same large-cap concentration as an S&P 500 ETF.",next:"Confirm account availability, minimums, fees and tax location."},
+  {id:"VTSAX",symbol:"VTSAX",name:"Vanguard Total Stock Market Index Fund",category:"Mutual Funds",subcategory:"Index mutual fund",score:90,risk:"Medium",cost:"0.04% expense",metric:"Broad U.S. equity market",horizon:"7+ years",minimum:"Often $3,000",fit:["Balanced","Growth"],why:"Broad diversification and simple recurring purchases for long-term portfolios.",caution:"Minimum investment and availability vary; equity drawdowns still apply.",next:"Compare VTSAX with an ETF share class and account-specific transaction fees."},
+  {id:"VBTLX",symbol:"VBTLX",name:"Vanguard Total Bond Market Index Fund",category:"Mutual Funds",subcategory:"Bond mutual fund",score:81,risk:"Lower",cost:"0.05% expense",metric:"Investment-grade U.S. bonds",horizon:"3+ years",minimum:"Often $3,000",fit:["Conservative","Balanced"],why:"Can reduce total portfolio volatility and provide diversified bond exposure.",caution:"Prices can fall when yields rise, and income may not outpace inflation.",next:"Match duration and credit exposure to the date the money will be needed."},
+  {id:"SPY-PUT",symbol:"SPY PUT",name:"SPY Protective Put · 30–60 DTE",category:"Options",subcategory:"Portfolio hedge",score:62,risk:"High",cost:"Premium + spread",metric:"Defined premium loss",horizon:"Short term",minimum:"100-share hedge unit",fit:["Active"],why:"Can define downside protection for an existing equity position.",caution:"Premium decays and repeated hedging can materially reduce long-term returns.",next:"A live option chain, implied volatility, Greeks and exact portfolio exposure are required."},
+  {id:"COVERED-CALL",symbol:"CALL",name:"Covered Call · quality holding",category:"Options",subcategory:"Income strategy",score:66,risk:"High",cost:"Spread + assignment risk",metric:"100 shares per contract",horizon:"30–60 days",minimum:"100 shares",fit:["Active"],why:"May generate premium on shares you are already willing to sell.",caution:"Caps upside, does not remove downside and can create tax or assignment consequences.",next:"Evaluate strike, expiration, implied volatility, earnings dates and willingness to sell."},
+  {id:"TBILL-13W",symbol:"13W T-BILL",name:"13-Week U.S. Treasury Bill",category:"Fixed Income",subcategory:"Treasury",score:92,risk:"Lower",cost:"Auction/broker terms",metric:"Short duration",horizon:"3 months",minimum:"Platform dependent",fit:["Conservative","Balanced","Growth","Active"],why:"Useful for near-term reserves where capital stability matters more than growth.",caution:"Reinvestment rates can fall and selling before maturity can change the result.",next:"Compare current after-tax yield with insured cash and the exact liquidity date."},
+  {id:"TREASURY-10Y",symbol:"10Y UST",name:"10-Year U.S. Treasury Note",category:"Fixed Income",subcategory:"Treasury",score:73,risk:"Medium",cost:"Auction/broker terms",metric:"Longer rate duration",horizon:"7–10 years",minimum:"Platform dependent",fit:["Conservative","Balanced"],why:"Can provide income and diversification when matched to a long horizon.",caution:"Price is sensitive to inflation and interest-rate changes.",next:"Stress-test price sensitivity and compare after-tax income with shorter maturities."},
+  {id:"BND",symbol:"BND",name:"Vanguard Total Bond Market ETF",category:"Fixed Income",subcategory:"Bond ETF",score:83,risk:"Lower",cost:"0.03% expense",metric:"Diversified investment-grade bonds",horizon:"3+ years",minimum:"1 share or fractional",fit:["Conservative","Balanced"],why:"Simple diversified bond allocation with daily liquidity.",caution:"Duration and credit exposure can still produce losses.",next:"Review SEC yield, duration, tax treatment and role in the total allocation."},
+  {id:"DCA-VTI",symbol:"AUTO · VTI",name:"Total-market recurring plan",category:"Recurring Investing",subcategory:"Monthly plan",score:93,risk:"Medium",cost:"Fund cost + broker terms",metric:"Automated monthly purchase",horizon:"10+ years",minimum:"Custom amount",fit:["Balanced","Growth"],why:"Automates consistency and reduces the temptation to time every market move.",caution:"Automation must not compete with bills, emergency reserves or high-interest debt.",next:"Choose an affordable amount after obligations, then review allocation quarterly."},
+  {id:"DCA-BAL",symbol:"AUTO · 60/40",name:"Balanced recurring portfolio",category:"Recurring Investing",subcategory:"Allocation plan",score:89,risk:"Lower",cost:"Underlying fund costs",metric:"60% stocks / 40% bonds",horizon:"5+ years",minimum:"Custom amount",fit:["Conservative","Balanced"],why:"Combines growth and stability in a repeatable contribution plan.",caution:"The allocation may be too cautious or aggressive depending on the real goal date.",next:"Set a goal, rebalance rule and contribution that leaves emergency cash intact."},
+];
+type OptionCandidateResult = { underlying:string; feed:string; asOf:string; contract:{contractSymbol:string;expiration:string;type:string;strike:number;dte:number;bid:number;ask:number;mid:number;spreadPct:number;delta:number;volume:number;score:number;iv:number|null;gamma:number|null;theta:number|null;vega:number|null;premium:number;maxLoss:number;breakeven:number}; rationale:string[]; warnings:string[] };
+type MarketClockResult = {status:string;timestamp?:string;isOpen?:boolean;nextOpen?:string;nextClose?:string};
+type StockQuote = {bid:number|null;ask:number|null;last:number|null;timestamp?:string|null};
+type ManualMarketAssessment = {symbol:string;verdict:"favorable"|"caution"|"unrated";label:string;reason:string;bid:number|null;ask:number|null;last:number|null;changePct:number|null};
+type JournalEntry = {id:string;createdAt:string;symbol:string;decision:string;timeframe:string;thesis:string;fundamentals:string;valuation:string;technical:string;news:string;risk:string;emotion:string;result:string};
+type ConnectedFinance = {connections:Array<Record<string,any>>;accounts:Array<Record<string,any>>;holdings:Array<Record<string,any>>};
+
+export default function Home({ initialTab = "Dashboard" }: { initialTab?: string } = {}) {
+  const [signedIn, setSignedIn] = useState(false);
+  const [authReady, setAuthReady] = useState(false);
+  const [authStep, setAuthStep] = useState<"login" | "verify">("login");
+  const [code, setCode] = useState("");
+  const [verifyMethod, setVerifyMethod] = useState<"email" | "sms">("email");
+  const [accountEmail, setAccountEmail] = useState("");
+  const [destination, setDestination] = useState("");
+  const [authNotice, setAuthNotice] = useState("");
+  const [tab, setTab] = useState(initialTab);
+  const [pick, setPick] = useState(opportunities[0]);
+  const [capital, setCapital] = useState(25000);
+  const [risk, setRisk] = useState(0.5);
+  const [entry, setEntry] = useState(181.46);
+  const [stop, setStop] = useState(176.9);
+  const [target, setTarget] = useState(192.5);
+  const [question, setQuestion] = useState("I want to buy NVDA at $180");
+  const [analyzed, setAnalyzed] = useState(false);
+  const calc = useMemo(() => {
+    const max = (capital * risk) / 100,
+      per = Math.max(0.01, Math.abs(entry - stop)),
+      shares = Math.floor(max / per);
+    return {
+      max,
+      shares,
+      exposure: shares * entry,
+      rr: Math.abs(target - entry) / per,
+    };
+  }, [capital, risk, entry, stop, target]);
+  const [extraMortgage, setExtraMortgage] = useState(300);
+  const [extraCard, setExtraCard] = useState(300);
+  const [alertFilter, setAlertFilter] = useState("All");
+  const [timezone, setTimezone] = useState("America/Phoenix");
+  const [dailyLimit, setDailyLimit] = useState(60);
+  const [travelMode, setTravelMode] = useState(false);
+  const [notifyStatus, setNotifyStatus] = useState("Not enabled");
+  const [isLocal, setIsLocal] = useState(false);
+  const [chartSymbol, setChartSymbol] = useState("NVDA");
+  const [timeframe, setTimeframe] = useState("1Y");
+  const [chartBars, setChartBars] = useState<Array<[number,number,number,number,number]>>([]);
+  const [indicator, setIndicator] = useState("Bollinger Bands");
+  const [feedNotice, setFeedNotice] = useState("Provider credentials required");
+  const [accessToken, setAccessToken] = useState("");
+  const [backendOverview, setBackendOverview] = useState<Record<string, number> | null>(null);
+  const [cycleRange, setCycleRange] = useState<"1Y" | "5Y">("5Y");
+  const [actionNotice, setActionNotice] = useState("");
+  const [academyWeek, setAcademyWeek] = useState(0);
+  const [completedWeeks, setCompletedWeeks] = useState<number[]>([]);
+  const [quizChoice, setQuizChoice] = useState("");
+  const [assetQuery, setAssetQuery] = useState("");
+  const [assetSector, setAssetSector] = useState("All sectors");
+  const [assetSort, setAssetSort] = useState("score");
+  const [investmentCategory, setInvestmentCategory] = useState("Stocks & ETFs");
+  const [investorProfile, setInvestorProfile] = useState("Balanced");
+  const [selectedInvestmentId, setSelectedInvestmentId] = useState("SPY");
+  const [advisorGoal, setAdvisorGoal] = useState("Build long-term wealth");
+  const [advisorHorizon, setAdvisorHorizon] = useState("10+ years");
+  const [advisorAmount, setAdvisorAmount] = useState(500);
+  const [advisorPlanReady, setAdvisorPlanReady] = useState(false);
+  const [marketLookup, setMarketLookup] = useState("");
+  const [marketLookupNotice, setMarketLookupNotice] = useState("");
+  const [manualAssessment, setManualAssessment] = useState<ManualMarketAssessment|null>(null);
+  const [portfolioGoal, setPortfolioGoal] = useState<"2–3 years"|"5 years">("5 years");
+  const [portfolioAmount, setPortfolioAmount] = useState(25000);
+  const [portfolioMix, setPortfolioMix] = useState({cash:10,bonds:10,diversified:40,dividend:20,growth:20});
+  const [portfolioNotice, setPortfolioNotice] = useState("");
+  const [journalEntries, setJournalEntries] = useState<JournalEntry[]>([]);
+  const [journalForm, setJournalForm] = useState({symbol:"",decision:"Watch / wait",timeframe:"5 years",thesis:"",fundamentals:"",valuation:"",technical:"Bollinger Bands: ",news:"",risk:"",emotion:"Calm",result:"Not reviewed yet"});
+  const [journalNotice, setJournalNotice] = useState("");
+  const [connectedFinance, setConnectedFinance] = useState<ConnectedFinance>({connections:[],accounts:[],holdings:[]});
+  const [plaidNotice, setPlaidNotice] = useState("Connect a read-only institution to begin syncing balances and transactions.");
+  const [plaidBusy, setPlaidBusy] = useState(false);
+  const [optionSymbol, setOptionSymbol] = useState("SPY");
+  const [optionOutlook, setOptionOutlook] = useState("bullish");
+  const [optionMaxRisk, setOptionMaxRisk] = useState(500);
+  const [optionTargetDte, setOptionTargetDte] = useState(45);
+  const [optionResult, setOptionResult] = useState<OptionCandidateResult|null>(null);
+  const [optionNotice, setOptionNotice] = useState("");
+  const [marketClock, setMarketClock] = useState<MarketClockResult>({status:"loading"});
+  const [clockTick, setClockTick] = useState(Date.now());
+  const [suggestionQuotes, setSuggestionQuotes] = useState<Record<string,StockQuote>>({});
+  const [quoteStatus, setQuoteStatus] = useState("Connect market data for live bid/ask");
+  const [bookNotice, setBookNotice] = useState("Upload your workbook securely to read it here.");
+  const [readerUrl, setReaderUrl] = useState("");
+  const [examAnswers,setExamAnswers]=useState<Record<number,number>>({});
+  const [analysisStrategy, setAnalysisStrategy] = useState<"swing"|"position">("swing");
+  const pathByTab: Record<string,string> = { Dashboard:"dashboard", Accounts:"accounts", "Market Intel":"markets", Portfolio:"portfolio", "Professional Charts":"charts", "Market News":"market-news", "Growth Finder":"growth", "Bills & cards":"cash-flow", Scanner:"opportunities", Liabilities:"debt", Household:"household", "Ask Northstar":"assistant", "Paper trade":"planner", Journal:"journal", Learn:"academy", Settings:"settings", Help:"help" };
+  const navigate = (next:string) => { window.location.assign(`/workspace/${pathByTab[next] || "dashboard"}`); };
+  const marketPages = ["Market Intel", "Professional Charts", "Market News", "Growth Finder"];
+  const breadcrumbParent = marketPages.includes(tab) && tab !== "Market Intel" ? "Market Intel" : null;
+  const notify = (message:string) => { setActionNotice(message); window.setTimeout(() => setActionNotice(""), 4200); };
+  const supabase = useMemo(() => {
+    const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+    return url && key ? createClient(url, key) : null;
+  }, []);
+  const globalTimezones = useMemo(() => {
+    try { return (Intl as typeof Intl & { supportedValuesOf(key:"timeZone"):string[] }).supportedValuesOf("timeZone"); }
+    catch { return ["Pacific/Honolulu","America/Anchorage","America/Los_Angeles","America/Phoenix","America/Denver","America/Chicago","America/New_York","America/Puerto_Rico","America/Santo_Domingo","Europe/London","Europe/Paris","Europe/Madrid","Africa/Cairo","Asia/Dubai","Asia/Kolkata","Asia/Singapore","Asia/Tokyo","Australia/Sydney"]; }
+  }, []);
+  const deviceTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
+  const activeTimezone = travelMode || timezone === "auto" ? deviceTimezone : timezone;
+  const localMarketClock = new Intl.DateTimeFormat("en-US", { timeZone: activeTimezone, weekday:"short", hour:"numeric", minute:"2-digit", timeZoneName:"short" }).format(new Date());
+  const clockTarget = marketClock.isOpen ? marketClock.nextClose : marketClock.nextOpen;
+  const clockRemainingMs = clockTarget ? Math.max(0,new Date(clockTarget).getTime()-clockTick) : 0;
+  const clockHours = Math.floor(clockRemainingMs/3600000), clockMinutes = Math.floor((clockRemainingMs%3600000)/60000);
+  const clockTargetLabel = clockTarget ? new Intl.DateTimeFormat("en-US",{timeZone:activeTimezone,weekday:"short",hour:"numeric",minute:"2-digit",timeZoneName:"short"}).format(new Date(clockTarget)) : "";
+  const nyParts = Object.fromEntries(new Intl.DateTimeFormat("en-US",{timeZone:"America/New_York",hour12:false,weekday:"short",hour:"2-digit",minute:"2-digit"}).formatToParts(new Date(clockTick)).filter(part=>part.type!=="literal").map(part=>[part.type,part.value]));
+  const nyMinutes = Number(nyParts.hour)*60+Number(nyParts.minute), isWeekday = !["Sat","Sun"].includes(String(nyParts.weekday));
+  const marketPhase = marketClock.status!=="connected"?"setup":marketClock.isOpen?"open":isWeekday&&nyMinutes>=240&&nyMinutes<570?"premarket":isWeekday&&nyMinutes>=960&&nyMinutes<1200?"afterhours":"closed";
+  const marketClockText = marketPhase==="open"?`US MARKET OPEN · closes in ${clockHours}h ${clockMinutes}m`:marketPhase==="premarket"?`US PRE-MARKET · opens in ${clockHours}h ${clockMinutes}m`:marketPhase==="afterhours"?`US AFTER-HOURS · next open in ${clockHours}h ${clockMinutes}m`:marketPhase==="closed"?`US MARKET CLOSED · opens in ${clockHours}h ${clockMinutes}m`:"MARKET CLOCK SETUP REQUIRED";
+  const displayedCandles=(chartBars.length?chartBars:candles).slice(-80),chartLow=Math.min(...displayedCandles.map(value=>value[2])),chartHigh=Math.max(...displayedCandles.map(value=>value[1])),chartSpan=Math.max(.01,chartHigh-chartLow),latestCandle=displayedCandles[displayedCandles.length-1],firstCandle=displayedCandles[0],chartChange=((latestCandle[3]-firstCandle[0])/firstCandle[0])*100;
+  const technicalAnalysis=useMemo(()=>probabilityEngine(displayedCandles,analysisStrategy),[displayedCandles,analysisStrategy]);
+  const visibleAssets = useMemo(() => marketAssets.filter(asset => (!assetQuery || `${asset.symbol} ${asset.name}`.toLowerCase().includes(assetQuery.toLowerCase())) && (assetSector==="All sectors" || asset.sector===assetSector)).sort((a,b)=>assetSort==="pe"?a.pe-b.pe:assetSort==="growth"?b.growth5y-a.growth5y:assetSort==="cap"?b.marketCap-a.marketCap:b.score-a.score),[assetQuery,assetSector,assetSort]);
+  const categoryItems = useMemo(() => investmentCatalog.filter(item => item.category===investmentCategory && (!assetQuery || `${item.symbol} ${item.name} ${item.subcategory}`.toLowerCase().includes(assetQuery.toLowerCase()))).sort((a,b)=>assetSort==="risk"?(a.risk==="Lower"?-1:a.risk==="Medium"?0:1)-(b.risk==="Lower"?-1:b.risk==="Medium"?0:1):b.score-a.score),[investmentCategory,assetQuery,assetSort]);
+  const advisorSuggestions = useMemo(() => investmentCatalog.filter(item=>item.category==="Stocks & ETFs"&&item.fit.includes(investorProfile)).map(item=>{const asset=marketAssets.find(value=>value.symbol===item.symbol),fair=modelFairValues[item.symbol],gap=asset&&fair?((asset.price-fair)/fair)*100:null,adjusted=item.score-(gap!==null&&gap>25?24:0)-(item.risk==="High"&&investorProfile!=="Active"?8:0);return {...item,gap,adjusted}}).sort((a,b)=>b.adjusted-a.adjusted).slice(0,5),[investorProfile]);
+  const selectedInvestment = investmentCatalog.find(item=>item.id===selectedInvestmentId) || investmentCatalog[0];
+  const selectedFit = selectedInvestment.fit.includes(investorProfile);
+  const selectedFundamentals = marketAssets.find(asset=>asset.symbol===selectedInvestment.symbol);
+  const selectedFairValue = modelFairValues[selectedInvestment.symbol];
+  const selectedDividendYield = indicatedDividendYields[selectedInvestment.symbol];
+  const valuationPremium = selectedFundamentals&&selectedFairValue ? ((selectedFundamentals.price-selectedFairValue)/selectedFairValue)*100 : null;
+  const sellReview = valuationPremium!==null&&valuationPremium>25;
+  const selectedQuote=suggestionQuotes[selectedInvestment.symbol],selectedReferencePrice=selectedQuote?.ask||selectedFundamentals?.price||0,allocationRate=investorProfile==="Conservative"?.05:investorProfile==="Balanced"?.075:investorProfile==="Growth"?.1:.12,positionBudget=Math.min(advisorAmount,capital*allocationRate),suggestedShares=selectedReferencePrice>0?positionBudget/selectedReferencePrice:0,selectedAction=sellReview?"SELL / REDUCE REVIEW":selectedFit&&selectedInvestment.score>=82?"BUY RESEARCH · WAIT FOR CONFIRMATION":selectedFit?"WATCH / HOLD":"AVOID · PROFILE MISMATCH";
+  const valuationScore=selectedFundamentals?(selectedFundamentals.pe<=20?90:selectedFundamentals.pe<=30?75:selectedFundamentals.pe<=40?55:30):null,fiveYearScore=selectedFundamentals?Math.min(95,35+Math.log10(Math.max(1,selectedFundamentals.growth5y))*25):null,sizeScore=selectedFundamentals?(selectedFundamentals.marketCap>=100?85:selectedFundamentals.marketCap>=10?70:45):null,dividendScore=selectedDividendYield===undefined?null:selectedDividendYield===0?55:selectedDividendYield<=5?80:selectedDividendYield<=8?55:25,technicalReady=chartSymbol===selectedInvestment.symbol&&chartBars.length>=20,technicalScore=technicalReady?(chartBars[chartBars.length-1][3]>chartBars[chartBars.length-20][3]?75:40):null,decisionScores=[valuationScore,fiveYearScore,sizeScore,dividendScore,technicalScore].filter((value):value is number=>value!==null),transparentDecisionScore=decisionScores.length?Math.round(decisionScores.reduce((sum,value)=>sum+value,0)/decisionScores.length):null;
+  const portfolioTotal=Object.values(portfolioMix).reduce((sum,value)=>sum+value,0),portfolioYears=portfolioGoal==="5 years"?5:3,weightedReturn=(portfolioMix.cash*3.5+portfolioMix.bonds*4.5+portfolioMix.diversified*7+portfolioMix.dividend*6.5+portfolioMix.growth*9)/Math.max(1,portfolioTotal)/100,portfolioProjected=portfolioAmount*Math.pow(1+weightedReturn,portfolioYears),portfolioLow=portfolioAmount*Math.pow(1+Math.max(-.05,weightedReturn-.08),portfolioYears),portfolioHigh=portfolioAmount*Math.pow(1+weightedReturn+.05,portfolioYears);
+  const applyPortfolioPreset = () => setPortfolioMix(portfolioGoal==="2–3 years"?{cash:35,bonds:40,diversified:20,dividend:5,growth:0}:{cash:10,bonds:10,diversified:40,dividend:20,growth:20});
+  const applyCoreDividendGrowthPreset = () => {setPortfolioGoal("5 years");setPortfolioMix({cash:0,bonds:0,diversified:40,dividend:30,growth:30});setPortfolioNotice("40% Core / 30% Dividend / 30% Growth applied. Review emergency cash and risk before using it.")};
+  const savePortfolio = () => {if(portfolioTotal!==100){setPortfolioNotice(`Allocation totals ${portfolioTotal}%. Adjust it to exactly 100% before saving.`);return}localStorage.setItem("northstar-portfolio-plan",JSON.stringify({portfolioGoal,portfolioAmount,portfolioMix}));setPortfolioNotice("✓ Portfolio goal and target allocation saved on this device.")};
+  const saveJournalEntry = () => {if(!journalForm.symbol.trim()||!journalForm.thesis.trim()||!journalForm.risk.trim()){setJournalNotice("Symbol, thesis, and invalidation/risk are required before saving.");return}const entry:JournalEntry={...journalForm,id:crypto.randomUUID(),createdAt:new Date().toISOString(),symbol:journalForm.symbol.trim().toUpperCase()};const next=[entry,...journalEntries];setJournalEntries(next);localStorage.setItem("northstar-decision-journal",JSON.stringify(next));setJournalNotice("✓ Decision saved. Return later to compare the outcome with the original reasoning.")};
+  const financeHeaders=()=>({"Content-Type":"application/json",...(accessToken?{Authorization:`Bearer ${accessToken}`}:{})});
+  const loadConnectedFinance=async()=>{try{const response=await fetch("/api/connections/plaid",{headers:financeHeaders()}),data=await response.json();if(!response.ok)throw new Error(data.error||"Unable to load connected accounts");setConnectedFinance(data)}catch(error){setPlaidNotice(error instanceof Error?error.message:"Unable to load connected accounts")}};
+  const syncPlaid=async(connectionId:string)=>{setPlaidBusy(true);setPlaidNotice("Synchronizing balances, transactions, and investment holdings…");try{const response=await fetch("/api/connections/plaid/sync",{method:"POST",headers:financeHeaders(),body:JSON.stringify({connectionId})}),data=await response.json();if(!response.ok)throw new Error(data.error||"Synchronization failed");setPlaidNotice(`✓ Synced ${data.accounts} accounts, ${data.holdings} holdings, and ${data.added+data.modified} transaction updates.`);await loadConnectedFinance()}catch(error){setPlaidNotice(error instanceof Error?error.message:"Synchronization failed")}finally{setPlaidBusy(false)}};
+  const connectPlaid=async()=>{setPlaidBusy(true);setPlaidNotice("Preparing secure Plaid Link…");try{const tokenResponse=await fetch("/api/connections/plaid/link-token",{method:"POST",headers:financeHeaders()}),tokenData=await tokenResponse.json();if(!tokenResponse.ok)throw new Error(tokenData.error||"Plaid Link could not start");if(!(window as any).Plaid)await new Promise<void>((resolve,reject)=>{const script=document.createElement("script");script.src="https://cdn.plaid.com/link/v2/stable/link-initialize.js";script.onload=()=>resolve();script.onerror=()=>reject(new Error("Plaid Link could not load"));document.head.appendChild(script)});const handler=(window as any).Plaid.create({token:tokenData.link_token,onSuccess:async(publicToken:string,metadata:any)=>{setPlaidNotice("Securing the connection…");const exchange=await fetch("/api/connections/plaid/exchange",{method:"POST",headers:financeHeaders(),body:JSON.stringify({publicToken,institutionName:metadata?.institution?.name})}),result=await exchange.json();if(!exchange.ok){setPlaidNotice(result.error||"Connection failed");return}await syncPlaid(result.id)},onExit:(error:any)=>{if(error)setPlaidNotice(error.display_message||error.error_message||"Plaid Link closed with an error");setPlaidBusy(false)}});handler.open()}catch(error){setPlaidNotice(error instanceof Error?error.message:"Plaid Link could not start");setPlaidBusy(false)}};
+  const buildAdvisorPlan = () => {
+    const targetId = advisorHorizon==="Less than 1 year" || advisorGoal==="Protect emergency money" ? "TBILL-13W" : advisorHorizon==="1–3 years" ? "BND" : advisorGoal==="Create reliable income" ? (investorProfile==="Conservative"?"BND":"VBTLX") : advisorGoal==="Invest automatically every month" ? (investorProfile==="Conservative"?"DCA-BAL":"DCA-VTI") : investorProfile==="Conservative" ? "DCA-BAL" : "VTI";
+    const target = investmentCatalog.find(item=>item.id===targetId) || investmentCatalog[0];
+    setSelectedInvestmentId(target.id);
+    setInvestmentCategory(target.category);
+    setAssetQuery("");
+    setAdvisorPlanReady(true);
+  };
+  const searchMarket = async () => { const query=marketLookup.trim().toUpperCase();if(!query)return;setManualAssessment(null);const known=investmentCatalog.find(item=>item.symbol===query||item.name.toUpperCase().includes(query));if(known){setInvestmentCategory(known.category);setSelectedInvestmentId(known.id);setAssetQuery("");setMarketLookupNotice(`✓ ${known.symbol} found. See the color-coded suitability decision and explanation below.`);return}setMarketLookupNotice("Searching the connected market provider…");try{const response=await fetch(`/api/market/quote?symbol=${encodeURIComponent(query)}`),data=await response.json();if(!response.ok)throw new Error(data.status==="not_configured"?"Connect Alpaca in Settings to search the full live market.":data.error||"Symbol could not be loaded.");const bid=Number(data.latestQuote?.bp)||null,ask=Number(data.latestQuote?.ap)||null,last=Number(data.latestTrade?.p||data.dailyBar?.c)||null,previous=Number(data.prevDailyBar?.c)||null,changePct=last&&previous?((last-previous)/previous)*100:null,spreadPct=bid&&ask?((ask-bid)/((ask+bid)/2))*100:null;const verdict=spreadPct!==null&&spreadPct>1?"caution":changePct!==null&&changePct>0?"favorable":"unrated",label=verdict==="favorable"?"FAVORABLE FOR FURTHER RESEARCH":verdict==="caution"?"CAUTION · WIDE BID/ASK SPREAD":"NOT YET RATED · MORE DATA REQUIRED",reason=verdict==="favorable"?"Price has positive near-term confirmation and the quote is tradeable. This is not enough to call the company a good investment; fundamentals, valuation, five-year growth, debt, earnings and portfolio fit must still pass.":verdict==="caution"?"The current spread may create meaningful execution cost. Avoid acting until liquidity improves and full fundamental and valuation checks are available.":"A valid quote confirms the symbol exists, but price alone cannot establish that it is a good investment. Connect fundamentals and complete the full analysis before considering it.";setChartSymbol(query);setManualAssessment({symbol:query,verdict,label,reason,bid,ask,last,changePct});setMarketLookupNotice(`✓ ${query} found and given a preliminary market-quality check.`)}catch(error){setMarketLookupNotice(error instanceof Error?error.message:"Search failed")}};
+  const findOptionContract = async () => {setOptionNotice("Scanning the live option chain…");setOptionResult(null);try{const response=await fetch("/api/market/options",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({symbol:optionSymbol,outlook:optionOutlook,maxRisk:optionMaxRisk,targetDte:optionTargetDte})}),data=await response.json();if(!response.ok)throw new Error(data.error||"No contract passed the filters.");setOptionResult(data);setOptionNotice("Exact contract candidate selected from the current chain.")}catch(error){setOptionNotice(error instanceof Error?error.message:"Option-chain analysis failed")}};
+  const testMarketClock = async () => {setMarketClock({status:"loading"});try{const response=await fetch("/api/market/clock"),data=await response.json();setMarketClock(response.ok?data:{status:data.status||"not_configured"})}catch{setMarketClock({status:"unavailable"})}};
+  const uploadAcademyBook = async (file:File) => { const form=new FormData();form.append("file",file);setBookNotice("Uploading securely…");try{const headers:HeadersInit=accessToken?{Authorization:`Bearer ${accessToken}`}:{},created=await fetch("/api/documents",{method:"POST",headers,body:form});const data=await created.json();if(!created.ok)throw new Error(data.error||"Upload failed");const response=await fetch(`/api/documents/${data.id}`,{headers});if(!response.ok)throw new Error("Book saved, but reader could not open it");const blobUrl=URL.createObjectURL(await response.blob());setReaderUrl(current=>{if(current)URL.revokeObjectURL(current);return blobUrl});setBookNotice(`${data.filename} is stored privately and ready to read.`)}catch(error){setBookNotice(error instanceof Error?error.message:"Upload failed")}};
+  const emailIdentity = accountEmail.includes("@") ? accountEmail.split("@")[0] : "";
+  const displayName = emailIdentity
+    ? emailIdentity
+        .split(/[._-]+/)
+        .filter(Boolean)
+        .map((part) => part.charAt(0).toUpperCase() + part.slice(1).toLowerCase())
+        .join(" ")
+    : "Account Owner";
+  const displayInitials = displayName
+    .split(" ")
+    .map((part) => part[0])
+    .join("")
+    .slice(0, 2)
+    .toUpperCase();
+  useEffect(() => {
+    const localHost = ["localhost", "127.0.0.1"].includes(window.location.hostname);
+    setIsLocal(localHost);
+    if (localHost && sessionStorage.getItem("northstar-local-preview") === "true") setSignedIn(true);
+    if (!("serviceWorker" in navigator)) return;
+    if (localHost) {
+      navigator.serviceWorker.getRegistrations().then((registrations) =>
+        Promise.all(registrations.map((registration) => registration.unregister())),
+      );
+      if ("caches" in window) {
+        caches.keys().then((keys) => Promise.all(keys.map((key) => caches.delete(key))));
+      }
+      return;
+    }
+    navigator.serviceWorker.register("/sw.js").catch(() => undefined);
+  }, []);
+  useEffect(() => {
+    if (!supabase) {
+      setAuthReady(true);
+      return;
+    }
+    supabase.auth.getSession().then(({ data }) => {
+      if (data.session) {
+        setAccessToken(data.session.access_token);
+        setAccountEmail(data.session.user.email || "");
+        setSignedIn(true);
+      }
+    }).finally(() => setAuthReady(true));
+    const { data } = supabase.auth.onAuthStateChange((_event, session) => {
+      setAccessToken(session?.access_token || "");
+      if (session?.user.email) setAccountEmail(session.user.email);
+      setSignedIn(Boolean(session));
+      setAuthReady(true);
+    });
+    return () => data.subscription.unsubscribe();
+  }, [supabase]);
+  useEffect(() => {
+    if (!signedIn) return;
+    const headers: HeadersInit = accessToken ? { Authorization: `Bearer ${accessToken}` } : {};
+    fetch("/api/overview", { headers })
+      .then(async response => response.ok ? response.json() : null)
+      .then(data => setBackendOverview(data))
+      .catch(() => setBackendOverview(null));
+  }, [signedIn, accessToken]);
+  useEffect(()=>{let active=true;const load=()=>fetch("/api/market/clock").then(async response=>({ok:response.ok,data:await response.json()})).then(({ok,data})=>{if(active)setMarketClock(ok?data:{status:data.status||"not_configured"})}).catch(()=>{if(active)setMarketClock({status:"unavailable"})});load();const refresh=window.setInterval(load,60000),tick=window.setInterval(()=>setClockTick(Date.now()),30000);return()=>{active=false;window.clearInterval(refresh);window.clearInterval(tick)}},[]);
+  useEffect(()=>{let active=true;setFeedNotice("Loading historical data…");fetch(`/api/market/bars?symbol=${encodeURIComponent(chartSymbol)}&range=${timeframe}`).then(async response=>({ok:response.ok,data:await response.json()})).then(({ok,data})=>{if(!active)return;if(!ok){setChartBars([]);setFeedNotice(data.status==="not_configured"?"Connect live market data in Settings":"Historical data unavailable");return}setChartBars(data.bars.map((bar:{open:number;high:number;low:number;close:number;volume:number})=>[bar.open,bar.high,bar.low,bar.close,bar.volume]));setFeedNotice(`${data.feed.toUpperCase()} · ${data.range} history`)}).catch(()=>{if(active){setChartBars([]);setFeedNotice("Historical data unavailable")}});return()=>{active=false}},[chartSymbol,timeframe]);
+  useEffect(()=>{let active=true;const symbols=advisorSuggestions.map(item=>item.symbol).filter(symbol=>/^[A-Z.]{1,10}$/.test(symbol));if(!symbols.length)return;fetch(`/api/market/quotes?symbols=${encodeURIComponent(symbols.join(","))}`).then(async response=>({ok:response.ok,data:await response.json()})).then(({ok,data})=>{if(!active)return;if(!ok){setSuggestionQuotes({});setQuoteStatus(data.status==="not_configured"?"Connect market data for live bid/ask":"Live quotes unavailable");return}setSuggestionQuotes(data.quotes);setQuoteStatus(`${data.feed.toUpperCase()} quotes · ${new Date(data.asOf).toLocaleTimeString()}`)}).catch(()=>{if(active)setQuoteStatus("Live quotes unavailable")});return()=>{active=false}},[advisorSuggestions]);
+  useEffect(() => {
+    if (initialTab !== "Ask Northstar") return;
+    const savedPrompt = sessionStorage.getItem("northstar-full-analysis-prompt");
+    if (!savedPrompt) return;
+    setQuestion(savedPrompt);
+    sessionStorage.removeItem("northstar-full-analysis-prompt");
+  }, [initialTab]);
+  useEffect(()=>{if(initialTab!=="Professional Charts")return;const saved=sessionStorage.getItem("northstar-chart-symbol");if(saved){setChartSymbol(saved);setMarketLookup(saved);sessionStorage.removeItem("northstar-chart-symbol")}},[initialTab]);
+  useEffect(()=>{try{const saved=localStorage.getItem("northstar-portfolio-plan");if(!saved)return;const plan=JSON.parse(saved);if(plan.portfolioGoal==="2–3 years"||plan.portfolioGoal==="5 years")setPortfolioGoal(plan.portfolioGoal);if(Number.isFinite(plan.portfolioAmount))setPortfolioAmount(plan.portfolioAmount);if(plan.portfolioMix&&["cash","bonds","diversified","dividend","growth"].every(key=>Number.isFinite(plan.portfolioMix[key])))setPortfolioMix(plan.portfolioMix)}catch{setPortfolioNotice("Saved portfolio plan could not be loaded.")}},[]);
+  useEffect(()=>{try{const saved=localStorage.getItem("northstar-decision-journal");if(saved)setJournalEntries(JSON.parse(saved));const reflection=sessionStorage.getItem("northstar-journal-reflection");if(initialTab==="Journal"&&reflection){setJournalForm(current=>({...current,thesis:reflection}));sessionStorage.removeItem("northstar-journal-reflection")}}catch{setJournalNotice("Saved journal entries could not be loaded.")}},[initialTab]);
+  useEffect(()=>{if(initialTab==="Accounts"&&signedIn)loadConnectedFinance()},[initialTab,signedIn,accessToken]);
+  const socialLogin = async (provider: "google" | "apple") => {
+    if (!supabase) {
+      setAuthNotice("Authentication environment variables are not configured yet.");
+      return;
+    }
+    const { error } = await supabase.auth.signInWithOAuth({ provider, options: { redirectTo: window.location.origin } });
+    if (error) setAuthNotice(error.message);
+  };
+  const sendOtp = async () => {
+    if (!supabase) return setAuthNotice("Authentication environment variables are not configured yet.");
+    const result = verifyMethod === "email"
+      ? await supabase.auth.signInWithOtp({ email: destination, options: { shouldCreateUser: true } })
+      : await supabase.auth.signInWithOtp({ phone: destination });
+    setAuthNotice(result.error ? result.error.message : `Code sent securely by ${verifyMethod}.`);
+  };
+  const verifyOtp = async () => {
+    if (!supabase) return setAuthNotice("Authentication environment variables are not configured yet.");
+    const result = verifyMethod === "email"
+      ? await supabase.auth.verifyOtp({ email: destination, token: code, type: "email" })
+      : await supabase.auth.verifyOtp({ phone: destination, token: code, type: "sms" });
+    if (result.error) setAuthNotice(result.error.message);
+  };
+  const enableNotifications = async () => {
+    if (!("Notification" in window)) {
+      setNotifyStatus("Not supported on this device");
+      return;
+    }
+    const result = await Notification.requestPermission();
+    setNotifyStatus(
+      result === "granted"
+        ? "Device permission granted · server push setup required"
+        : result === "denied"
+          ? "Blocked in browser settings"
+          : "Not enabled",
+    );
+  };
+  const navigationGroups = [
+    {name:"Overview",items:[["Dashboard","⌂"]]},
+    {name:"Financial Adviser",items:[["Accounts","▣"],["Bills & cards","$"],["Liabilities","▥"],["Household","♧"]]},
+    {name:"Portfolio Manager",items:[["Portfolio","◫"],["Market Intel","◉"],["Growth Finder","↗"]]},
+    {name:"Swing Trading Desk",items:[["Professional Charts","⌁"],["Scanner","⌕"],["Market News","●"],["Paper trade","◎"],["Journal","▤"]]},
+    {name:"Academy",items:[["Learn","◇"]]},
+    {name:"System",items:[["Settings","⚙"]]},
+  ];
+  const alerts = [
+    {
+      level: "ACT NOW TO REVIEW",
+      category: "Trade / Tariffs",
+      time: "8 min ago",
+      title: "New semiconductor export restriction announced",
+      source: "U.S. Department of Commerce · Primary source",
+      impact: "Directly affects 12% of your portfolio",
+      confidence: 91,
+      move: "+8.4%",
+      action: "Review exposure",
+    },
+    {
+      level: "IMPORTANT",
+      category: "Defense",
+      time: "24 min ago",
+      title: "Federal contract expands domestic drone procurement",
+      source: "U.S. Department of Defense · Contract notice",
+      impact: "Two suppliers and one ETF may benefit",
+      confidence: 86,
+      move: "+3.1%",
+      action: "Research beneficiaries",
+    },
+    {
+      level: "WATCH",
+      category: "Healthcare / FDA",
+      time: "1 hr ago",
+      title: "FDA decision expected tomorrow for a major holding",
+      source: "FDA calendar · Confirmed date",
+      impact: "Options IV elevated; gap risk is material",
+      confidence: 78,
+      move: "−0.6%",
+      action: "Review position risk",
+    },
+    {
+      level: "INFO",
+      category: "Institutional Activity",
+      time: "3 hr ago",
+      title: "Large fund disclosed a new energy-grid position",
+      source: "SEC 13F · Delayed public filing",
+      impact: "Disclosure is up to 45 days delayed",
+      confidence: 64,
+      move: "+0.9%",
+      action: "Study, do not copy",
+    },
+  ];
+  const visibleAlerts =
+    alertFilter === "All"
+      ? alerts
+      : alerts.filter((a) => a.level === alertFilter);
+  const bills = [
+    {
+      name: "Mortgage",
+      category: "Housing",
+      amount: 2148,
+      due: "Sep 1",
+      autopay: true,
+      change: 0,
+    },
+    {
+      name: "APS Electricity",
+      category: "Utilities",
+      amount: 186,
+      due: "Sep 4",
+      autopay: true,
+      change: 18,
+    },
+    {
+      name: "Internet",
+      category: "Utilities",
+      amount: 79,
+      due: "Sep 8",
+      autopay: true,
+      change: 0,
+    },
+    {
+      name: "Auto Insurance",
+      category: "Insurance",
+      amount: 214,
+      due: "Sep 12",
+      autopay: false,
+      change: 12,
+    },
+    {
+      name: "Mobile Family Plan",
+      category: "Phone",
+      amount: 164,
+      due: "Sep 15",
+      autopay: true,
+      change: 0,
+    },
+    {
+      name: "Streaming bundle",
+      category: "Subscriptions",
+      amount: 47,
+      due: "Sep 19",
+      autopay: true,
+      change: 7,
+    },
+  ];
+  const cards = [
+    {
+      name: "Visa Signature",
+      balance: 8420,
+      limit: 12000,
+      statement: 7910,
+      min: 248,
+      due: "Sep 6",
+      apr: 24.9,
+      rewards: "12,480 pts",
+    },
+    {
+      name: "Everyday Cash",
+      balance: 1260,
+      limit: 8500,
+      statement: 1184,
+      min: 45,
+      due: "Sep 14",
+      apr: 19.49,
+      rewards: "$86.20",
+    },
+    {
+      name: "Travel Card",
+      balance: 390,
+      limit: 15000,
+      statement: 390,
+      min: 35,
+      due: "Sep 22",
+      apr: 21.99,
+      rewards: "34,120 mi",
+    },
+  ];
+  const monthlyBills = bills.reduce((s, b) => s + b.amount, 0);
+  const cardMinimums = cards.reduce((s, c) => s + c.min, 0);
+  const monthlyIncome = 9200;
+  const freeCash = monthlyIncome - monthlyBills - cardMinimums - 3258;
+  const debts = [
+    {
+      name: "Visa Signature",
+      type: "Credit card",
+      balance: 8420,
+      apr: 24.9,
+      payment: 260,
+      urgency: "Critical",
+    },
+    {
+      name: "Home Mortgage",
+      type: "Mortgage",
+      balance: 287640,
+      apr: 4.125,
+      payment: 2148,
+      urgency: "Manage",
+    },
+    {
+      name: "Tesla Model Y",
+      type: "Auto loan",
+      balance: 31800,
+      apr: 6.49,
+      payment: 612,
+      urgency: "Review",
+    },
+    {
+      name: "Federal Student Loans",
+      type: "Student loan",
+      balance: 22450,
+      apr: 4.8,
+      payment: 238,
+      urgency: "Manage",
+    },
+  ];
+  const totalDebt = debts.reduce((sum, d) => sum + d.balance, 0);
+  const weightedApr =
+    debts.reduce((sum, d) => sum + d.balance * d.apr, 0) / totalDebt;
+  if (!authReady)
+    return (
+      <main className="app-loading" aria-busy="true" aria-label="Loading your Northstar workspace">
+        <header className="loading-header">
+          <div className="loading-brand"><span>N</span><b>NORTHSTAR</b></div>
+          <i className="skeleton skeleton-pill" />
+        </header>
+        <div className="loading-shell">
+          <aside className="loading-sidebar">
+            <p>WORKSPACE</p>
+            {tabs.map((item, index) => (
+              <button key={item} className={tab === item ? "active" : ""} disabled>
+                <span>{["⌂", "◉", "$", "⌁", "▥", "♧", "✦", "◎", "▤", "◇"][index]}</span>
+                {item}
+              </button>
+            ))}
+            <p>MY LISTS</p>
+            <button disabled><span className="violet">●</span>Core watchlist <em>4</em></button>
+            <button disabled><span className="gold">●</span>Future sectors <em>12</em></button>
+            <div className="guard"><strong>◈ Capital guard is on</strong><small>Checking your secure workspace session.</small></div>
+          </aside>
+          <section className="loading-content">
+            <div className="loading-title"><div><i className="skeleton skeleton-kicker" /><i className="skeleton skeleton-heading" /></div><i className="skeleton skeleton-action" /></div>
+            <div className="skeleton skeleton-summary" />
+            <div className="loading-card-grid"><div className="skeleton skeleton-card" /><div className="skeleton skeleton-card" /></div>
+            <div className="skeleton skeleton-wide" />
+          </section>
+        </div>
+        <span className="loading-status">Securely loading your financial workspace…</span>
+      </main>
+    );
+  if (!signedIn)
+    return (
+      <main className="auth-page">
+        <section className="auth-brand">
+          <span>N</span>
+          <b>NORTHSTAR</b>
+          <p>
+            One intelligent financial home for investing, trading, debt, and the
+            people you trust.
+          </p>
+          <blockquote>
+            Protect the household first.
+            <br />
+            Build wealth with a repeatable process.
+          </blockquote>
+        </section>
+        <section className="auth-panel">
+          {authStep === "login" ? (
+            <div className="auth-box">
+              <p className="kicker">SECURE HOUSEHOLD ACCESS</p>
+              <h1>Welcome to Northstar</h1>
+              <p>Sign in to see your private financial workspace.</p>
+              <button
+                className={`oauth ${supabase ? "" : "disabled"}`}
+                onClick={() => socialLogin("google")}
+              >
+                <b>G</b> Continue with Google <span>{supabase ? "Secure OAuth" : "Setup required"}</span>
+              </button>
+              <button
+                className={`oauth ${supabase ? "" : "disabled"}`}
+                onClick={() => socialLogin("apple")}
+              >
+                <b>●</b> Continue with Apple <span>{supabase ? "Secure OAuth" : "Setup required"}</span>
+              </button>
+              <div className="or">
+                <i />
+                or
+                <i />
+              </div>
+              <label>
+                Account email
+                <input
+                  value={accountEmail}
+                  onChange={(e) => setAccountEmail(e.target.value.trim())}
+                  placeholder="you@example.com"
+                  type="email"
+                  autoComplete="email"
+                />
+              </label>
+              <button
+                className="primary full-auth"
+                disabled={!accountEmail.includes("@")}
+                onClick={() => {
+                  setVerifyMethod("email");
+                  setDestination(accountEmail);
+                  setAuthStep("verify");
+                  setAuthNotice("");
+                }}
+              >
+                Continue to verification
+              </button>
+              <small>
+                Enter the account email first. Verification and the localhost
+                developer bypass are available on the next step.
+              </small>
+            </div>
+          ) : (
+            <div className="auth-box">
+              <button className="back" onClick={() => setAuthStep("login")}>
+                ← Back
+              </button>
+              <p className="kicker">IDENTITY VERIFICATION</p>
+              <h1>Receive your security code</h1>
+              <p>
+                Choose where Northstar should send a one-time six-digit code.
+              </p>
+              <div className="method-tabs">
+                <button
+                  className={verifyMethod === "email" ? "active" : ""}
+                  onClick={() => {
+                    setVerifyMethod("email");
+                    setDestination(accountEmail);
+                    setAuthNotice("");
+                  }}
+                >
+                  Email
+                </button>
+                <button
+                  className={verifyMethod === "sms" ? "active" : ""}
+                  onClick={() => {
+                    setVerifyMethod("sms");
+                    setDestination("");
+                    setAuthNotice("");
+                  }}
+                >
+                  SMS
+                </button>
+              </div>
+              <label>
+                {verifyMethod === "email" ? "Email address" : "Mobile number"}
+                <input
+                  value={destination}
+                  onChange={(e) => setDestination(e.target.value)}
+                  placeholder={
+                    verifyMethod === "email"
+                      ? "you@example.com"
+                      : "+1 555 123 4567"
+                  }
+                  type={verifyMethod === "email" ? "email" : "tel"}
+                />
+              </label>
+              <button
+                className="primary full-auth"
+                disabled={!destination}
+                onClick={sendOtp}
+              >
+                Send verification code
+              </button>
+              {authNotice && (
+                <div className="provider-warning">
+                  <b>Provider required</b>
+                  <span>{authNotice}</span>
+                </div>
+              )}
+              <label className="code-label">
+                Verification code
+                <input
+                  value={code}
+                  onChange={(e) =>
+                    setCode(e.target.value.replace(/\D/g, "").slice(0, 6))
+                  }
+                  placeholder="000000"
+                  inputMode="numeric"
+                  className="code"
+                  disabled={!authNotice.startsWith("Code sent")}
+                />
+              </label>
+              <button className="primary full-auth" disabled={code.length !== 6} onClick={verifyOtp}>
+                Verify and enter Northstar
+              </button>
+              {isLocal && (
+                  <button
+                    className="dev-bypass"
+                    disabled={!accountEmail.includes("@")}
+                    onClick={() => {
+                      sessionStorage.setItem("northstar-local-preview", "true");
+                      setAuthNotice("Local UI preview only. Backend development authentication must also be explicitly enabled in .env.local.");
+                      setSignedIn(true);
+                    }}
+                  >
+                    Developer bypass · localhost only
+                  </button>
+                )}
+              <div className="security-note">
+                <b>◈ No fake verification</b>
+                <span>
+                  Northstar will enable this form only after email/SMS delivery
+                  and server-side verification are configured.
+                </span>
+              </div>
+            </div>
+          )}
+        </section>
+      </main>
+    );
+  return (
+    <main className={`workspace-view page-${(pathByTab[tab] || "dashboard").replace(/[^a-z-]/g, "")}`}>
+      <header>
+        <div className="brand">
+          <span>N</span>
+          <b>NORTHSTAR</b>
+          <small>MARKET COPILOT</small>
+        </div>
+        <div className={`open ${marketPhase}`} role="button" tabIndex={0} onClick={()=>window.location.assign("/workspace/settings#market-data-settings")} onKeyDown={e=>{if(e.key==="Enter"||e.key===" ")window.location.assign("/workspace/settings#market-data-settings")}} title={clockTargetLabel?`${marketClock.isOpen?"Closes":"Next opens"} ${clockTargetLabel}`:"Open Market Data & Clock setup"}>
+          <i />
+          <span>{marketClockText}<small>{clockTargetLabel&&` · ${marketClock.isOpen?"close":"open"} ${clockTargetLabel}`}</small></span>
+        </div>
+        <div className="head-actions">
+          <button
+            className="help-link"
+            onClick={() => navigate("Help")}
+          >
+            ? Help & Guide
+          </button>
+          <button onClick={() => { const symbol=window.prompt("Enter a stock or ETF symbol",chartSymbol); if(symbol){sessionStorage.setItem("northstar-chart-symbol",symbol.toUpperCase());navigate("Professional Charts");} }}>⌕ Search</button>
+          <button>♢</button>
+          <span className="avatar">{displayInitials}</span>
+        </div>
+      </header>
+      <div className="shell">
+        <aside>
+          {navigationGroups.map(group => <div className="nav-group" key={group.name}><p>{group.name}</p>{group.items.map(([x,icon]) => (
+            <button
+              key={x}
+              onClick={() => navigate(x)}
+              className={tab === x ? "active" : ""}
+            >
+              <span>{icon}</span>
+              {x}
+            </button>
+          ))}</div>)}
+          <p>MY LISTS</p>
+          <button>
+            <span className="violet">●</span>Core watchlist <em>4</em>
+          </button>
+          <button>
+            <span className="gold">●</span>Future sectors <em>12</em>
+          </button>
+          <div className="guard">
+            <strong>◈ Capital guard is on</strong>
+            <small>
+              Every idea is checked against your rules before you act.
+            </small>
+            <button onClick={() => setTab("Paper trade")}>
+              Review risk rules →
+            </button>
+          </div>
+          <div className="user">
+            <span className="avatar">{displayInitials}</span>
+            <b>
+              {displayName}<small>{accountEmail} · Household owner</small>
+            </b>
+            <button className="signout" onClick={() => { supabase?.auth.signOut(); setSignedIn(false); setAccessToken(""); }}>
+              Sign out
+            </button>
+          </div>
+        </aside>
+        <section className="content">
+          {actionNotice && <div className="action-toast" role="status">{actionNotice}</div>}
+          <nav className="workspace-breadcrumb" aria-label="Page navigation">
+            <div className="history-controls" aria-label="Navigation history">
+              <button type="button" onClick={() => window.history.back()} aria-label="Go back" title="Go back">← <span>Back</span></button>
+              <button type="button" onClick={() => window.history.forward()} aria-label="Go forward" title="Go forward"><span>Forward</span> →</button>
+            </div>
+            <ol>
+              <li><button type="button" onClick={() => navigate("Dashboard")}>Workspace</button></li>
+              {breadcrumbParent && <li><button type="button" onClick={() => navigate(breadcrumbParent)}>Markets</button></li>}
+              <li aria-current="page">{tab === "Market Intel" ? "Markets" : tab}</li>
+            </ol>
+          </nav>
+          <div className="hero" id="dashboard-top">
+            <div>
+              <p className="kicker">
+                MONDAY · MARKET BRIEF · {tab.toUpperCase()}
+              </p>
+              <h1>Your professional trading copilot.</h1>
+              <p>
+                Built for every experience level. Protect capital first. Find
+                opportunities second. Profit is the result of a repeatable
+                process—not a prediction.
+              </p>
+            </div>
+            <button className="primary" onClick={() => navigate("Ask Northstar")}>
+              ✦ Analyze an idea
+            </button>
+          </div>
+          <nav className="market-subnav" aria-label="Market tools"><button className={tab==="Market Intel"?"active":""} onClick={()=>navigate("Market Intel")}><b>✦</b><span>Market Advisor<small>Recommendations and product analysis</small></span></button><button className={tab==="Professional Charts"?"active":""} onClick={()=>navigate("Professional Charts")}><b>⌁</b><span>Professional Charts<small>Any stock or ETF · 1M to 5Y</small></span></button><button className={tab==="Market News"?"active":""} onClick={()=>navigate("Market News")}><b>◉</b><span>Market Intelligence<small>News, catalysts and causal chains</small></span></button><button className={tab==="Growth Finder"?"active":""} onClick={()=>navigate("Growth Finder")}><b>↗</b><span>Affordable Growth<small>Lower-price research with risk checks</small></span></button></nav>
+          <section className="connected-accounts card">
+            <div className="accounts-head"><div><span>▣ READ-ONLY FINANCIAL CONNECTIONS</span><h2>Bank, cards, loans, and investment accounts</h2><p>Connect through Plaid to track balances, spending, liabilities, and portfolio holdings. Northstar cannot transfer money or place trades.</p></div><button className="primary" disabled={plaidBusy} onClick={connectPlaid}>{plaidBusy?"Connecting…":"+ Connect an institution"}</button></div>
+            <div className="plaid-security"><b>🔒 Your bank credentials never enter Northstar.</b><span>Plaid handles institution authentication. Northstar stores only an encrypted provider token on the server and requests read-only financial data.</span></div>
+            <div className="connection-summary"><div><small>Connected institutions</small><b>{connectedFinance.connections.length}</b></div><div><small>Financial accounts</small><b>{connectedFinance.accounts.length}</b></div><div><small>Investment holdings</small><b>{connectedFinance.holdings.length}</b></div><div><small>Tracked value</small><b>${((connectedFinance.accounts.reduce((sum,item)=>sum+Number(item.current_balance_cents||0),0)+connectedFinance.holdings.reduce((sum,item)=>sum+Number(item.market_value_cents||0),0))/100).toLocaleString(undefined,{maximumFractionDigits:0})}</b></div></div>
+            <div className="plaid-notice" role="status">{plaidNotice}</div>
+            <div className="connections-list">{connectedFinance.connections.map(connection=><article key={connection.id}><i>▣</i><span><b>{connection.institution_name||"Connected institution"}</b><small>{connection.last_synced_at?`Last synced ${new Date(connection.last_synced_at).toLocaleString()}`:"Ready for first synchronization"}</small></span><em className={connection.status}>{connection.status}</em><button disabled={plaidBusy} onClick={()=>syncPlaid(String(connection.id))}>↻ Sync now</button></article>)}{!connectedFinance.connections.length&&<div className="connection-empty"><b>No institution connected yet</b><span>Use Connect an institution to securely select a bank, credit card, loan servicer, or supported brokerage.</span></div>}</div>
+            {!!connectedFinance.accounts.length&&<section className="account-table"><div className="account-row heading"><span>Account</span><span>Type</span><span>Available</span><span>Current balance</span><span>Credit limit</span></div>{connectedFinance.accounts.map(account=><div className="account-row" key={account.id}><span><b>{account.name}</b><small>{account.official_name||""} {account.mask?`•••• ${account.mask}`:""}</small></span><span>{account.subtype||account.type}</span><span>{account.available_balance_cents==null?"—":`$${(Number(account.available_balance_cents)/100).toLocaleString()}`}</span><strong>${(Number(account.current_balance_cents||0)/100).toLocaleString()}</strong><span>{account.credit_limit_cents==null?"—":`$${(Number(account.credit_limit_cents)/100).toLocaleString()}`}</span></div>)}</section>}
+            {!!connectedFinance.holdings.length&&<section className="holdings-table"><h3>Investment holdings and growth tracking</h3>{connectedFinance.holdings.map(holding=>{const market=Number(holding.market_value_cents||0),cost=Number(holding.cost_basis_cents||0),gain=market-cost;return <article key={`${holding.account_id}_${holding.ticker}_${holding.name}`}><span><b>{holding.ticker||"—"}</b><small>{holding.name}</small></span><span><small>Shares</small><b>{Number(holding.quantity||0).toLocaleString()}</b></span><span><small>Market value</small><b>${(market/100).toLocaleString()}</b></span><span className={gain>=0?"gain":"loss"}><small>Gain / loss</small><b>{gain>=0?"+":"−"}${(Math.abs(gain)/100).toLocaleString()}</b></span></article>})}</section>}
+          </section>
+          <section className="portfolio-builder card">
+            <div className="portfolio-head"><div><span>◫ GOAL-BASED PORTFOLIO BUILDER</span><h2>Create and adjust your investment plan</h2><p>Choose when the money is needed, set a target mix, and review possible outcomes before changing real holdings.</p></div><em>READ-ONLY PLAN</em></div>
+            <div className="portfolio-setup"><label>Goal horizon<select value={portfolioGoal} onChange={e=>setPortfolioGoal(e.target.value as "2–3 years"|"5 years")}><option>2–3 years</option><option>5 years</option></select></label><label>Portfolio amount<div className="portfolio-money"><b>$</b><input type="number" min="0" step="500" value={portfolioAmount} onChange={e=>setPortfolioAmount(Math.max(0,+e.target.value))}/></div></label><div className="preset-actions"><button onClick={applyPortfolioPreset}>✦ Build risk-aware mix</button><button onClick={applyCoreDividendGrowthPreset}>◎ Apply 40 / 30 / 30</button></div></div>
+            <div className="portfolio-body"><div className="allocation-editor">{([{key:"cash",icon:"◆",label:"Cash & short-term",note:"Stability and near-term needs"},{key:"bonds",icon:"▰",label:"Bonds / fixed income",note:"Income and volatility control"},{key:"diversified",icon:"◎",label:"Core / VOO–VTI type",note:"Broad-market base and diversification"},{key:"dividend",icon:"$",label:"Dividend / SCHD type",note:"Quality income and dividend growth"},{key:"growth",icon:"↗",label:"Growth stocks",note:"Revenue, earnings and cash-flow growth"}] as const).map(asset=><label key={asset.key}><i>{asset.icon}</i><span><b>{asset.label}</b><small>{asset.note}</small></span><input type="range" min="0" max="100" step="5" value={portfolioMix[asset.key]} onChange={e=>setPortfolioMix(current=>({...current,[asset.key]:+e.target.value}))}/><strong>{portfolioMix[asset.key]}%</strong><em>${(portfolioAmount*portfolioMix[asset.key]/100).toLocaleString(undefined,{maximumFractionDigits:0})}</em></label>)}</div><aside className="portfolio-summary"><span className={portfolioTotal===100?"valid":"invalid"}>{portfolioTotal===100?"✓":"!"} ALLOCATION TOTAL · {portfolioTotal}%</span><h3>{portfolioGoal} planning range</h3><div><small>Lower scenario</small><b>${portfolioLow.toLocaleString(undefined,{maximumFractionDigits:0})}</b></div><div><small>Planning midpoint</small><b>${portfolioProjected.toLocaleString(undefined,{maximumFractionDigits:0})}</b></div><div><small>Higher scenario</small><b>${portfolioHigh.toLocaleString(undefined,{maximumFractionDigits:0})}</b></div><p><u>Important:</u> These are uncertain scenarios, not promised returns. A 40/30/30 stock allocation can still lose substantially and may be unsuitable for money required within 2–3 years.</p><button className="primary" onClick={savePortfolio}>Save portfolio goal</button>{portfolioNotice&&<small className="portfolio-notice">{portfolioNotice}</small>}</aside></div>
+            <div className="portfolio-guidance"><section><b>✓ Favorable structure</b><p>{portfolioGoal==="2–3 years"?"Keep most goal-critical money in cash and high-quality short-duration bonds.":"A five-year horizon can support diversified equity exposure, provided you can tolerate temporary losses."}</p></section><section><b>! Rebalance review</b><p>Compare these targets with connected holdings. Buy or sell only after reviewing taxes, fees, debt, emergency reserves, and position concentration.</p></section></div>
+          </section>
+          <section className="focus-bar">
+            {backendOverview && <div><span>PERSISTENT DATA</span><b>{backendOverview.entities} entities · {backendOverview.transactions} transactions</b><small>D1 financial ledger connected</small></div>}
+            <div>
+              <span>LOCAL MARKET TIME</span>
+              <b>{activeTimezone.replace(/_/g," ")}</b>
+              <small>{localMarketClock} · Exchange anchored to New York</small>
+            </div>
+            <div>
+              <span>TODAY’S WATCH PLAN</span>
+              <b>50 of {dailyLimit} minutes</b>
+              <small>6:20–7:00 AM · 12:50–1:00 PM</small>
+            </div>
+            <div>
+              <span>DECISION GUARD</span>
+              <b>10-minute cooling-off</b>
+              <small>Required after high-urgency alerts</small>
+            </div>
+            <button
+              onClick={() => navigate("Settings")}
+            >
+              Configure attention limits →
+            </button>
+          </section>
+          <section className="growth-finder card" id="growth-finder">
+            <div className="screener-head"><div><p>AFFORDABLE GROWTH RESEARCH</p><h2>Find emerging companies without confusing price with value</h2><span>Northstar searches for strong growth, sensible valuation, liquidity, cash runway and limited dilution—not merely a low share price.</span></div><em>LIVE FUNDAMENTALS REQUIRED</em></div>
+            <div className="growth-principle"><b>A $10 stock is not automatically cheaper than a $200 stock.</b><span>Share count determines nominal price. The advisor compares market capitalization, enterprise value, revenue growth, margins, free cash flow and dilution before calling anything inexpensive.</span></div>
+            <div className="growth-screen-grid"><article><span>01 · QUALITY</span><h3>Business acceleration</h3><p>Revenue growth above 20%, improving gross margin, recurring demand and credible management execution.</p></article><article><span>02 · FINANCIAL SAFETY</span><h3>Survival before upside</h3><p>Cash runway, manageable debt, positive or improving free cash flow, and no dependence on repeated share issuance.</p></article><article><span>03 · VALUATION</span><h3>Price versus realistic growth</h3><p>Forward valuation must be supportable by revenue, earnings and cash-flow scenarios—not social-media excitement.</p></article><article><span>04 · MARKET EVIDENCE</span><h3>3–12 month confirmation</h3><p>Relative strength, volume, institutional participation, catalysts and clear invalidation levels.</p></article></div>
+            <div className="growth-scenarios"><div><span>BEAR CASE</span><b>−45% to −20%</b><p>Growth disappoints, dilution increases or the market multiple contracts.</p></div><div><span>BASE CASE</span><b>−5% to +30%</b><p>Execution continues near expectations and valuation remains stable.</p></div><div><span>BULL CASE</span><b>+30% to +100%+</b><p>Only when growth, margins and catalysts materially exceed expectations. This is low probability—not a promise.</p></div></div>
+            <div className="provider-required"><b>No invented “exponential growth” picks</b><span>Connect live quotes and fundamentals in Settings. Northstar will then rank candidates and show the data timestamp, probability ranges, downside, valuation, dilution risk and the evidence that would invalidate each forecast.</span><button onClick={()=>window.location.assign("/workspace/settings#market-data-settings")}>Connect research data →</button></div>
+          </section>
+          <div className="regime">
+            <div>
+              <p>MARKET CONDITION</p>
+              <b>
+                <i /> Constructively bullish
+              </b>
+              <span>
+                Trend is positive, but breadth is narrowing. Favor quality
+                setups; avoid chasing extended moves.
+              </span>
+            </div>
+            {[
+              ["S&P 500", "6,482", "+0.74%"],
+              ["NASDAQ", "21,705", "+1.08%"],
+              ["DOW", "45,228", "+0.31%"],
+              ["RUSSELL", "2,347", "−0.22%"],
+            ].map((x) => (
+              <div className="index" key={x[0]}>
+                <span>{x[0]}</span>
+                <b>{x[1]}</b>
+                <em className={x[2][0] === "−" ? "down" : ""}>{x[2]}</em>
+              </div>
+            ))}
+          </div>
+          <section className="chart-workspace card" id="market-charts">
+            <div className="chart-head">
+              <div>
+                <p>PROFESSIONAL MARKET CHARTS</p>
+                <h2>{chartSymbol} · Candles, volume and technical context</h2>
+              </div>
+              <div className="feed-state"><i /> {chartBars.length?"CONNECTED DATA":"DEMO FALLBACK"} <small>{feedNotice}</small></div>
+            </div>
+            <div className="chart-toolbar">
+              <div className="chart-symbol-search"><input value={marketLookup} onChange={e=>setMarketLookup(e.target.value.toUpperCase().replace(/[^A-Z.]/g,"").slice(0,10))} onKeyDown={e=>{if(e.key==="Enter"&&marketLookup)setChartSymbol(marketLookup)}} placeholder="Search any ticker" aria-label="Search any stock or ETF chart"/><button onClick={()=>marketLookup&&setChartSymbol(marketLookup)}>Load chart</button></div>
+              <div className="symbol-picks">
+                {["NVDA","SPY","QQQ","AAPL","MSFT"].map(symbol => <button key={symbol} className={chartSymbol===symbol?"active":""} onClick={()=>{setChartSymbol(symbol);setMarketLookup(symbol)}}>{symbol}</button>)}
+              </div>
+              <div className="time-picks">
+                {["1M","3M","6M","1Y","5Y"].map(frame => <button key={frame} className={timeframe===frame?"active":""} onClick={()=>setTimeframe(frame)}>{frame}</button>)}
+              </div>
+              <select aria-label="Technical indicator" value={indicator} onChange={e=>setIndicator(e.target.value)}>
+                <option>Bollinger Bands</option><option>EMA 20/50</option><option>SMA 50/200</option><option>VWAP</option>
+              </select>
+            </div>
+            <div className="quote-strip">
+              <span><small>LAST</small><b>${latestCandle[3].toFixed(2)}</b></span><span><small>RANGE CHANGE</small><b className={chartChange>=0?"green":"red"}>{chartChange>=0?"+":""}{chartChange.toFixed(2)}%</b></span>
+              <span><small>FIRST OPEN</small><b>${firstCandle[0].toFixed(2)}</b></span><span><small>RANGE HIGH / LOW</small><b>${chartHigh.toFixed(2)} / ${chartLow.toFixed(2)}</b></span>
+              <span><small>LATEST VOLUME</small><b>{latestCandle[4]>=1000000?(latestCandle[4]/1000000).toFixed(1)+"M":latestCandle[4].toLocaleString()}</b></span><span><small>RANGE</small><b>{timeframe}</b></span>
+            </div>
+            <div className="chart-layout">
+              <div className="price-panel">
+                <div className="price-grid"><span>${chartHigh.toFixed(2)}</span><span>${(chartLow+chartSpan*.75).toFixed(2)}</span><span>${(chartLow+chartSpan*.5).toFixed(2)}</span><span>${(chartLow+chartSpan*.25).toFixed(2)}</span><span>${chartLow.toFixed(2)}</span></div>
+                <div className="candle-field">
+                  {displayedCandles.map((c,i) => {
+                    const [open,high,low,close,volume]=c; const green=close>=open;
+                    return <div className="candle-column" key={i}>
+                      <div className="wick" style={{height:`${Math.max(3,((high-low)/chartSpan)*285)}px`,bottom:`${((low-chartLow)/chartSpan)*285+52}px`}} />
+                      <div className={`candle ${green?"up":"down"}`} style={{height:`${Math.max(3,(Math.abs(close-open)/chartSpan)*285)}px`,bottom:`${((Math.min(open,close)-chartLow)/chartSpan)*285+52}px`}} title={`O ${open.toFixed(2)} H ${high.toFixed(2)} L ${low.toFixed(2)} C ${close.toFixed(2)}`} />
+                      <div className={`volume ${green?"up":"down"}`} style={{height:`${Math.max(3,Math.min(42,(volume/Math.max(...displayedCandles.map(value=>value[4])))*42))}px`}} />
+                    </div>;
+                  })}
+                </div>
+                <div className="ema ema-fast">{indicator}</div><div className="ema ema-slow">Trend confirmation</div>
+                <span className="event-marker earnings" tabIndex={0} aria-label="Earnings event marker" title="E · Earnings event"><b>E</b><div role="tooltip"><strong>Earnings event</strong><small>A scheduled company report that can cause gaps, higher volume, and volatility. Check the confirmed date before acting.</small></div></span><span className="event-marker news" tabIndex={0} aria-label="Verified news marker" title="N · Verified market news"><b>N</b><div role="tooltip"><strong>Verified news</strong><small>A confirmed company or market headline. Read the primary source and observe price and volume reaction before making a decision.</small></div></span>
+              </div>
+              <aside className="chart-side">
+                <h3>Technical read</h3>
+                <div className="signal positive"><b>Bullish structure</b><span>Higher highs remain intact above $179.</span></div>
+                <div className="signal"><b>Momentum</b><span>RSI 62.4 · strong, not overbought.</span></div>
+                <div className="signal"><b>MACD</b><span>Positive histogram, momentum slowing.</span></div>
+                <div className="signal warning"><b>Risk condition</b><span>Close below $176.90 invalidates this setup.</span></div>
+                <button className="primary" onClick={()=>setTab("Paper trade")}>Send to trade planner →</button>
+              </aside>
+            </div>
+            <div className="indicator-grid">
+              <div className="mini-chart"><span>RSI (14) <b>62.4</b></span><div className="rsi-line"><i /></div><small>30 oversold</small><small>70 overbought</small></div>
+              <div className="mini-chart"><span>MACD <b>+1.82</b></span><div className="macd-bars">{[3,6,9,13,18,14,11,8,5,2,-2,-4].map((x,i)=><i key={i} className={x<0?"negative":""} style={{height:`${Math.abs(x)+5}px`}} />)}</div><small>Momentum histogram</small></div>
+              <div className="mini-chart performance"><span>Portfolio vs S&amp;P 500</span><b>+12.8% <small>vs +9.4%</small></b><div><i style={{width:"78%"}}/><em style={{width:"61%"}}/></div></div>
+            </div>
+            <section className="probability-engine">
+              <div className="engine-head"><div><p>TRANSPARENT MULTI-TIMEFRAME PROBABILITY ENGINE</p><h3>Evidence alignment · {technicalAnalysis.probability}% bullish</h3><span>Calculated from price direction, moving-average structure, relative volume and timeframe weights. Decision support—not a forecast or trade signal.</span></div><label>Strategy<select value={analysisStrategy} onChange={e=>setAnalysisStrategy(e.target.value as "swing"|"position")}><option value="swing">Swing</option><option value="position">Position</option></select></label></div>
+              <div className="timeframe-matrix">{technicalAnalysis.rows.map(row=><article key={row.frame} className={`${row.bias.toLowerCase()} ${row.available?"":"unavailable"}`}><b>{row.frame}</b><strong>{row.available?`${row.score}%`:"—"}</strong><span>{row.available?row.bias:"No data"}</span><small>{row.weight}% weight</small></article>)}</div>
+              <div className="reality-grid"><article><span>CANDLE / BREAKOUT REALITY</span><h4>{technicalAnalysis.best?technicalAnalysis.best.name:"No qualified pattern"}</h4><b>{technicalAnalysis.best?`${technicalAnalysis.best.quality}/100 Pattern Quality`:"Insufficient contextual evidence"}</b><p>{technicalAnalysis.best?.evidence||"Wait for location, volume and follow-through evidence."}</p></article><article><span>EVIDENCE & DISAGREEMENT</span><h4>{technicalAnalysis.disagreement?"Timeframes disagree":"Directional evidence aligned"}</h4><b>{technicalAnalysis.relVol.toFixed(2)}× relative volume · ATR ${technicalAnalysis.atr.toFixed(2)}</b><p>{technicalAnalysis.disagreement?"Confidence is reduced. Do not force lower-timeframe evidence against higher-timeframe context.":"Alignment improves confidence but does not remove gap, news or execution risk."}</p></article><article><span>CONFIRMATION</span><h4>What must happen next</h4><p>{technicalAnalysis.confirmation}</p><span>INVALIDATION</span><p>{technicalAnalysis.invalidation}</p></article></div>
+              <details className="pattern-catalog"><summary>Pattern coverage and current history query</summary><div>{Object.entries(patternLibrary).map(([group,names])=><p key={group}><b>{group}</b><span>{names.join(" · ")}</span></p>)}</div><small>Detected now: {technicalAnalysis.patterns.map(p=>`${p.name} (${p.quality})`).join(", ")||"none"}. Source: {chartBars.length?"connected market bars":"demonstration bars"}; calculated {new Date(technicalAnalysis.timestamp).toLocaleString()}.</small></details>
+            </section>
+            <div className="cycle-head">
+              <div><p>LONG-RANGE MARKET CYCLES</p><h3>Performance through expansion, contraction and recovery</h3></div>
+              <div>{(["1Y","5Y"] as const).map(range => <button key={range} className={cycleRange===range?"active":""} onClick={()=>setCycleRange(range)}>{range}</button>)}</div>
+            </div>
+            <div className="cycle-grid">
+              <div className="long-chart">
+                <div className="long-scale"><span>+80%</span><span>+40%</span><span>0%</span><span>−20%</span></div>
+                <div className="long-series" aria-label={`${cycleRange} historical performance chart`}>
+                  {(cycleRange === "1Y" ? fiveYearSeries.slice(-12) : fiveYearSeries).map((value,index,shown) => {
+                    const previous=index ? shown[index-1] : value;
+                    return <i key={index} className={value>=previous?"gain":"loss"} style={{height:`${Math.max(6,(value-72)*1.65)}px`}} title={`${value.toFixed(1)} index value`} />;
+                  })}
+                </div>
+                <div className="cycle-zones"><span>Recovery</span><span>Expansion</span><span>Contraction</span><span>Recovery</span><span>Late cycle</span></div>
+                <div className="long-labels"><span>{cycleRange==="5Y"?"2021":"12 months ago"}</span><span>{cycleRange==="5Y"?"2022":"9 months"}</span><span>{cycleRange==="5Y"?"2023":"6 months"}</span><span>{cycleRange==="5Y"?"2024":"3 months"}</span><span>Today</span></div>
+              </div>
+              <div className="cycle-summary">
+                <span><small>{cycleRange} RETURN</small><b>+{cycleRange==="5Y"?"78.6":"12.8"}%</b></span>
+                <span><small>ANNUALIZED</small><b>{cycleRange==="5Y"?"12.3":"12.8"}%</b></span>
+                <span><small>MAX DRAWDOWN</small><b className="red">−22.1%</b></span>
+                <span><small>VOLATILITY</small><b>18.4%</b></span>
+                <p>Compare performance across a complete cycle. A strong return is less valuable if it required an unacceptable drawdown.</p>
+              </div>
+            </div>
+            <div className="year-compare">
+              <div className="year-head"><b>Year-by-year cycle comparison</b><span>Portfolio <i /> Benchmark <em /></span></div>
+              {cycleYears.map(year => <div className="year-row" key={year.year}>
+                <b>{year.year}<small>{year.phase}</small></b>
+                <div className="return-track"><i className={year.portfolio<0?"negative":""} style={{width:`${Math.abs(year.portfolio)*2.2}%`}} /><span>{year.portfolio>0?"+":""}{year.portfolio}%</span></div>
+                <div className="return-track benchmark"><i className={year.benchmark<0?"negative":""} style={{width:`${Math.abs(year.benchmark)*2.2}%`}} /><span>{year.benchmark>0?"+":""}{year.benchmark}%</span></div>
+                <span className="drawdown">Max drawdown <b>{year.drawdown}%</b></span>
+              </div>)}
+              <p className="history-note">Historical charts use demonstration values until the market-data provider is configured. Past performance does not predict future results.</p>
+            </div>
+            <div className="provider-connect">
+              <div><b>Connect live market data</b><span>Quotes, historical candles, news and paper/live account sync use a licensed provider connection.</span></div>
+              <select aria-label="Market data provider"><option>Alpaca</option><option>Interactive Brokers</option><option>Webull</option><option>CoinMarketCap</option></select>
+              <button onClick={()=>{setFeedNotice("Connection setup requires provider sign-in and API authorization");navigate("Settings")}}>Connect provider</button>
+            </div>
+          </section>
+          <section className="asset-screener card" id="asset-search">
+            <div className="screener-head"><div><p>INVESTMENT DISCOVERY & RECOMMENDATION ENGINE</p><h2>Find investments by purpose—not by hype</h2><span>Search, compare, and understand suitability across major investment categories.</span></div><em>EDUCATIONAL CATALOG · CONNECT LIVE DATA FOR CURRENT PRICES</em></div>
+            <section className="advisor-start">
+              <div className="advisor-intro"><span>✦ NORTHSTAR ADVISOR · START HERE</span><h3>You do not need to understand every market product.</h3><p>Tell Northstar what the money is for. The app will suggest a sensible place to begin, explain why, show the risks, and tell you what must be checked before investing.</p></div>
+              <div className="market-lookup"><div><b>⌕ Search any stock or ETF</b><span>Enter a ticker or company name to learn whether it is a good fit, needs caution, or should be avoided.</span></div><input value={marketLookup} onChange={e=>setMarketLookup(e.target.value)} onKeyDown={e=>{if(e.key==="Enter")searchMarket()}} placeholder="Example: AAPL, NVDA, SPY, Microsoft…" aria-label="Search any stock or ETF" /><button onClick={searchMarket}>✦ Analyze market</button>{marketLookupNotice&&<small>{marketLookupNotice}</small>}</div>
+              {manualAssessment&&<section className={`manual-assessment ${manualAssessment.verdict}`}><div className="assessment-icon" aria-hidden="true">{manualAssessment.verdict==="favorable"?"✓":manualAssessment.verdict==="caution"?"!":"?"}</div><div><span>MANUAL SEARCH · PRELIMINARY DECISION</span><h3>{manualAssessment.symbol} · {manualAssessment.label}</h3><p><u>Why:</u> {manualAssessment.reason}</p></div><dl><div><dt>Bid</dt><dd>{manualAssessment.bid?`$${manualAssessment.bid.toFixed(2)}`:"—"}</dd></div><div><dt>Ask</dt><dd>{manualAssessment.ask?`$${manualAssessment.ask.toFixed(2)}`:"—"}</dd></div><div><dt>Last</dt><dd>{manualAssessment.last?`$${manualAssessment.last.toFixed(2)}`:"—"}</dd></div><div><dt>Daily move</dt><dd>{manualAssessment.changePct===null?"—":`${manualAssessment.changePct>=0?"+":""}${manualAssessment.changePct.toFixed(2)}%`}</dd></div></dl></section>}
+              <div className="advisor-questions">
+                <label><span>1. What is your goal?</span><select value={advisorGoal} onChange={e=>{setAdvisorGoal(e.target.value);setAdvisorPlanReady(false)}}>{["Build long-term wealth","Invest automatically every month","Create reliable income","Protect emergency money"].map(goal=><option key={goal}>{goal}</option>)}</select></label>
+                <label><span>2. When will you need the money?</span><select value={advisorHorizon} onChange={e=>{setAdvisorHorizon(e.target.value);setAdvisorPlanReady(false)}}>{["Less than 1 year","1–3 years","3–7 years","10+ years"].map(value=><option key={value}>{value}</option>)}</select></label>
+                <label><span>3. How much can you invest now or monthly?</span><div className="money-input"><b>$</b><input type="number" min="0" value={advisorAmount} onChange={e=>{setAdvisorAmount(+e.target.value);setAdvisorPlanReady(false)}} /></div></label>
+                <label><span>4. How comfortable are you with losses?</span><select value={investorProfile} onChange={e=>{setInvestorProfile(e.target.value);setAdvisorPlanReady(false)}}><option value="Conservative">Low · protect money first</option><option value="Balanced">Medium · growth with stability</option><option value="Growth">Higher · long-term growth</option><option value="Active">Advanced · I understand trading risk</option></select></label>
+              </div>
+              <button className="advisor-button" onClick={buildAdvisorPlan}>Show my explained starting plan →</button>
+              {advisorPlanReady&&<div className="advisor-answer"><div><span>NORTHSTAR'S STARTING POINT</span><h3>{selectedInvestment.name}</h3><p>For <b>{advisorGoal.toLowerCase()}</b>, a <b>{advisorHorizon.toLowerCase()}</b> horizon, and approximately <b>${advisorAmount.toLocaleString()}</b>, begin your research here. This is not permission to buy yet—the checks below explain what Northstar still needs to verify.</p></div><strong>{selectedInvestment.score}<small>/100</small></strong></div>}
+            </section>
+            <section className="advisor-shortlist"><div className="shortlist-head"><div><span>ADVISOR-SUGGESTED RESEARCH LIST</span><h3>Best starting candidates for a {investorProfile.toLowerCase()} profile</h3></div><small>{quoteStatus}</small></div><div className="shortlist-grid">{advisorSuggestions.map((item,index)=>{const quote=suggestionQuotes[item.symbol],overvalued=item.gap!==null&&item.gap>25,action=overvalued?"Sell / avoid review":index<2?"Buy research":"Wait / compare";return <button key={item.id} onClick={()=>{setInvestmentCategory("Stocks & ETFs");setSelectedInvestmentId(item.id);setAssetQuery("")}}><i>{index+1}</i><span><b>{item.symbol} · {item.name}</b><small>{item.why}</small></span><span className="quote-cell"><small>BID</small><b>{quote?.bid?`$${quote.bid.toFixed(2)}`:"—"}</b><small>ASK</small><b>{quote?.ask?`$${quote.ask.toFixed(2)}`:"—"}</b></span><em className={overvalued?"avoid":index<2?"top":"watch"}>{action}</em><strong>{item.adjusted}<small>/100 adjusted</small></strong></button>})}</div><p className="shortlist-note">This is a research priority list, not an automatic buy list. Open a candidate to see the maximum dollar amount, share quantity, entry condition and sell rule.</p></section>
+            <div className="advanced-label"><span>Explore and compare products</span><small>Advanced view · optional</small></div>
+            <nav className="investment-tabs" aria-label="Investment categories">{["Stocks & ETFs","Mutual Funds","Options","Fixed Income","Recurring Investing"].map(category=><button key={category} className={investmentCategory===category?"active":""} onClick={()=>{setInvestmentCategory(category);setAssetQuery("");const first=investmentCatalog.find(item=>item.category===category);if(first)setSelectedInvestmentId(first.id)}}><span>{category==="Stocks & ETFs"?"▥":category==="Mutual Funds"?"◫":category==="Options"?"⇄":category==="Fixed Income"?"▤":"↻"}</span>{category}<small>{investmentCatalog.filter(item=>item.category===category).length}</small></button>)}</nav>
+            <div className="screener-controls investment-controls"><label><span>Search this category</span><input value={assetQuery} onChange={e=>setAssetQuery(e.target.value)} placeholder="Search symbol, name, strategy..." /></label><label><span>Your current profile</span><select value={investorProfile} onChange={e=>setInvestorProfile(e.target.value)}>{["Conservative","Balanced","Growth","Active"].map(x=><option key={x}>{x}</option>)}</select></label><label><span>Rank results</span><select value={assetSort} onChange={e=>setAssetSort(e.target.value)}><option value="score">Highest research score</option><option value="risk">Lower risk first</option></select></label></div>
+            {investmentCategory==="Options"&&<section className="option-contract-advisor"><div className="option-advisor-head"><div><span>PROFESSIONAL OPTIONS CONTRACT SELECTOR</span><h3>Find the most suitable exact contract</h3><p>Northstar ranks live contracts by DTE, delta, premium risk, spread, volume, implied volatility and Greeks. It never sends an order.</p></div><em>LIVE CHAIN REQUIRED</em></div><div className="option-fields"><label>Underlying symbol<input value={optionSymbol} onChange={e=>setOptionSymbol(e.target.value.toUpperCase().replace(/[^A-Z.]/g,"").slice(0,10))} /></label><label>Directional outlook<select value={optionOutlook} onChange={e=>setOptionOutlook(e.target.value)}><option value="bullish">Bullish · long call</option><option value="bearish">Bearish · long put</option></select></label><label>Target expiration window<select value={optionTargetDte} onChange={e=>setOptionTargetDte(+e.target.value)}><option value="21">About 21 DTE</option><option value="45">About 45 DTE</option><option value="60">About 60 DTE</option><option value="90">About 90 DTE</option></select></label><label>Maximum premium risk<div className="money-input"><b>$</b><input type="number" min="50" value={optionMaxRisk} onChange={e=>setOptionMaxRisk(+e.target.value)} /></div></label><button onClick={findOptionContract}>Scan live chain →</button></div>{optionNotice&&<div className="option-notice">{optionNotice}</div>}{optionResult&&<article className="exact-contract"><div className="contract-verdict"><span>BEST CONTRACT CANDIDATE · VERIFY QUOTE BEFORE ACTING</span><h3>{optionResult.contract.contractSymbol}</h3><p>{optionResult.underlying} {optionResult.contract.expiration} ${optionResult.contract.strike.toFixed(2)} {optionResult.contract.type.toUpperCase()} · {optionResult.contract.dte} DTE</p></div><div className="contract-metrics"><span><small>Ask / debit</small><b>${optionResult.contract.ask.toFixed(2)}</b><em>${optionResult.contract.premium.toFixed(0)} per contract</em></span><span><small>Maximum loss</small><b>${optionResult.contract.maxLoss.toFixed(0)}</b><em>Long option premium</em></span><span><small>Breakeven</small><b>${optionResult.contract.breakeven.toFixed(2)}</b><em>At expiration</em></span><span><small>Delta</small><b>{optionResult.contract.delta.toFixed(2)}</b><em>Target near ±0.40</em></span><span><small>Spread</small><b>{optionResult.contract.spreadPct.toFixed(1)}%</b><em>Lower is better</em></span><span><small>IV</small><b>{optionResult.contract.iv===null?"N/A":`${(optionResult.contract.iv*100).toFixed(1)}%`}</b><em>{optionResult.feed} feed</em></span></div><div className="contract-explanation"><section><b>Why this contract ranked first</b>{optionResult.rationale.map(reason=><p key={reason}>✓ {reason}</p>)}</section><section><b>Mandatory checks</b>{optionResult.warnings.map(warning=><p key={warning}>! {warning}</p>)}</section></div><small>Chain timestamp: {new Date(optionResult.asOf).toLocaleString()}</small></article>}</section>}
+            <div className="investment-discovery-layout">
+              <div className="investment-results"><div className="investment-results-head"><span>{investmentCategory}</span><b>{categoryItems.length} results</b></div>{categoryItems.map(item=>{const fit=item.fit.includes(investorProfile);return <button className={`investment-result ${selectedInvestment.id===item.id?"selected":""}`} key={item.id} onClick={()=>setSelectedInvestmentId(item.id)}><span className="investment-symbol">{item.symbol.slice(0,5)}</span><span className="investment-name"><b>{item.name}</b><small>{item.subcategory} · {item.horizon}</small></span><span className={`fit-label ${fit?"good":"review"}`}>{fit?"Profile fit":"Review fit"}</span><strong>{item.score}<small>/100</small></strong><i>›</i></button>})}{!categoryItems.length&&<div className="empty-assets">No matches in this category. Try a broader search.</div>}</div>
+              <article className="investment-analysis">
+                <div className="analysis-top"><div><p>EXPLAINABLE ANALYSIS</p><h3>{selectedInvestment.symbol} · {selectedInvestment.name}</h3><span>{selectedInvestment.subcategory}</span></div><strong>{selectedInvestment.score}<small>/100 research score</small></strong></div>
+                <div className={`recommendation-verdict ${selectedFit?"fit":"caution"}`}><i aria-hidden="true">{selectedFit?"✓":"!"}</i><b>{selectedFit?`RECOMMENDED FOR RESEARCH · ${investorProfile.toUpperCase()} FIT`:`NOT A DEFAULT FIT FOR ${investorProfile.toUpperCase()}`}</b><span>{selectedFit?"The product matches the selected profile, but account data and current market evidence must still be checked.":"The risk, horizon, or complexity does not naturally match the selected profile. Review alternatives first."}</span></div>
+                <div className="investment-facts"><span><small>Risk</small><b>{selectedInvestment.risk}</b></span><span><small>Cost / structure</small><b>{selectedInvestment.cost}</b></span><span><small>Time horizon</small><b>{selectedInvestment.horizon}</b></span><span><small>Minimum</small><b>{selectedInvestment.minimum}</b></span></div>
+                <section className={`execution-plan ${sellReview?"sell":""}`}><div className="execution-head"><span>READ-ONLY ACTION PLAN</span><h3>{selectedAction}</h3><p>{selectedQuote?.bid&&selectedQuote?.ask?`Live bid $${selectedQuote.bid.toFixed(2)} · ask $${selectedQuote.ask.toFixed(2)}. Use a limit order near a verified quote; never assume the displayed price will execute.`:"Connect live bid/ask data before using a precise entry or quantity."}</p></div><div className="execution-grid"><span><small>Maximum allocation</small><b>${positionBudget.toLocaleString(undefined,{maximumFractionDigits:0})}</b><em>{(allocationRate*100).toFixed(1)}% profile cap; limited by your ${advisorAmount.toLocaleString()} available amount</em></span><span><small>Suggested quantity</small><b>{selectedReferencePrice>0?(suggestedShares>=1?`${Math.floor(suggestedShares)} whole shares`: `${suggestedShares.toFixed(2)} fractional shares`):"Quote required"}</b><em>{selectedReferencePrice>0?`Approximately $${Math.min(positionBudget,(suggestedShares>=1?Math.floor(suggestedShares):suggestedShares)*selectedReferencePrice).toFixed(0)} at $${selectedReferencePrice.toFixed(2)}`:"No quantity without a current ask"}</em></span><span><small>Buy only when</small><b>{sellReview?"Do not add while overvaluation rule is active":selectedInvestment.score>=82?"Valuation and trend confirmation agree":"Score improves and invalidation is defined"}</b><em>Verify cash reserves, debt and portfolio concentration first</em></span><span><small>Sell / reduce when</small><b>{sellReview?"Now requires review · premium exceeds 25%":"Thesis breaks, risk limit is hit, or price exceeds fair value by 25%"}</b><em>Also review taxes, replacement options and earnings risk</em></span></div></section>
+                {selectedFundamentals&&<section className="stock-fundamentals"><div className="fundamentals-title"><span>STOCK & ETF FUNDAMENTAL CHECK</span><b>Included in Northstar's research score</b></div><div className="fundamental-metrics"><span><small>P/E ratio</small><strong>{selectedFundamentals.pe.toFixed(1)}×</strong><p>{selectedFundamentals.pe>45?"High valuation: future growth expectations are demanding.":selectedFundamentals.pe<20?"Lower valuation: investigate whether risk or weak growth explains it.":"Moderate valuation: compare with its industry and history."}</p></span><span><small>{selectedInvestment.subcategory.includes("ETF")?"Fund size / AUM":"Market capitalization"}</small><strong>${selectedFundamentals.marketCap>=1000?(selectedFundamentals.marketCap/1000).toFixed(2)+"T":selectedFundamentals.marketCap+"B"}</strong><p>{selectedInvestment.subcategory.includes("ETF")?"Larger funds often provide stronger liquidity; size is not investment quality.":"Company size helps assess stability and concentration; it does not determine fair value."}</p></span><span><small>Five-year price growth</small><strong className="growth-positive">+{selectedFundamentals.growth5y}%</strong><p>Historical price change—not a forecast. Northstar also requires earnings, revenue and cash-flow quality.</p></span><span><small>{selectedInvestment.subcategory.includes("ETF")?"Distribution yield":"Dividend"}</small><strong>{selectedDividendYield>0?`Yes · ${selectedDividendYield.toFixed(2)}% yield`:"No regular dividend"}</strong><p>{selectedDividendYield>0?"Verify payout ratio, free-cash-flow coverage, dividend growth and the next ex-dividend date.":"The investment case depends on price appreciation and business growth rather than cash income."}</p></span><span className={sellReview?"sell-review-metric":""}><small>Price vs estimated fair value</small><strong>{valuationPremium!==null?`${valuationPremium>=0?"+":""}${valuationPremium.toFixed(1)}%`:"Provider required"}</strong><p>Market ${selectedFundamentals.price.toFixed(2)} vs model estimate ${selectedFairValue?.toFixed(2)}. Estimates must be updated as fundamentals change.</p></span></div>{valuationPremium!==null&&<div className={`valuation-decision ${sellReview?"sell":"hold"}`}><b>{sellReview?"SELL / REDUCE REVIEW · PRICE IS MORE THAN 25% ABOVE ESTIMATED FAIR VALUE":valuationPremium>0?"HOLD / VALUATION REVIEW · PRICE IS ABOVE ESTIMATED FAIR VALUE":"RESEARCH OPPORTUNITY · PRICE IS BELOW ESTIMATED FAIR VALUE"}</b><span>{sellReview?`The market price is ${valuationPremium.toFixed(1)}% above the model estimate. Review trimming or selling, but first verify the valuation model, thesis, taxes, position size, catalysts and replacement investment.`:`The valuation gap is ${valuationPremium.toFixed(1)}%. This does not trigger the greater-than-25% sell-review rule.`}</span></div>}</section>}
+                {!selectedFundamentals&&selectedInvestment.category==="Stocks & ETFs"&&<div className="fundamentals-missing"><b>Fundamental data required</b><span>Connect the live market provider to retrieve current P/E, market cap or fund AUM, five-year performance, revenue growth, earnings growth and cash flow before a recommendation.</span></div>}
+                {selectedInvestment.category==="Stocks & ETFs"&&<section className="decision-framework"><div className="framework-head"><div><span>DISCIPLINED VALUE + GROWTH + CHART PROCESS</span><h3>Why Northstar is—or is not—suggesting this investment</h3></div><strong>{transparentDecisionScore??"—"}<small>/100 partial evidence</small></strong></div><div className="framework-grid"><article className={fiveYearScore!==null&&fiveYearScore>=70?"pass":"review"}><i>{fiveYearScore!==null&&fiveYearScore>=70?"✓":"!"}</i><b>Five-year growth</b><strong>{selectedFundamentals?`+${selectedFundamentals.growth5y}% price history`:"Data required"}</strong><p>History is context, not a forecast. Revenue, EPS and free-cash-flow growth must confirm it.</p></article><article className={valuationScore!==null&&valuationScore>=70?"pass":"review"}><i>{valuationScore!==null&&valuationScore>=70?"✓":"!"}</i><b>Value / P-E</b><strong>{selectedFundamentals?`${selectedFundamentals.pe.toFixed(1)}× P/E`:"Data required"}</strong><p>Compared with growth, sector peers and history. Buffett-style quality still requires ROIC, cash flow and debt.</p></article><article className={sizeScore!==null&&sizeScore>=70?"pass":"review"}><i>{sizeScore!==null&&sizeScore>=70?"✓":"!"}</i><b>Market cap & durability</b><strong>{selectedFundamentals?`$${selectedFundamentals.marketCap>=1000?(selectedFundamentals.marketCap/1000).toFixed(2)+"T":selectedFundamentals.marketCap+"B"}`:"Data required"}</strong><p>Size supports liquidity analysis but never makes a company automatically safe or inexpensive.</p></article><article className={dividendScore!==null&&dividendScore>=70?"pass":"neutral"}><i>{selectedDividendYield>0?"$":"—"}</i><b>Dividend quality</b><strong>{selectedDividendYield>0?`${selectedDividendYield.toFixed(2)}% indicated yield`:"No regular dividend"}</strong><p>Require payout coverage, dividend growth and cut history; avoid chasing unusually high yield.</p></article><article className={technicalScore!==null&&technicalScore>=70?"pass":"review"}><i>{technicalScore===null?"?":technicalScore>=70?"✓":"!"}</i><b>Candles & chart signals</b><strong>{technicalScore===null?"Load this symbol’s chart":technicalScore>=70?"Trend confirmation present":"Trend confirmation weak"}</strong><p>Check candles, volume, support, resistance, moving averages, RSI and MACD together—not one signal alone.</p></article><article className="review"><i>!</i><b>News & catalyst check</b><strong>Verified feed required</strong><p>Policy, earnings and company news must be verified, evaluated for financial impact and checked for “already priced in” risk.</p></article></div><div className="framework-rule"><b>Decision rule</b><span>No “BUY RESEARCH” label should become actionable until quality, valuation, technical confirmation, news, portfolio fit and risk checks pass. Missing evidence lowers confidence—it is never silently assumed.</span></div></section>}
+                <div className="analysis-reasons"><section className="positive"><b><i>✓</i> Why it is on the list</b><p>{selectedInvestment.why}</p></section><section className="warning"><b><i>!</i> What can go wrong</b><p>{selectedInvestment.caution}</p></section></div>
+                <div className="analysis-next"><span>✦ NEXT REQUIRED ANALYSIS</span><b>{selectedInvestment.next}</b></div>
+                <div className="analysis-actions"><button onClick={()=>{sessionStorage.setItem("northstar-chart-symbol",selectedInvestment.symbol);navigate("Professional Charts")}}>View market evidence</button><button className="primary" onClick={()=>{const fundamentals=selectedFundamentals?` Current illustrative metrics: price $${selectedFundamentals.price.toFixed(2)}, P/E ${selectedFundamentals.pe.toFixed(1)}x, ${selectedInvestment.subcategory.includes("ETF")?"fund AUM":"market cap"} $${selectedFundamentals.marketCap>=1000?(selectedFundamentals.marketCap/1000).toFixed(2)+"T":selectedFundamentals.marketCap+"B"}, five-year price growth ${selectedFundamentals.growth5y}%, and ${selectedDividendYield>0?`an indicated dividend/distribution yield of ${selectedDividendYield.toFixed(2)}%`:"no regular dividend"}. Estimated fair value is $${selectedFairValue?.toFixed(2)} with a ${valuationPremium?.toFixed(1)}% valuation gap.`:"";const prompt=`Provide a full analysis of ${selectedInvestment.symbol} — ${selectedInvestment.name} for my ${investorProfile.toLowerCase()} profile. My goal is ${advisorGoal.toLowerCase()}, my time horizon is ${advisorHorizon.toLowerCase()}, and the amount is approximately $${advisorAmount.toLocaleString()}.${fundamentals} Explain in plain language: suitability, valuation, financial quality, five-year trend, dividend status and sustainability, risks, costs, diversification impact, bull/base/bear scenarios, better alternatives, and the exact evidence that would change the recommendation. If price is more than 25% above fair value, explain whether I should hold, trim, or sell after considering taxes and position size. Do not assume or place a trade.`;sessionStorage.setItem("northstar-full-analysis-prompt",prompt);navigate("Ask Northstar")}}>Ask for full analysis</button></div>
+              </article>
+            </div>
+            <div className="screener-foot"><span>✓ Category-specific criteria</span><span>✓ Profile and horizon fit</span><span>✓ Costs, risks and next evidence</span><b>Recommendation means research next—not automatic purchase</b></div>
+          </section>
+          <section className="intel card" id="market-intel">
+            <div className="intel-top">
+              <div>
+                <p>LIVE MARKET INTELLIGENCE</p>
+                <h2>Events that may change risk or opportunity</h2>
+                <span>
+                  <i /> Engine monitoring · demonstration feed
+                </span>
+              </div>
+              <div className="intel-actions">
+                <button onClick={()=>navigate("Settings")}>⚙ Alert preferences</button>
+                <button className="primary" onClick={()=>notify("Watch creation requires the authenticated connected-data form.")}>＋ Create watch</button>
+              </div>
+            </div>
+            <div className="intel-filters">
+              {["All", "ACT NOW TO REVIEW", "IMPORTANT", "WATCH", "INFO"].map(
+                (f) => (
+                  <button
+                    key={f}
+                    onClick={() => setAlertFilter(f)}
+                    className={alertFilter === f ? "active" : ""}
+                  >
+                    {f}
+                  </button>
+                ),
+              )}
+            </div>
+            <div className="alert-list">
+              {visibleAlerts.map((a) => (
+                <article key={a.title}>
+                  <div
+                    className={`urgency ${a.level.split(" ")[0].toLowerCase()}`}
+                  >
+                    {a.level}
+                  </div>
+                  <div className="alert-copy">
+                    <div>
+                      <span>{a.category}</span>
+                      <time>{a.time}</time>
+                    </div>
+                    <h3>{a.title}</h3>
+                    <p>
+                      <b>Verified source:</b> {a.source}
+                    </p>
+                    <p>
+                      <b>Portfolio fit:</b> {a.impact}
+                    </p>
+                    <div className="evidence">
+                      <span>
+                        Confidence <b>{a.confidence}%</b>
+                      </span>
+                      <span>
+                        Price reaction <b>{a.move}</b>
+                      </span>
+                      <span>
+                        Next step <b>{a.action}</b>
+                      </span>
+                    </div>
+                  </div>
+                  <button className="review" onClick={()=>document.querySelector(".causal")?.scrollIntoView({behavior:"smooth"})}>Open evidence chain →</button>
+                </article>
+              ))}
+            </div>
+            <div className="intel-foot">
+              <span>✓ Primary-source verification</span>
+              <span>✓ Rumor suppression</span>
+              <span>✓ Price-chase detection</span>
+              <span>✓ Portfolio concentration check</span>
+              <b>Alerts are research prompts—not trade orders.</b>
+            </div>
+          </section>
+          <div className="intel-grid">
+            <section className="card causal">
+              <div className="title">
+                <div>
+                  <p>CAUSAL CHAIN · FEATURED EVENT</p>
+                  <h2>Who may benefit—and who may lose</h2>
+                </div>
+                <span className="score">
+                  91<small>/100</small>
+                </span>
+              </div>
+              <div className="chain">
+                <span>
+                  <small>FORMAL ACTION</small>
+                  <b>Export restriction</b>
+                </span>
+                <i>→</i>
+                <span>
+                  <small>DIRECT EFFECT</small>
+                  <b>Foreign chip supply constrained</b>
+                </span>
+                <i>→</i>
+                <span>
+                  <small>SUBSTITUTION</small>
+                  <b>Domestic capacity demand</b>
+                </span>
+                <i>→</i>
+                <span>
+                  <small>SECOND ORDER</small>
+                  <b>Power, equipment, chemicals</b>
+                </span>
+              </div>
+              <div className="exposure-map">
+                <div>
+                  <b>Bullish beneficiaries to research</b>
+                  <span>
+                    AMAT <em>Equipment</em>
+                  </span>
+                  <span>
+                    LRCX <em>Equipment</em>
+                  </span>
+                  <span>
+                    VRT <em>Data-center power</em>
+                  </span>
+                </div>
+                <div>
+                  <b>Potential losers / risks</b>
+                  <span>
+                    Restricted suppliers <em>Revenue risk</em>
+                  </span>
+                  <span>
+                    Chip designers <em>China exposure</em>
+                  </span>
+                  <span>
+                    SMH ETF <em>Your allocation is overweight</em>
+                  </span>
+                </div>
+              </div>
+              <div className="thesis-check">
+                <span>
+                  <b>Already priced in?</b> Partly—headline beneficiary is up
+                  8.4%. Avoid chasing.
+                </span>
+                <span>
+                  <b>Invalidation:</b> Policy delay, exemptions, or limited
+                  revenue impact.
+                </span>
+                <span>
+                  <b>Watch next:</b> Implementation date, company guidance,
+                  volume confirmation.
+                </span>
+              </div>
+            </section>
+            <section className="card trackers">
+              <div className="title">
+                <div>
+                  <p>WATCH NETWORK</p>
+                  <h2>Sources and people</h2>
+                </div>
+              </div>
+              {[
+                [
+                  "White House & Congress",
+                  "Policy, tariffs, fiscal action",
+                  "LIVE","https://www.whitehouse.gov/news/",
+                ],
+                ["Federal Reserve", "Rates, liquidity, bank policy", "LIVE","https://www.federalreserve.gov/newsevents/pressreleases.htm"],
+                ["SEC · FDA · FTC", "Filings and regulatory decisions", "LIVE","https://www.sec.gov/newsroom"],
+                ["CEOs & founders", "Verified public statements", "WATCH","https://www.sec.gov/search-filings"],
+                [
+                  "13F & insider filings",
+                  "Legally public · delayed",
+                  "DELAYED","https://www.sec.gov/search-filings",
+                ],
+              ].map((x) => (
+                <div className="tracker" key={x[0]}>
+                  <span>
+                    <i />{" "}
+                    <b>
+                      {x[0]}
+                      <small>{x[1]}</small>
+                    </b>
+                  </span>
+                  <span className="tracker-actions"><em>{x[2]}</em><a href={x[3]} target="_blank" rel="noopener noreferrer" aria-label={`Open official source for ${x[0]} in a new tab`}>Open ↗</a></span>
+                </div>
+              ))}
+              <div className="filing-note">
+                Public filings may be delayed by days or weeks. Northstar never
+                labels delayed disclosures as real-time insider knowledge.
+              </div>
+            </section>
+          </div>
+          <section className="themes card">
+            <div className="title">
+              <div>
+                <p>THEME DISCOVERY ENGINE</p>
+                <h2>Multiple events are converging</h2>
+              </div>
+              <button onClick={()=>navigate("Market Intel")}>Explore all themes →</button>
+            </div>
+            <div className="theme-list">
+              {[
+                [
+                  "AI electricity demand",
+                  "7 confirming events",
+                  "Nuclear · grid · cooling · copper",
+                  "Strong",
+                ],
+                [
+                  "Domestic manufacturing",
+                  "5 confirming events",
+                  "Automation · construction · chemicals",
+                  "Building",
+                ],
+                [
+                  "Cybersecurity regulation",
+                  "4 confirming events",
+                  "Identity · cloud · compliance",
+                  "Early",
+                ],
+                [
+                  "Defense modernization",
+                  "6 confirming events",
+                  "Drones · space · secure communications",
+                  "Strong",
+                ],
+              ].map((x) => (
+                <div key={x[0]}>
+                  <span>
+                    <b>{x[0]}</b>
+                    <small>{x[1]}</small>
+                  </span>
+                  <span>{x[2]}</span>
+                  <em>{x[3]}</em>
+                </div>
+              ))}
+            </div>
+          </section>
+          <div className="main-grid" id="scanner">
+            <section className="card scanner">
+              <div className="title">
+                <div>
+                  <p>AI OPPORTUNITY SCANNER</p>
+                  <h2>{tab==="Scanner"?"Full ranked setup list":"Setups worth studying"}</h2>
+                </div>
+                {tab!=="Scanner"&&<button onClick={() => navigate("Scanner")}>View all →</button>}
+              </div>
+              {(tab==="Scanner"?scannerOpportunities:opportunities).map((o) => (
+                <button
+                  className={pick.ticker === o.ticker ? "opp selected" : "opp"}
+                  key={o.ticker}
+                  onClick={() => {
+                    setPick(o);
+                    setEntry(o.price);
+                    setStop(+(o.price * 0.975).toFixed(2));
+                    setTarget(+(o.price * 1.06).toFixed(2));
+                  }}
+                >
+                  <span className="symbol">{o.ticker[0]}</span>
+                  <span>
+                    <b>{o.ticker}</b>
+                    <small>{o.setup}</small>
+                  </span>
+                  <span className="trend">{o.trend}</span>
+                  <strong>
+                    {o.score}
+                    <small>/100</small>
+                  </strong>
+                </button>
+              ))}
+            </section>
+            <section className="card rationale">
+              <div className="title">
+                <div>
+                  <p>EXPLAINABLE DECISION · MULTI-TIMEFRAME</p>
+                  <h2>{pick.ticker} · Wait for confirmation</h2>
+                </div>
+                <span className="score">
+                  {pick.score}
+                  <small>/100</small>
+                </span>
+              </div>
+              <div className="verdict">
+                NOT AN ORDER · CONDITIONAL SETUP · WEEKLY ↑ · DAILY ↑ · 1H ↔
+              </div>
+              <p className="summary">
+                {pick.name} is in a constructive higher-timeframe trend and
+                pulling toward support. The current location is interesting, but
+                entering before price proves demand could mean catching a deeper
+                decline.
+              </p>
+              <div className="why">
+                <div>
+                  <b>Why it may work</b>
+                  <ul>
+                    <li>
+                      Weekly and daily structure show higher highs and lows
+                    </li>
+                    <li>
+                      Support at ${pick.support} offers a defined invalidation
+                      area
+                    </li>
+                    <li>
+                      Relative volume is {pick.volume}, showing active
+                      participation
+                    </li>
+                  </ul>
+                </div>
+                <div>
+                  <b>What can go wrong</b>
+                  <ul>
+                    <li>Close below support breaks the thesis</li>
+                    <li>{pick.catalyst} can increase gap risk</li>
+                    <li>Broad-market weakness may override the setup</li>
+                  </ul>
+                </div>
+              </div>
+              <div className="condition">
+                <span>ENTRY CONDITION</span>
+                <b>
+                  Wait for a bullish candle to reclaim support with
+                  above-average volume.
+                </b>
+              </div>
+              <div className="scenarios">
+                <span>
+                  <b>42%</b>Bull: retest then continuation
+                </span>
+                <span>
+                  <b>38%</b>Neutral: range continues
+                </span>
+                <span>
+                  <b>20%</b>Bear: support fails
+                </span>
+              </div>
+            </section>
+          </div>
+          <section className="card planner" id="trade-planner">
+            <div className="title">
+              <div>
+                <p>MANDATORY RISK CHECK</p>
+                <h2>Position blueprint</h2>
+              </div>
+              <span className={calc.rr >= 2 ? "pass" : "warn"}>
+                {calc.rr >= 2 ? "✓ Passes rules" : "! Improve reward/risk"}
+              </span>
+            </div>
+            <div className="plan-grid">
+              <div className="fields">
+                <label>
+                  Account size ($)
+                  <input
+                    type="number"
+                    value={capital}
+                    onChange={(e) => setCapital(+e.target.value)}
+                  />
+                </label>
+                <label>
+                  Maximum risk (%)
+                  <input
+                    type="number"
+                    step=".1"
+                    max="1"
+                    value={risk}
+                    onChange={(e) => setRisk(+e.target.value)}
+                  />
+                </label>
+                <label>
+                  Entry ($)
+                  <input
+                    type="number"
+                    value={entry}
+                    onChange={(e) => setEntry(+e.target.value)}
+                  />
+                </label>
+                <label>
+                  Invalidation / stop ($)
+                  <input
+                    type="number"
+                    value={stop}
+                    onChange={(e) => setStop(+e.target.value)}
+                  />
+                </label>
+                <label>
+                  First target ($)
+                  <input
+                    type="number"
+                    value={target}
+                    onChange={(e) => setTarget(+e.target.value)}
+                  />
+                </label>
+              </div>
+              <div className="blueprint">
+                <p>MAXIMUM POSITION</p>
+                <strong>
+                  {calc.shares.toLocaleString()} <small>shares</small>
+                </strong>
+                <span>
+                  Capital exposure{" "}
+                  <b>
+                    $
+                    {calc.exposure.toLocaleString(undefined, {
+                      maximumFractionDigits: 0,
+                    })}
+                  </b>
+                </span>
+                <span>
+                  Maximum planned loss{" "}
+                  <b className="red">−${calc.max.toFixed(2)}</b>
+                </span>
+                <span>
+                  Reward / risk <b>{calc.rr.toFixed(1)} : 1</b>
+                </span>
+                <button onClick={() => navigate("Paper trade")}>
+                  Practice this plan
+                </button>
+                <em>No live order will be sent.</em>
+              </div>
+            </div>
+          </section>
+          <div className="lower-grid">
+            <section className="card ask" id="ask-northstar">
+              <div className="title">
+                <div>
+                  <p>SHOULD I ENTER?</p>
+                  <h2>Challenge your trade idea</h2>
+                </div>
+              </div>
+              <textarea
+                value={question}
+                onChange={(e) => setQuestion(e.target.value)}
+              />
+              <button className="primary" onClick={() => setAnalyzed(true)}>
+                Analyze entry
+              </button>
+              {analyzed && (
+                <div className="answer">
+                  <b>Verdict: wait for evidence.</b>
+                  <p>
+                    At this entry, the idea has reasonable upside but
+                    confirmation is incomplete. A stronger plan is to wait for
+                    price to hold above $180, then form a bullish candle with
+                    improving volume. Do not enter if the broader semiconductor
+                    sector weakens.
+                  </p>
+                  <span>
+                    Invalidation: daily close below $176.90 · Target: $192.50 ·
+                    Risk/reward: {calc.rr.toFixed(1)}:1
+                  </span>
+                </div>
+              )}
+            </section>
+            <section className="card events">
+              <div className="title">
+                <div>
+                  <p>CATALYST RADAR</p>
+                  <h2>What could move markets</h2>
+                </div>
+              </div>
+              <div>
+                <time>10:00 ET</time>
+                <span>
+                  <b>Consumer confidence</b>
+                  <small>High-impact macro event · volatility possible</small>
+                </span>
+                <em>HIGH</em>
+              </div>
+              <div>
+                <time>14:00 ET</time>
+                <span>
+                  <b>Federal Reserve speaker</b>
+                  <small>Watch rate-sensitive sectors and bond yields</small>
+                </span>
+                <em>MED</em>
+              </div>
+              <div>
+                <time>FRI</time>
+                <span>
+                  <b>U.S. jobs report</b>
+                  <small>Could change expectations for interest rates</small>
+                </span>
+                <em>HIGH</em>
+              </div>
+              <p className="news-note">
+                Public-figure statements are treated as unverified catalysts
+                until confirmed by primary reporting and visible market
+                reaction.
+              </p>
+            </section>
+          </div>
+          <section className="cash-command card" id="bills-cards">
+            <div className="title">
+              <div>
+                <p>HOUSEHOLD CASH-FLOW COMMAND CENTER</p>
+                <h2>Everything due, before you invest</h2>
+              </div>
+              <button onClick={() => navigate("Bills & cards")}>
+                Manage bills & cards →
+              </button>
+            </div>
+            <div className="cash-equation">
+              <span>
+                <small>Expected monthly income</small>
+                <b>${monthlyIncome.toLocaleString()}</b>
+              </span>
+              <i>−</i>
+              <span>
+                <small>Recurring bills</small>
+                <b>${monthlyBills.toLocaleString()}</b>
+              </span>
+              <i>−</i>
+              <span>
+                <small>Card minimums</small>
+                <b>${cardMinimums}</b>
+              </span>
+              <i>−</i>
+              <span>
+                <small>Other loan payments</small>
+                <b>$3,258</b>
+              </span>
+              <i>=</i>
+              <span className={freeCash < 0 ? "danger-cash" : "safe-cash"}>
+                <small>Projected free cash</small>
+                <b>${freeCash.toLocaleString()}</b>
+              </span>
+            </div>
+            <div className="cash-advice">
+              <b>Northstar decision</b>
+              <span>
+                Do not add money to trading this month. The projected cash flow
+                is negative and the Visa balance costs 24.9% APR. Cover
+                obligations, preserve liquidity, then direct surplus to the
+                card.
+              </span>
+            </div>
+          </section>
+          <div className="bills-grid">
+            <section className="card bill-center">
+              <div className="title">
+                <div>
+                  <p>UPCOMING BILLS</p>
+                  <h2>${monthlyBills.toLocaleString()} due this month</h2>
+                </div>
+                <button onClick={()=>notify("Bill creation will save to D1 after authentication is configured.")}>＋ Add bill</button>
+              </div>
+              <div className="bill-head">
+                <span>Bill</span>
+                <span>Due</span>
+                <span>Amount</span>
+                <span>Autopay</span>
+              </div>
+              {bills.map((b) => (
+                <div className="bill-row" key={b.name}>
+                  <span className="bill-name">
+                    <i>{b.name[0]}</i>
+                    <b>
+                      {b.name}
+                      <small>{b.category}</small>
+                    </b>
+                  </span>
+                  <span>{b.due}</span>
+                  <b>${b.amount}</b>
+                  <span className={b.autopay ? "autopay" : "manual"}>
+                    {b.autopay ? "ON" : "MANUAL"}
+                  </span>
+                  {b.change > 0 && <em>↑ ${b.change}</em>}
+                </div>
+              ))}
+              <div className="bill-foot">
+                <span>Annual recurring total</span>
+                <b>${(monthlyBills * 12).toLocaleString()}</b>
+                <span>3 bills increased · $37/month</span>
+              </div>
+            </section>
+            <section className="card bill-insights">
+              <div className="title">
+                <div>
+                  <p>BILL INTELLIGENCE</p>
+                  <h2>Needs attention</h2>
+                </div>
+              </div>
+              <div className="insight urgent">
+                <b>Auto insurance due in 12 days</b>
+                <span>
+                  Autopay is off. Missing this payment could create a coverage
+                  lapse.
+                </span>
+                <button onClick={()=>notify("Payment-plan reminder marked for review. No money was moved.")}>Mark payment plan →</button>
+              </div>
+              <div className="insight">
+                <b>Subscriptions rose 17.5%</b>
+                <span>
+                  Streaming increased by $7. Review usage before the next
+                  renewal.
+                </span>
+                <button onClick={()=>document.querySelector(".bill-center")?.scrollIntoView({behavior:"smooth"})}>Review subscriptions →</button>
+              </div>
+              <div className="insight">
+                <b>Electricity is above trend</b>
+                <span>
+                  This bill is $18 higher than the three-month average.
+                </span>
+                <button onClick={()=>document.getElementById("market-charts")?.scrollIntoView({behavior:"smooth"})}>Compare history →</button>
+              </div>
+            </section>
+          </div>
+          <section className="cards-center card">
+            <div className="title">
+              <div>
+                <p>CREDIT CARD CONTROL</p>
+                <h2>Pay expensive revolving debt first</h2>
+              </div>
+              <span className="warn">1 HIGH-RISK CARD</span>
+            </div>
+            <div className="card-table">
+              <div className="card-head">
+                <span>Account</span>
+                <span>Balance / available</span>
+                <span>Utilization</span>
+                <span>APR</span>
+                <span>Minimum / due</span>
+                <span>Rewards</span>
+              </div>
+              {cards.map((c) => {
+                const utilization = (c.balance / c.limit) * 100;
+                return (
+                  <div className="credit-row" key={c.name}>
+                    <span>
+                      <i>◫</i>
+                      <b>
+                        {c.name}
+                        <small>${c.limit.toLocaleString()} limit</small>
+                      </b>
+                    </span>
+                    <span>
+                      <b>${c.balance.toLocaleString()}</b>
+                      <small>
+                        ${(c.limit - c.balance).toLocaleString()} available
+                      </small>
+                    </span>
+                    <span>
+                      <b className={utilization > 50 ? "red" : ""}>
+                        {utilization.toFixed(1)}%
+                      </b>
+                      <i className="util">
+                        <i style={{ width: `${utilization}%` }} />
+                      </i>
+                    </span>
+                    <span>
+                      <b className={c.apr > 20 ? "red" : ""}>{c.apr}%</b>
+                      <small>
+                        ${Math.round((c.balance * c.apr) / 1200)}/mo est.
+                      </small>
+                    </span>
+                    <span>
+                      <b>${c.min}</b>
+                      <small>{c.due}</small>
+                    </span>
+                    <span>
+                      <b>{c.rewards}</b>
+                      <small>Current value</small>
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+            <div className="card-scenario">
+              <div>
+                <p>PAYOFF SCENARIO · VISA SIGNATURE</p>
+                <h3>What if I pay an extra ${extraCard}?</h3>
+                <input
+                  type="range"
+                  min="0"
+                  max="1500"
+                  step="50"
+                  value={extraCard}
+                  onChange={(e) => setExtraCard(+e.target.value)}
+                />
+              </div>
+              <span>
+                <small>New monthly payment</small>
+                <b>${248 + extraCard}</b>
+              </span>
+              <span>
+                <small>Estimated payoff</small>
+                <b>{Math.max(5, 34 - Math.round(extraCard / 55))} months</b>
+              </span>
+              <span>
+                <small>Estimated interest saved</small>
+                <b>${Math.round(extraCard * 5.8).toLocaleString()}</b>
+              </span>
+              <button onClick={()=>notify(`Payoff scenario saved for review: extra $${extraCard}/month. No payment was sent.`)}>Apply to payoff plan</button>
+            </div>
+            <p className="fine cards-fine">
+              Estimates assume no new charges and a stable APR. The card
+              issuer’s minimum-payment formula may change.
+            </p>
+          </section>
+          <section className="debt-health card" id="liabilities">
+            <div className="title">
+              <div>
+                <p>PERSONAL FINANCE · LIABILITIES</p>
+                <h2>Household debt dashboard</h2>
+              </div>
+              <button onClick={() => navigate("Liabilities")}>
+                Open full debt center →
+              </button>
+            </div>
+            <div className="health-metrics">
+              <span>
+                <small>Total liabilities</small>
+                <b>${totalDebt.toLocaleString()}</b>
+              </span>
+              <span>
+                <small>Monthly obligations</small>
+                <b>$3,258</b>
+              </span>
+              <span>
+                <small>Weighted APR</small>
+                <b>{weightedApr.toFixed(2)}%</b>
+              </span>
+              <span>
+                <small>Debt-to-income</small>
+                <b>31.4%</b>
+              </span>
+              <span>
+                <small>Home equity</small>
+                <b>$164,360</b>
+              </span>
+            </div>
+            <div className="debt-list">
+              {debts.map((d) => (
+                <div key={d.name}>
+                  <span className="debt-type">{d.type[0]}</span>
+                  <span>
+                    <b>{d.name}</b>
+                    <small>
+                      {d.type} · ${d.payment}/month
+                    </small>
+                  </span>
+                  <span>
+                    <small>Balance</small>
+                    <b>${d.balance.toLocaleString()}</b>
+                  </span>
+                  <span>
+                    <small>APR</small>
+                    <b className={d.apr > 12 ? "red" : ""}>{d.apr}%</b>
+                  </span>
+                  <em className={d.urgency === "Critical" ? "critical" : ""}>
+                    {d.urgency}
+                  </em>
+                </div>
+              ))}
+            </div>
+          </section>
+          <div className="finance-grid">
+            <section className="card mortgage">
+              <div className="title">
+                <div>
+                  <p>MORTGAGE INTELLIGENCE</p>
+                  <h2>What if I pay extra?</h2>
+                </div>
+                <span className="pass">4.125% FIXED</span>
+              </div>
+              <div className="mortgage-stats">
+                <span>
+                  <small>Home value</small>
+                  <b>$452,000</b>
+                </span>
+                <span>
+                  <small>Mortgage balance</small>
+                  <b>$287,640</b>
+                </span>
+                <span>
+                  <small>Estimated equity</small>
+                  <b>$164,360</b>
+                </span>
+                <span>
+                  <small>Loan-to-value</small>
+                  <b>63.6%</b>
+                </span>
+              </div>
+              <label className="extra">
+                Additional monthly principal <b>${extraMortgage}</b>
+                <input
+                  type="range"
+                  min="0"
+                  max="1500"
+                  step="50"
+                  value={extraMortgage}
+                  onChange={(e) => setExtraMortgage(+e.target.value)}
+                />
+              </label>
+              <div className="savings">
+                <span>
+                  <small>Estimated time saved</small>
+                  <b>{((extraMortgage / 100) * 1.4).toFixed(1)} years</b>
+                </span>
+                <span>
+                  <small>Estimated interest saved</small>
+                  <b>${Math.round(extraMortgage * 142).toLocaleString()}</b>
+                </span>
+                <span>
+                  <small>New projected payoff</small>
+                  <b>{2049 - Math.round((extraMortgage / 100) * 1.4)}</b>
+                </span>
+              </div>
+              <p className="fine">
+                Illustrative amortization scenario. Taxes, escrow, rate changes,
+                and lender rules can affect actual results.
+              </p>
+            </section>
+            <section className="card next-money">
+              <div className="title">
+                <div>
+                  <p>HOUSEHOLD DECISION ASSISTANT</p>
+                  <h2>What should I do with my next $500?</h2>
+                </div>
+              </div>
+              <div className="priority">
+                <strong>1</strong>
+                <span>
+                  <b>Pay the 24.9% credit card</b>
+                  <small>
+                    A guaranteed reduction in high-cost interest is stronger
+                    than uncertain market returns.
+                  </small>
+                </span>
+              </div>
+              <div className="priority">
+                <strong>2</strong>
+                <span>
+                  <b>Build emergency reserves</b>
+                  <small>
+                    You currently have about one month. Target at least three
+                    before increasing trading risk.
+                  </small>
+                </span>
+              </div>
+              <div className="priority muted">
+                <strong>3</strong>
+                <span>
+                  <b>Mortgage or investing</b>
+                  <small>
+                    Compare after-tax mortgage cost with uncertain
+                    investment-return ranges after the first two priorities.
+                  </small>
+                </span>
+              </div>
+              <div className="decision-warning">
+                Investing $500 now could expose the household while expensive
+                debt compounds at 24.9% APR.
+              </div>
+            </section>
+          </div>
+          <section className="household card" id="household">
+            <div className="title">
+              <div>
+                <p>HOUSEHOLD & PERMISSIONS</p>
+                <h2>Your shared financial team</h2>
+              </div>
+              <button onClick={()=>notify("Invitations require production authentication and verified email delivery. No invitation was sent.")}>＋ Invite member</button>
+            </div>
+            <div className="members">
+              <span>
+                <i className="avatar">{displayInitials}</i>
+                <b>
+                  {displayName}<small>{accountEmail} · Owner · full control</small>
+                </b>
+                <em>YOU</em>
+              </span>
+              <span>
+                <i className="avatar rose">AM</i>
+                <b>
+                  Alex M.<small>Co-manager · can view and update</small>
+                </b>
+                <em>ACTIVE</em>
+              </span>
+              <span>
+                <i className="avatar gold-bg">LM</i>
+                <b>
+                  Lucía M.<small>Viewer · education and goals only</small>
+                </b>
+                <em>INVITED</em>
+              </span>
+            </div>
+            <div className="role-note">
+              <b>Role protection</b>
+              <span>
+                Owners manage access. Co-managers can update household finances
+                but cannot remove owners. Viewers see only categories explicitly
+                shared with them. Every sensitive change is logged.
+              </span>
+            </div>
+          </section>
+          <section className="attention card" id="attention-settings">
+            <div className="title">
+              <div>
+                <p>MOBILE, TIMEZONE & BEHAVIOR GUARDRAILS</p>
+                <h2>Stay informed without living in the market</h2>
+              </div>
+              <span className="pass">INSTALLABLE PWA</span>
+            </div>
+            <div className="attention-grid">
+              <div className="setting-block">
+                <b>Market timezone</b>
+                <p>
+                  Arizona uses Mountain Standard Time year-round. Northstar
+                  converts exchange hours and alerts automatically.
+                </p>
+                <label>
+                  Home timezone
+                  <select
+                    value={timezone}
+                    onChange={(e) => setTimezone(e.target.value)}
+                  >
+                    <option value="auto">Use current device timezone</option>
+                    {globalTimezones.map(zone => <option value={zone} key={zone}>{zone.replace(/_/g," ")}</option>)}
+                  </select>
+                </label>
+                <label className="switch-row">
+                  <input
+                    type="checkbox"
+                    checked={travelMode}
+                    onChange={(e) => setTravelMode(e.target.checked)}
+                  />
+                  <span>
+                    <b>Travel mode</b>
+                    <small>
+                      {travelMode
+                        ? "Following device timezone; exchange times remain anchored to New York."
+                        : "Home timezone stays fixed when traveling."}
+                    </small>
+                  </span>
+                </label>
+              </div>
+              <div className="setting-block">
+                <b>Daily analysis budget</b>
+                <p>
+                  Limit deliberate market analysis to reduce fatigue,
+                  overtrading, and emotionally driven decisions.
+                </p>
+                <div className="limit-value">
+                  <strong>{dailyLimit}</strong>
+                  <span>minutes per market day</span>
+                </div>
+                <input
+                  type="range"
+                  min="20"
+                  max="120"
+                  step="10"
+                  value={dailyLimit}
+                  onChange={(e) => setDailyLimit(+e.target.value)}
+                />
+                <div className="session-plan">
+                  <span>
+                    <b>40 min</b>Opening context
+                  </span>
+                  <span>
+                    <b>10 min</b>Closing review
+                  </span>
+                  <span>
+                    <b>10 min</b>Reserved for alerts
+                  </span>
+                </div>
+              </div>
+              <div className="setting-block">
+                <b>Mobile push notifications</b>
+                <p>
+                  Only IMPORTANT and ACT NOW TO REVIEW events interrupt you.
+                  INFO and WATCH stay in the daily digest.
+                </p>
+                <button
+                  className="primary notify"
+                  onClick={enableNotifications}
+                >
+                  Enable device alerts
+                </button>
+                <span className="notify-status">{notifyStatus}</span>
+                <small className="setup-note">
+                  Web Push delivery requires a deployed HTTPS origin, a
+                  push-signing key, and a server subscription endpoint.
+                </small>
+              </div>
+              <div className="setting-block provider-setting" id="market-data-settings">
+                <b>Market Data & Clock</b>
+                <p>Connect the official U.S. exchange clock for trading days, holidays, early closes, and timezone-aware countdowns.</p>
+                <div className={`connection-state ${marketClock.status==="connected"?"connected":"missing"}`}><i />{marketClock.status==="connected"?"Connected · official clock active":"Not connected · setup required"}</div>
+                <div className="config-keys"><span><b>ALPACA_API_KEY</b><small>Your read-only/paper Alpaca key ID</small></span><span><b>ALPACA_API_SECRET</b><small>Your secret key—server only</small></span><span><b>ALPACA_CLOCK_BASE_URL</b><small>https://paper-api.alpaca.markets</small></span></div>
+                <div className="setup-steps"><b>Local setup</b><span>1. Open the Northstar Trading project’s <code>.env.local</code> file.</span><span>2. Add the three values shown above.</span><span>3. Restart the local app, then test the connection.</span></div>
+                <button className="primary notify" onClick={testMarketClock}>Test market-clock connection</button>
+                <small className="setup-note">Credentials are never entered into this browser page or exposed to client code.</small>
+              </div>
+            </div>
+            <div className="discipline-rules">
+              <span>✓ No alerts during sleep hours</span>
+              <span>✓ Maximum 3 urgent alerts/day</span>
+              <span>✓ 10-minute cooling-off before trade planning</span>
+              <span>✓ Session locks after daily limit</span>
+              <span>✓ Vacation digest mode</span>
+            </div>
+          </section>
+          <section className="decision-journal card" id="decision-journal">
+            <div className="journal-head"><div><span>▤ SYNCHRONIZED DECISION JOURNAL</span><h2>Record the evidence before you act</h2><p>The journal now follows the same valuation, growth, dividend, Bollinger/chart, news, portfolio-fit, and risk checks used by the advisor.</p></div><strong>{journalEntries.length}<small>saved decisions</small></strong></div>
+            <div className="journal-layout"><form onSubmit={e=>{e.preventDefault();saveJournalEntry()}}><div className="journal-basics"><label>Symbol / asset<input value={journalForm.symbol} onChange={e=>setJournalForm(current=>({...current,symbol:e.target.value.toUpperCase()}))} placeholder="AAPL, VTI, SCHD…"/></label><label>Decision<select value={journalForm.decision} onChange={e=>setJournalForm(current=>({...current,decision:e.target.value}))}><option>Watch / wait</option><option>Research for possible buy</option><option>Hold</option><option>Reduce / sell review</option><option>Avoid</option><option>Paper trade only</option></select></label><label>Time horizon<select value={journalForm.timeframe} onChange={e=>setJournalForm(current=>({...current,timeframe:e.target.value}))}><option>Days / trading</option><option>2–3 years</option><option>5 years</option><option>10+ years</option></select></label><label>Emotional state<select value={journalForm.emotion} onChange={e=>setJournalForm(current=>({...current,emotion:e.target.value}))}><option>Calm</option><option>Excited / FOMO</option><option>Fearful</option><option>Recovering from a loss</option><option>Overconfident</option></select></label></div><div className="journal-fields"><label><span>✦ Observation and thesis</span><textarea value={journalForm.thesis} onChange={e=>setJournalForm(current=>({...current,thesis:e.target.value}))} placeholder="What do I believe, over what period, and why?"/></label><label><span>✓ Business quality and five-year growth</span><textarea value={journalForm.fundamentals} onChange={e=>setJournalForm(current=>({...current,fundamentals:e.target.value}))} placeholder="Revenue, EPS, free cash flow, margins, debt, market cap…"/></label><label><span>$ Valuation and dividend</span><textarea value={journalForm.valuation} onChange={e=>setJournalForm(current=>({...current,valuation:e.target.value}))} placeholder="P/E vs history/peers, margin of safety, yield, payout coverage…"/></label><label><span>⌁ Candles, Bollinger Bands and confirmation</span><textarea value={journalForm.technical} onChange={e=>setJournalForm(current=>({...current,technical:e.target.value}))} placeholder="Timeframe, bands, candle pattern, volume, support, resistance, RSI/MACD…"/></label><label><span>◉ News and catalysts</span><textarea value={journalForm.news} onChange={e=>setJournalForm(current=>({...current,news:e.target.value}))} placeholder="Verified source, financial impact, price reaction, already priced in?"/></label><label className="required"><span>! Risk and invalidation</span><textarea value={journalForm.risk} onChange={e=>setJournalForm(current=>({...current,risk:e.target.value}))} placeholder="What specific evidence proves this idea wrong? Maximum acceptable loss?"/></label></div><div className="journal-save"><p><u>Required decision structure:</u> Observation → Evidence → Risk → Recommendation → Why → Invalidation → What to monitor.</p><button className="primary" type="submit">Save decision record</button>{journalNotice&&<span>{journalNotice}</span>}</div></form><aside className="journal-history"><h3>Recent decisions</h3>{journalEntries.slice(0,6).map(entry=><article key={entry.id}><div><b>{entry.symbol}</b><em>{entry.decision}</em></div><time>{new Date(entry.createdAt).toLocaleDateString()} · {entry.timeframe}</time><p>{entry.thesis}</p><span>Invalidation: {entry.risk}</span></article>)}{!journalEntries.length&&<div className="journal-empty">No decisions recorded yet. The purpose is to preserve what you knew and felt before seeing the outcome.</div>}</aside></div>
+          </section>
+          <section className="help-guide card" id="help-guide">
+            <div className="title">
+              <div>
+                <p>HELP & APP GUIDE</p>
+                <h2>How to use Northstar safely and effectively</h2>
+              </div>
+              <span className="guide-status">8-part guide</span>
+            </div>
+            <div className="guide-start">
+              <strong>Your focused daily workflow</strong>
+              <ol>
+                <li><b>Cover essentials.</b> Review bills, emergency savings, and expensive debt before taking market risk.</li>
+                <li><b>Read the market.</b> Check the regime, calendar, and important alerts—not every headline.</li>
+                <li><b>Investigate an opportunity.</b> Open its explanation, evidence, opposing case, and invalidation condition.</li>
+                <li><b>Plan before acting.</b> Set entry, stop, target, and position size; then respect your daily time limit.</li>
+              </ol>
+            </div>
+            <div className="guide-grid">
+              <article><span>01</span><h3>Market Intelligence</h3><p>ACT NOW TO REVIEW means time-sensitive research, not an automatic trade. IMPORTANT affects a thesis; WATCH belongs on your list; INFO stays in the digest.</p></article>
+              <article><span>02</span><h3>Opportunity Scanner</h3><p>Ranks setups using trend, valuation, catalysts, sentiment, and risk. Select a symbol to see why it qualifies and what evidence could invalidate it.</p></article>
+              <article><span>03</span><h3>Trade Planner</h3><p>Enter an intended entry, stop, target, and account risk. Northstar calculates risk/reward and a disciplined position-size blueprint before any order.</p></article>
+              <article><span>04</span><h3>Money & Debt</h3><p>Bills, cards, loans, mortgage, savings, and investments share one financial picture. High-cost debt and weak reserves can lower investing capacity.</p></article>
+              <article><span>05</span><h3>Household Access</h3><p>Invite family members and assign roles. An owner can manage everything; collaborators should receive only the permissions needed for shared finances.</p></article>
+              <article><span>06</span><h3>Alerts & Focus</h3><p>Choose your timezone, travel mode, daily analysis limit, quiet hours, and alert urgency. Push alerts require HTTPS plus a configured notification service.</p></article>
+              <article><span>07</span><h3>Accounts & Security</h3><p>Email or SMS verification requires a production OTP provider. The visible bypass is localhost-only for development and must never ship in production.</p></article>
+              <article><span>08</span><h3>Data Connections</h3><p>Live quotes, brokerage orders, bank balances, news, email/SMS, and push delivery require approved provider credentials. Illustrative data is clearly labeled.</p></article>
+            </div>
+            <div className="guide-safety">
+              <b>Decision rule:</b>
+              <span>Northstar explains evidence and uncertainty; it does not promise profit or automatically move money. Confirm prices, fees, taxes, and account details with the connected institution before acting.</span>
+            </div>
+          </section>
+          <section className="academy-hub card" id="academy-course">
+            <div className="academy-banner"><div><p>NORTHSTAR ACADEMY · 20-WEEK GUIDE</p><h2>Read, practice, test, and improve your decisions</h2><span>Structured from your investment and trading workbook.</span></div><strong>{completedWeeks.length}<small>/20 complete</small></strong></div>
+            <div className="academy-library"><div><span>PRIVATE DOCUMENT LIBRARY</span><h3>Mi Libro de Inversión y Trading · 20 Semanas</h3><p>{bookNotice}</p></div><label className="book-upload">Upload PDF<input type="file" accept="application/pdf" onChange={e=>{const file=e.target.files?.[0];if(file)uploadAcademyBook(file)}} /></label>{readerUrl&&<a href={readerUrl} target="_blank" rel="noreferrer">Open full reader ↗</a>}</div>
+            {readerUrl&&<div className="book-reader"><iframe src={readerUrl} title="Investment and trading workbook reader" /></div>}
+            {academyWeek===4&&<section className="week-five-lab"><div className="candle-anatomy"><i/><b>HIGH</b><span>OPEN ↔ CLOSE BODY</span><b>LOW</b><i/><p>Wicks show rejection; the body shows open-to-close control. Meaning comes from timeframe, location, trend, volume and confirmation.</p></div><div className="candle-exam"><div><b>Week 5 · Eight-question mastery exam</b><span>{Object.keys(examAnswers).length}/8 answered · {candleExam.filter((q,i)=>examAnswers[i]===q[2]).length}/8 correct</span></div>{candleExam.map((q,i)=><fieldset key={q[0]}><legend>{i+1}. {q[0]}</legend>{q[1].map((answer,j)=><button key={answer} className={examAnswers[i]===j?(j===q[2]?"correct":"incorrect"):""} onClick={()=>setExamAnswers(x=>({...x,[i]:j}))}>{String.fromCharCode(65+j)}. {answer}</button>)}{examAnswers[i]!==undefined&&<small>{examAnswers[i]===q[2]?"Correct.":`Answer: ${String.fromCharCode(65+q[2])}.`} {q[1][q[2]]}</small>}</fieldset>)}<p><b>Mastery rule:</b> 7/8 plus one journaled chart example. Answers are revealed only after an attempt.</p></div></section>}
+            <div className="academy-layout">
+              <nav className="week-list" aria-label="Academy weeks">{academyWeeks.map((week,index)=><button key={week} className={academyWeek===index?"active":""} onClick={()=>{setAcademyWeek(index);setQuizChoice("")}}><i>{completedWeeks.includes(index)?"✓":index+1}</i><span><b>Week {index+1}</b><small>{week}</small></span></button>)}</nav>
+              <article className="lesson-panel"><p className="kicker">WEEK {academyWeek+1} · GUIDED LESSON</p><h2>{academyWeeks[academyWeek]}</h2><div className="lesson-objectives"><b>Learning method</b><span>Simple explanation → professional language → practice → mini-exam → journal reflection.</span></div><div className="lesson-columns"><section><small>SIMPLE EXPLANATION</small><p>{academyLessons[academyWeek].simple}</p><b>Required reading</b><p>{academyLessons[academyWeek].reading}</p></section><section><small>PROFESSIONAL VIEW</small><p>{academyLessons[academyWeek].professional}</p><b>Decision standard</b><p>Document the evidence, timeframe, uncertainty, risk, and invalidation before acting.</p></section></div><div className="academy-assignment"><span><b>Week {academyWeek+1} practice</b>{academyLessons[academyWeek].assignment}</span><button onClick={()=>navigate("Market Intel")}>Open market desk</button></div><div className="practice-box"><b>Week {academyWeek+1} knowledge test</b><p>{academyLessons[academyWeek].question}</p>{academyLessons[academyWeek].options.map((answer,index)=><button key={answer} className={quizChoice===answer?(index===academyLessons[academyWeek].correct?"correct":"incorrect"):""} onClick={()=>setQuizChoice(answer)}>{String.fromCharCode(65+index)}. {answer}</button>)}{quizChoice&&<span>{academyLessons[academyWeek].options.indexOf(quizChoice)===academyLessons[academyWeek].correct?`Correct. ${academyLessons[academyWeek].professional}`:`Review Week ${academyWeek+1}, then try again. The correct answer must follow the lesson's decision rule.`}</span>}</div><div className="lesson-actions"><button onClick={()=>{sessionStorage.setItem("northstar-journal-reflection",`Academy Week ${academyWeek+1} — ${academyWeeks[academyWeek]}: `);navigate("Journal")}}>Add journal note</button><button className="primary" onClick={()=>setCompletedWeeks(current=>current.includes(academyWeek)?current:[...current,academyWeek])}>✓ Mark complete</button></div></article>
+              <aside className="academy-rail"><div><p>LEVEL</p><b>{completedWeeks.length<5?"Foundation":completedWeeks.length<13?"Developing analyst":"Advanced practice"}</b></div><div><p>WEEKLY RHYTHM</p><span>Lesson · book · charts · news case · quiz · journal</span></div><div><p>READINESS RULE</p><span>Do not increase risk until position sizing and journal discipline are consistently demonstrated.</span></div></aside>
+            </div>
+          </section>
+          <section className="learn-strip" id="learning">
+            <div>
+              <p>YOUR LEARNING PATH</p>
+              <h2>Build skill before increasing risk</h2>
+            </div>
+            {modules.slice(0, 4).map((m, i) => (
+              <span key={m}>
+                <i>{i < 2 ? "✓" : i + 1}</i>
+                <b>{m}</b>
+                <small>{i < 2 ? "Complete" : "Next lesson"}</small>
+              </span>
+            ))}
+            <button onClick={() => {setTab("Learn");notify("Learning progress will persist after authentication is configured.")}}>Continue →</button>
+          </section>
+          <footer>
+            Educational decision support only—not financial advice. Market data
+            in this prototype is illustrative. No strategy can guarantee profit.
+          </footer>
+        </section>
+      </div>
+    </main>
+  );
+}

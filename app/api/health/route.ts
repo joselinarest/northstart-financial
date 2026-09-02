@@ -1,0 +1,1 @@
+import { database } from "@/lib/db";export const dynamic="force-dynamic";export async function GET(){const db=await database();const row=await db.prepare("SELECT 1 ok").first();return Response.json({ok:row?.ok===1,database:"D1",documents:"R2",connections:"read-only"})}

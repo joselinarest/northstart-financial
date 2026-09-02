@@ -1,0 +1,6 @@
+import { env } from "cloudflare:workers";import { schemaStatements } from "@/db/schema";import { requireUser } from "@/lib/auth";
+type RuntimeEnv={DB:D1Database;FILES:R2Bucket};let initialized=false;
+export const fileBucket=()=>(env as unknown as RuntimeEnv).FILES;
+export async function database(){const d1=(env as unknown as RuntimeEnv).DB;if(!initialized){await d1.batch(schemaStatements.map(sql=>d1.prepare(sql)));await d1.prepare("PRAGMA optimize").run();initialized=true}return d1}
+export const id=(prefix:string)=>`${prefix}_${crypto.randomUUID()}`;
+export async function workspace(request:Request){const user=await requireUser(request);const db=await database();const householdId=`household_${user.userId}`;const entityId=`entity_${user.userId}_personal`;await db.batch([db.prepare("INSERT OR IGNORE INTO users(id,email,display_name,last_login_at) VALUES(?,?,?,CURRENT_TIMESTAMP)").bind(user.userId,user.email,user.name),db.prepare("INSERT OR IGNORE INTO households(id,name,goal_date) VALUES(?,?,?)").bind(householdId,"My Household","2036-12-31"),db.prepare("INSERT OR IGNORE INTO household_members(household_id,user_id,role) VALUES(?,?,?)").bind(householdId,user.userId,"owner"),db.prepare("INSERT OR IGNORE INTO entities(id,household_id,type,name) VALUES(?,?,?,?)").bind(entityId,householdId,"personal","Personal Finances")]);return{db,householdId,entityId,...user}}
