@@ -2,7 +2,11 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { createClient } from "@supabase/supabase-js";
-import { patternLibrary, probabilityEngine } from "@/lib/technical-analysis";
+import { patternLibrary, probabilityEngine, type Bar } from "@/lib/technical-analysis";
+import AcademyLab from "@/app/academy-lab";
+import AdvancedStudyChart from "@/app/advanced-study-chart";
+import ScenarioGallery from "@/app/scenario-gallery";
+import BuySellGuide from "@/app/buy-sell-guide";
 
 const opportunities = [
   {
@@ -64,7 +68,7 @@ const modules = [
   "Trading psychology",
 ];
 
-const candles = [
+const candles: Bar[] = [
   [177.2,179.4,176.4,178.8,42],[178.8,180.1,177.6,179.2,51],[179.2,180.4,177.9,178.3,38],[178.3,181.2,177.8,180.7,63],
   [180.7,182.4,179.8,181.9,58],[181.9,182.7,180.2,180.9,45],[180.9,183.1,180.4,182.6,74],[182.6,184.2,181.6,183.4,66],
   [183.4,184.0,181.1,181.8,59],[181.8,183.0,180.5,182.4,48],[182.4,185.1,182.0,184.6,82],[184.6,186.2,183.5,185.4,77],
@@ -154,6 +158,7 @@ type StockQuote = {bid:number|null;ask:number|null;last:number|null;timestamp?:s
 type ManualMarketAssessment = {symbol:string;verdict:"favorable"|"caution"|"unrated";label:string;reason:string;bid:number|null;ask:number|null;last:number|null;changePct:number|null};
 type JournalEntry = {id:string;createdAt:string;symbol:string;decision:string;timeframe:string;thesis:string;fundamentals:string;valuation:string;technical:string;news:string;risk:string;emotion:string;result:string};
 type ConnectedFinance = {connections:Array<Record<string,any>>;accounts:Array<Record<string,any>>;holdings:Array<Record<string,any>>};
+type HouseholdAccess = {role:string;household?:{id:string;name:string};members:Array<{user_id:string;role:string;status:string;email:string;display_name:string}>;invitations:Array<{id:string;email:string;role:string;status:string;expires_at:string}>;availableHouseholds:Array<{id:string;name:string;role:string}>};
 
 export default function Home({ initialTab = "Dashboard" }: { initialTab?: string } = {}) {
   const [signedIn, setSignedIn] = useState(false);
@@ -173,6 +178,8 @@ export default function Home({ initialTab = "Dashboard" }: { initialTab?: string
   const [target, setTarget] = useState(192.5);
   const [question, setQuestion] = useState("I want to buy NVDA at $180");
   const [analyzed, setAnalyzed] = useState(false);
+  const [aiAnswer,setAiAnswer]=useState("");
+  const [aiBusy,setAiBusy]=useState(false);
   const calc = useMemo(() => {
     const max = (capital * risk) / 100,
       per = Math.max(0.01, Math.abs(entry - stop)),
@@ -190,7 +197,8 @@ export default function Home({ initialTab = "Dashboard" }: { initialTab?: string
   const [timezone, setTimezone] = useState("America/Phoenix");
   const [dailyLimit, setDailyLimit] = useState(60);
   const [travelMode, setTravelMode] = useState(false);
-  const [notifyStatus, setNotifyStatus] = useState("Not enabled");
+  const [notifyStatus, setNotifyStatus] = useState("Checking permission…");
+  const [pushEnabled,setPushEnabled]=useState(false);
   const [isLocal, setIsLocal] = useState(false);
   const [chartSymbol, setChartSymbol] = useState("NVDA");
   const [timeframe, setTimeframe] = useState("1Y");
@@ -217,7 +225,8 @@ export default function Home({ initialTab = "Dashboard" }: { initialTab?: string
   const [marketLookup, setMarketLookup] = useState("");
   const [marketLookupNotice, setMarketLookupNotice] = useState("");
   const [manualAssessment, setManualAssessment] = useState<ManualMarketAssessment|null>(null);
-  const [portfolioGoal, setPortfolioGoal] = useState<"2–3 years"|"5 years">("5 years");
+  const [portfolioGoal, setPortfolioGoal] = useState<"Swing"|"2–3 years"|"5 years"|"10+ years">("5 years");
+  const [portfolioAccount,setPortfolioAccount]=useState<"Taxable brokerage"|"401(k)"|"Traditional IRA"|"Roth IRA">("Taxable brokerage");
   const [portfolioAmount, setPortfolioAmount] = useState(25000);
   const [portfolioMix, setPortfolioMix] = useState({cash:10,bonds:10,diversified:40,dividend:20,growth:20});
   const [portfolioNotice, setPortfolioNotice] = useState("");
@@ -241,11 +250,17 @@ export default function Home({ initialTab = "Dashboard" }: { initialTab?: string
   const [readerUrl, setReaderUrl] = useState("");
   const [examAnswers,setExamAnswers]=useState<Record<number,number>>({});
   const [analysisStrategy, setAnalysisStrategy] = useState<"swing"|"position">("swing");
+  const [householdAccess,setHouseholdAccess]=useState<HouseholdAccess|null>(null);
+  const [inviteOpen,setInviteOpen]=useState(false);
+  const [inviteEmail,setInviteEmail]=useState("");
+  const [inviteRole,setInviteRole]=useState("investment_manager");
+  const [inviteNotice,setInviteNotice]=useState("");
   const pathByTab: Record<string,string> = { Dashboard:"dashboard", Accounts:"accounts", "Market Intel":"markets", Portfolio:"portfolio", "Professional Charts":"charts", "Market News":"market-news", "Growth Finder":"growth", "Bills & cards":"cash-flow", Scanner:"opportunities", Liabilities:"debt", Household:"household", "Ask Northstar":"assistant", "Paper trade":"planner", Journal:"journal", Learn:"academy", Settings:"settings", Help:"help" };
   const navigate = (next:string) => { window.location.assign(`/workspace/${pathByTab[next] || "dashboard"}`); };
   const marketPages = ["Market Intel", "Professional Charts", "Market News", "Growth Finder"];
   const breadcrumbParent = marketPages.includes(tab) && tab !== "Market Intel" ? "Market Intel" : null;
   const notify = (message:string) => { setActionNotice(message); window.setTimeout(() => setActionNotice(""), 4200); };
+  const analyzeWithAI=async()=>{setAiBusy(true);setAnalyzed(false);setAiAnswer("");try{const response=await fetch("/api/ai/investment-coach",{method:"POST",headers:financeHeaders(),body:JSON.stringify({question,context:{symbol:chartSymbol,entry,stop,target,riskPercent:risk,calculatedShares:calc.shares,rewardRisk:calc.rr,marketData:chartBars.length?"connected":"demonstration only"}})}),data=await response.json();if(!response.ok)throw new Error(data.error||"Analysis unavailable");setAiAnswer(data.answer);setAnalyzed(true)}catch(error){setAiAnswer(error instanceof Error?error.message:"Analysis unavailable");setAnalyzed(true)}finally{setAiBusy(false)}};
   const supabase = useMemo(() => {
     const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
     const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -268,6 +283,9 @@ export default function Home({ initialTab = "Dashboard" }: { initialTab?: string
   const marketClockText = marketPhase==="open"?`US MARKET OPEN · closes in ${clockHours}h ${clockMinutes}m`:marketPhase==="premarket"?`US PRE-MARKET · opens in ${clockHours}h ${clockMinutes}m`:marketPhase==="afterhours"?`US AFTER-HOURS · next open in ${clockHours}h ${clockMinutes}m`:marketPhase==="closed"?`US MARKET CLOSED · opens in ${clockHours}h ${clockMinutes}m`:"MARKET CLOCK SETUP REQUIRED";
   const displayedCandles=(chartBars.length?chartBars:candles).slice(-80),chartLow=Math.min(...displayedCandles.map(value=>value[2])),chartHigh=Math.max(...displayedCandles.map(value=>value[1])),chartSpan=Math.max(.01,chartHigh-chartLow),latestCandle=displayedCandles[displayedCandles.length-1],firstCandle=displayedCandles[0],chartChange=((latestCandle[3]-firstCandle[0])/firstCandle[0])*100;
   const technicalAnalysis=useMemo(()=>probabilityEngine(displayedCandles,analysisStrategy),[displayedCandles,analysisStrategy]);
+  const movingAverages=useMemo(()=>{const closes=displayedCandles.map(bar=>bar[3]),last=closes.at(-1)||0,sma=(period:number)=>closes.length>=period?closes.slice(-period).reduce((sum,value)=>sum+value,0)/period:null,ema=(period:number)=>{if(closes.length<period)return null;const k=2/(period+1);return closes.reduce((value,close,index)=>index?close*k+value*(1-k):close)};return [{name:"EMA 9",value:ema(9),use:"Fast swing momentum"},{name:"EMA 20",value:ema(20),use:"Common swing pullback area"},{name:"EMA 21",value:ema(21),use:"Short-term trend support"},{name:"SMA 50",value:sma(50),use:"Intermediate trend"},{name:"SMA 100",value:sma(100),use:"Position-trend reference"},{name:"SMA 200",value:sma(200),use:"Long-term regime"}].map(item=>{const distance=item.value===null?null:((last-item.value)/item.value)*100,status=item.value===null?"Unavailable":last<item.value?"Broken / below":Math.abs(distance!)<=2?"Testing support":"Above support";return{...item,distance,status,last}})},[displayedCandles]);
+  const chartInterpretation=useMemo(()=>{const latest=displayedCandles.at(-1)!,recent=displayedCandles.slice(-Math.min(20,displayedCandles.length)),recentHigh=Math.max(...recent.map(bar=>bar[1])),recentLow=Math.min(...recent.map(bar=>bar[2])),probability=technicalAnalysis.probability,direction=probability>=62?"Upward bias":probability<=38?"Downward bias":"Sideways / uncertain",confidence=Math.max(20,Math.min(90,probability>=50?probability:100-probability)-(technicalAnalysis.disagreement?15:0)-(chartBars.length?0:12)),relevantNames=analysisStrategy==="swing"?["EMA 9","EMA 20","EMA 21","SMA 50"]:["SMA 50","SMA 100","SMA 200"],relevant=movingAverages.filter(item=>relevantNames.includes(item.name)&&item.value!==null),holding=relevant.filter(item=>item.last>=item.value!),broken=relevant.filter(item=>item.last<item.value!),nearestSupport=holding.sort((a,b)=>b.value!-a.value!)[0]?.value??recentLow,nearestResistance=recentHigh,bullCase=latest[3]+technicalAnalysis.atr*(analysisStrategy==="swing"?2:4),bearCase=latest[3]-technicalAnalysis.atr*(analysisStrategy==="swing"?1.5:3);let suggestion="Wait—directional evidence is mixed. Do not force an entry.";if(analysisStrategy==="swing"&&direction==="Upward bias")suggestion=technicalAnalysis.relVol>=1.2?`Watch for a confirmed close above $${nearestResistance.toFixed(2)}, or a controlled pullback that holds $${nearestSupport.toFixed(2)}. Define risk before entry.`:`Do not chase. Wait for price to hold $${nearestSupport.toFixed(2)} and for volume or a bullish candle to confirm demand.`;if(analysisStrategy==="swing"&&direction==="Downward bias")suggestion=`Avoid a new long entry until price reclaims $${nearestSupport.toFixed(2)} with confirmation. Existing swing plans require an invalidation review.`;if(analysisStrategy==="position"&&direction==="Upward bias")suggestion="Long-term structure is constructive. If the investment still passes fundamentals, valuation, diversification, and account-fit checks, consider planned contributions rather than chasing one candle.";if(analysisStrategy==="position"&&direction==="Downward bias")suggestion="Long-term technical structure is weak. Review fundamentals and allocation; pause automatic increases if the thesis changed, but do not panic-sell from chart evidence alone.";return{direction,confidence,recentHigh,recentLow,nearestSupport,nearestResistance,bullCase,bearCase,holding,broken,suggestion,latest:latest[3],observation:`Price is $${latest[3].toFixed(2)} with ${technicalAnalysis.relVol.toFixed(2)}× relative volume. ${holding.length} relevant averages are holding and ${broken.length} are below price.`,evidence:`Model alignment is ${probability}% bullish${technicalAnalysis.disagreement?", with timeframe disagreement":""}. ${technicalAnalysis.best?`${technicalAnalysis.best.name} quality is ${technicalAnalysis.best.quality}/100.`:"No qualified candle pattern is active."}`,risk:`A move below $${nearestSupport.toFixed(2)} would weaken this ${analysisStrategy==="swing"?"swing":"long-term"} interpretation. News gaps can bypass technical levels.`}},[displayedCandles,technicalAnalysis,movingAverages,analysisStrategy,chartBars.length]);
+  const volumeInterpretation=useMemo(()=>{const last=displayedCandles.at(-1)!,previous=displayedCandles.at(-2)!,closeLocation=(last[3]-last[2])/Math.max(.01,last[1]-last[2]),priceUp=last[3]>previous[3],highVolume=technicalAnalysis.relVol>=1.2,lowVolume=technicalAnalysis.relVol<.8;let label="Average participation",meaning="Volume is near its recent average and does not independently confirm direction.";if(highVolume&&priceUp&&closeLocation>.65){label="Demand confirmation";meaning="Price advanced and closed near the high on above-average volume. This supports—but does not prove—the bullish case."}else if(highVolume&&!priceUp&&closeLocation<.35){label="Distribution warning";meaning="Price declined and closed near the low on above-average volume. Selling pressure strengthens the bearish evidence."}else if(highVolume){label="High-volume conflict";meaning="Participation is elevated, but candle direction or closing location is inconclusive. Wait for follow-through."}else if(lowVolume){label="Weak participation";meaning="The move has below-average participation, so confidence is reduced until price and volume confirm together."}const pullbackLow=chartInterpretation.nearestSupport, pullbackHigh=pullbackLow+technicalAnalysis.atr*.35,breakout=chartInterpretation.nearestResistance+technicalAnalysis.atr*.08,stop=pullbackLow-technicalAnalysis.atr*(analysisStrategy==="swing"?.5:1);return{label,meaning,closeLocation,ratio:technicalAnalysis.relVol,pullbackLow,pullbackHigh,breakout,stop,firstTarget:chartInterpretation.nearestResistance,secondTarget:chartInterpretation.bullCase}},[displayedCandles,technicalAnalysis,chartInterpretation,analysisStrategy]);
   const visibleAssets = useMemo(() => marketAssets.filter(asset => (!assetQuery || `${asset.symbol} ${asset.name}`.toLowerCase().includes(assetQuery.toLowerCase())) && (assetSector==="All sectors" || asset.sector===assetSector)).sort((a,b)=>assetSort==="pe"?a.pe-b.pe:assetSort==="growth"?b.growth5y-a.growth5y:assetSort==="cap"?b.marketCap-a.marketCap:b.score-a.score),[assetQuery,assetSector,assetSort]);
   const categoryItems = useMemo(() => investmentCatalog.filter(item => item.category===investmentCategory && (!assetQuery || `${item.symbol} ${item.name} ${item.subcategory}`.toLowerCase().includes(assetQuery.toLowerCase()))).sort((a,b)=>assetSort==="risk"?(a.risk==="Lower"?-1:a.risk==="Medium"?0:1)-(b.risk==="Lower"?-1:b.risk==="Medium"?0:1):b.score-a.score),[investmentCategory,assetQuery,assetSort]);
   const advisorSuggestions = useMemo(() => investmentCatalog.filter(item=>item.category==="Stocks & ETFs"&&item.fit.includes(investorProfile)).map(item=>{const asset=marketAssets.find(value=>value.symbol===item.symbol),fair=modelFairValues[item.symbol],gap=asset&&fair?((asset.price-fair)/fair)*100:null,adjusted=item.score-(gap!==null&&gap>25?24:0)-(item.risk==="High"&&investorProfile!=="Active"?8:0);return {...item,gap,adjusted}}).sort((a,b)=>b.adjusted-a.adjusted).slice(0,5),[investorProfile]);
@@ -280,12 +298,17 @@ export default function Home({ initialTab = "Dashboard" }: { initialTab?: string
   const sellReview = valuationPremium!==null&&valuationPremium>25;
   const selectedQuote=suggestionQuotes[selectedInvestment.symbol],selectedReferencePrice=selectedQuote?.ask||selectedFundamentals?.price||0,allocationRate=investorProfile==="Conservative"?.05:investorProfile==="Balanced"?.075:investorProfile==="Growth"?.1:.12,positionBudget=Math.min(advisorAmount,capital*allocationRate),suggestedShares=selectedReferencePrice>0?positionBudget/selectedReferencePrice:0,selectedAction=sellReview?"SELL / REDUCE REVIEW":selectedFit&&selectedInvestment.score>=82?"BUY RESEARCH · WAIT FOR CONFIRMATION":selectedFit?"WATCH / HOLD":"AVOID · PROFILE MISMATCH";
   const valuationScore=selectedFundamentals?(selectedFundamentals.pe<=20?90:selectedFundamentals.pe<=30?75:selectedFundamentals.pe<=40?55:30):null,fiveYearScore=selectedFundamentals?Math.min(95,35+Math.log10(Math.max(1,selectedFundamentals.growth5y))*25):null,sizeScore=selectedFundamentals?(selectedFundamentals.marketCap>=100?85:selectedFundamentals.marketCap>=10?70:45):null,dividendScore=selectedDividendYield===undefined?null:selectedDividendYield===0?55:selectedDividendYield<=5?80:selectedDividendYield<=8?55:25,technicalReady=chartSymbol===selectedInvestment.symbol&&chartBars.length>=20,technicalScore=technicalReady?(chartBars[chartBars.length-1][3]>chartBars[chartBars.length-20][3]?75:40):null,decisionScores=[valuationScore,fiveYearScore,sizeScore,dividendScore,technicalScore].filter((value):value is number=>value!==null),transparentDecisionScore=decisionScores.length?Math.round(decisionScores.reduce((sum,value)=>sum+value,0)/decisionScores.length):null;
-  const portfolioTotal=Object.values(portfolioMix).reduce((sum,value)=>sum+value,0),portfolioYears=portfolioGoal==="5 years"?5:3,weightedReturn=(portfolioMix.cash*3.5+portfolioMix.bonds*4.5+portfolioMix.diversified*7+portfolioMix.dividend*6.5+portfolioMix.growth*9)/Math.max(1,portfolioTotal)/100,portfolioProjected=portfolioAmount*Math.pow(1+weightedReturn,portfolioYears),portfolioLow=portfolioAmount*Math.pow(1+Math.max(-.05,weightedReturn-.08),portfolioYears),portfolioHigh=portfolioAmount*Math.pow(1+weightedReturn+.05,portfolioYears);
-  const applyPortfolioPreset = () => setPortfolioMix(portfolioGoal==="2–3 years"?{cash:35,bonds:40,diversified:20,dividend:5,growth:0}:{cash:10,bonds:10,diversified:40,dividend:20,growth:20});
+  const portfolioTotal=Object.values(portfolioMix).reduce((sum,value)=>sum+value,0),portfolioYears=portfolioGoal==="Swing"?1:portfolioGoal==="2–3 years"?3:portfolioGoal==="5 years"?5:20,weightedReturn=(portfolioMix.cash*3.5+portfolioMix.bonds*4.5+portfolioMix.diversified*7+portfolioMix.dividend*6.5+portfolioMix.growth*9)/Math.max(1,portfolioTotal)/100,portfolioProjected=portfolioAmount*Math.pow(1+weightedReturn,portfolioYears),portfolioLow=portfolioAmount*Math.pow(1+Math.max(-.05,weightedReturn-.08),portfolioYears),portfolioHigh=portfolioAmount*Math.pow(1+weightedReturn+.05,portfolioYears);
+  const applyPortfolioPreset = () => setPortfolioMix(portfolioGoal==="Swing"?{cash:55,bonds:0,diversified:20,dividend:5,growth:20}:portfolioGoal==="2–3 years"?{cash:35,bonds:40,diversified:20,dividend:5,growth:0}:portfolioGoal==="10+ years"?{cash:5,bonds:10,diversified:55,dividend:15,growth:15}:{cash:10,bonds:10,diversified:40,dividend:20,growth:20});
   const applyCoreDividendGrowthPreset = () => {setPortfolioGoal("5 years");setPortfolioMix({cash:0,bonds:0,diversified:40,dividend:30,growth:30});setPortfolioNotice("40% Core / 30% Dividend / 30% Growth applied. Review emergency cash and risk before using it.")};
-  const savePortfolio = () => {if(portfolioTotal!==100){setPortfolioNotice(`Allocation totals ${portfolioTotal}%. Adjust it to exactly 100% before saving.`);return}localStorage.setItem("northstar-portfolio-plan",JSON.stringify({portfolioGoal,portfolioAmount,portfolioMix}));setPortfolioNotice("✓ Portfolio goal and target allocation saved on this device.")};
+  const savePortfolio = () => {if(portfolioTotal!==100){setPortfolioNotice(`Allocation totals ${portfolioTotal}%. Adjust it to exactly 100% before saving.`);return}localStorage.setItem("northstar-portfolio-plan",JSON.stringify({portfolioGoal,portfolioAccount,portfolioAmount,portfolioMix}));setPortfolioNotice("✓ Portfolio goal, account type, and target allocation saved on this device.")};
   const saveJournalEntry = () => {if(!journalForm.symbol.trim()||!journalForm.thesis.trim()||!journalForm.risk.trim()){setJournalNotice("Symbol, thesis, and invalidation/risk are required before saving.");return}const entry:JournalEntry={...journalForm,id:crypto.randomUUID(),createdAt:new Date().toISOString(),symbol:journalForm.symbol.trim().toUpperCase()};const next=[entry,...journalEntries];setJournalEntries(next);localStorage.setItem("northstar-decision-journal",JSON.stringify(next));setJournalNotice("✓ Decision saved. Return later to compare the outcome with the original reasoning.")};
-  const financeHeaders=()=>({"Content-Type":"application/json",...(accessToken?{Authorization:`Bearer ${accessToken}`}:{})});
+  const financeHeaders=()=>({"Content-Type":"application/json",...(accessToken?{Authorization:`Bearer ${accessToken}`}:{}) ,...(typeof window!=="undefined"&&localStorage.getItem("northstar-household-id")?{"X-Household-ID":localStorage.getItem("northstar-household-id")!}:{})});
+  const loadHousehold=async()=>{try{const response=await fetch("/api/household",{headers:financeHeaders()}),data=await response.json() as HouseholdAccess&{error?:string};if(!response.ok)throw new Error(data.error||"Unable to load household access");setHouseholdAccess(data)}catch(error){setInviteNotice(error instanceof Error?error.message:"Unable to load household access")}};
+  const inviteMember=async()=>{setInviteNotice("Creating secure invitation…");try{const response=await fetch("/api/household/invitations",{method:"POST",headers:financeHeaders(),body:JSON.stringify({email:inviteEmail,role:inviteRole})}),data=await response.json() as {error?:string;delivered?:boolean;acceptUrl?:string};if(!response.ok)throw new Error(data.error||"Invitation failed");setInviteNotice(data.delivered?"✓ Invitation emailed. It expires in 7 days.":`✓ Invitation created. Email delivery is not configured; secure link: ${data.acceptUrl}`);setInviteEmail("");await loadHousehold()}catch(error){setInviteNotice(error instanceof Error?error.message:"Invitation failed")}};
+  const acceptInvitation=async(token:string)=>{setInviteNotice("Accepting invitation…");try{const response=await fetch("/api/household/invitations/accept",{method:"POST",headers:financeHeaders(),body:JSON.stringify({token})}),data=await response.json() as {error?:string;householdId:string;role:string};if(!response.ok)throw new Error(data.error||"Unable to accept invitation");localStorage.setItem("northstar-household-id",data.householdId);history.replaceState({},"",location.pathname);setInviteNotice(`✓ Joined household as ${String(data.role).replaceAll("_"," ")}.`);await loadHousehold()}catch(error){setInviteNotice(error instanceof Error?error.message:"Unable to accept invitation")}};
+  const switchHousehold=(householdId:string)=>{localStorage.setItem("northstar-household-id",householdId);loadHousehold();};
+  useEffect(()=>{if(!signedIn)return;loadHousehold();const token=new URLSearchParams(window.location.search).get("invite");if(token)acceptInvitation(token)},[signedIn,accessToken]);
   const loadConnectedFinance=async()=>{try{const response=await fetch("/api/connections/plaid",{headers:financeHeaders()}),data=await response.json();if(!response.ok)throw new Error(data.error||"Unable to load connected accounts");setConnectedFinance(data)}catch(error){setPlaidNotice(error instanceof Error?error.message:"Unable to load connected accounts")}};
   const syncPlaid=async(connectionId:string)=>{setPlaidBusy(true);setPlaidNotice("Synchronizing balances, transactions, and investment holdings…");try{const response=await fetch("/api/connections/plaid/sync",{method:"POST",headers:financeHeaders(),body:JSON.stringify({connectionId})}),data=await response.json();if(!response.ok)throw new Error(data.error||"Synchronization failed");setPlaidNotice(`✓ Synced ${data.accounts} accounts, ${data.holdings} holdings, and ${data.added+data.modified} transaction updates.`);await loadConnectedFinance()}catch(error){setPlaidNotice(error instanceof Error?error.message:"Synchronization failed")}finally{setPlaidBusy(false)}};
   const connectPlaid=async()=>{setPlaidBusy(true);setPlaidNotice("Preparing secure Plaid Link…");try{const tokenResponse=await fetch("/api/connections/plaid/link-token",{method:"POST",headers:financeHeaders()}),tokenData=await tokenResponse.json();if(!tokenResponse.ok)throw new Error(tokenData.error||"Plaid Link could not start");if(!(window as any).Plaid)await new Promise<void>((resolve,reject)=>{const script=document.createElement("script");script.src="https://cdn.plaid.com/link/v2/stable/link-initialize.js";script.onload=()=>resolve();script.onerror=()=>reject(new Error("Plaid Link could not load"));document.head.appendChild(script)});const handler=(window as any).Plaid.create({token:tokenData.link_token,onSuccess:async(publicToken:string,metadata:any)=>{setPlaidNotice("Securing the connection…");const exchange=await fetch("/api/connections/plaid/exchange",{method:"POST",headers:financeHeaders(),body:JSON.stringify({publicToken,institutionName:metadata?.institution?.name})}),result=await exchange.json();if(!exchange.ok){setPlaidNotice(result.error||"Connection failed");return}await syncPlaid(result.id)},onExit:(error:any)=>{if(error)setPlaidNotice(error.display_message||error.error_message||"Plaid Link closed with an error");setPlaidBusy(false)}});handler.open()}catch(error){setPlaidNotice(error instanceof Error?error.message:"Plaid Link could not start");setPlaidBusy(false)}};
@@ -370,7 +393,7 @@ export default function Home({ initialTab = "Dashboard" }: { initialTab?: string
     sessionStorage.removeItem("northstar-full-analysis-prompt");
   }, [initialTab]);
   useEffect(()=>{if(initialTab!=="Professional Charts")return;const saved=sessionStorage.getItem("northstar-chart-symbol");if(saved){setChartSymbol(saved);setMarketLookup(saved);sessionStorage.removeItem("northstar-chart-symbol")}},[initialTab]);
-  useEffect(()=>{try{const saved=localStorage.getItem("northstar-portfolio-plan");if(!saved)return;const plan=JSON.parse(saved);if(plan.portfolioGoal==="2–3 years"||plan.portfolioGoal==="5 years")setPortfolioGoal(plan.portfolioGoal);if(Number.isFinite(plan.portfolioAmount))setPortfolioAmount(plan.portfolioAmount);if(plan.portfolioMix&&["cash","bonds","diversified","dividend","growth"].every(key=>Number.isFinite(plan.portfolioMix[key])))setPortfolioMix(plan.portfolioMix)}catch{setPortfolioNotice("Saved portfolio plan could not be loaded.")}},[]);
+  useEffect(()=>{try{const saved=localStorage.getItem("northstar-portfolio-plan");if(!saved)return;const plan=JSON.parse(saved);if(["Swing","2–3 years","5 years","10+ years"].includes(plan.portfolioGoal))setPortfolioGoal(plan.portfolioGoal);if(["Taxable brokerage","401(k)","Traditional IRA","Roth IRA"].includes(plan.portfolioAccount))setPortfolioAccount(plan.portfolioAccount);if(Number.isFinite(plan.portfolioAmount))setPortfolioAmount(plan.portfolioAmount);if(plan.portfolioMix&&["cash","bonds","diversified","dividend","growth"].every(key=>Number.isFinite(plan.portfolioMix[key])))setPortfolioMix(plan.portfolioMix)}catch{setPortfolioNotice("Saved portfolio plan could not be loaded.")}},[]);
   useEffect(()=>{try{const saved=localStorage.getItem("northstar-decision-journal");if(saved)setJournalEntries(JSON.parse(saved));const reflection=sessionStorage.getItem("northstar-journal-reflection");if(initialTab==="Journal"&&reflection){setJournalForm(current=>({...current,thesis:reflection}));sessionStorage.removeItem("northstar-journal-reflection")}}catch{setJournalNotice("Saved journal entries could not be loaded.")}},[initialTab]);
   useEffect(()=>{if(initialTab==="Accounts"&&signedIn)loadConnectedFinance()},[initialTab,signedIn,accessToken]);
   const socialLogin = async (provider: "google" | "apple") => {
@@ -401,6 +424,7 @@ export default function Home({ initialTab = "Dashboard" }: { initialTab?: string
       return;
     }
     const result = await Notification.requestPermission();
+    if(result==="granted"){localStorage.setItem("northstar-push-enabled","true");setPushEnabled(true)}
     setNotifyStatus(
       result === "granted"
         ? "Device permission granted · server push setup required"
@@ -409,6 +433,8 @@ export default function Home({ initialTab = "Dashboard" }: { initialTab?: string
           : "Not enabled",
     );
   };
+  useEffect(()=>{if(!("Notification" in window)){setNotifyStatus("Not supported on this device");return}const appOn=localStorage.getItem("northstar-push-enabled")!=="false"&&Notification.permission==="granted";setPushEnabled(appOn);setNotifyStatus(Notification.permission==="granted"?(appOn?"Northstar alerts ON · browser permission granted":"Northstar alerts OFF · browser permission remains granted"):Notification.permission==="denied"?"Blocked in browser settings":"Not enabled")},[]);
+  const notifyClass=notifyStatus.includes("alerts ON")||notifyStatus.startsWith("Enabled")||notifyStatus.startsWith("Device permission")?"enabled":notifyStatus.startsWith("Blocked")?"blocked":notifyStatus.startsWith("Not supported")?"unsupported":notifyStatus.startsWith("Checking")?"checking":"disabled";
   const navigationGroups = [
     {name:"Overview",items:[["Dashboard","⌂"]]},
     {name:"Financial Adviser",items:[["Accounts","▣"],["Bills & cards","$"],["Liabilities","▥"],["Household","♧"]]},
@@ -599,17 +625,7 @@ export default function Home({ initialTab = "Dashboard" }: { initialTab?: string
         </header>
         <div className="loading-shell">
           <aside className="loading-sidebar">
-            <p>WORKSPACE</p>
-            {tabs.map((item, index) => (
-              <button key={item} className={tab === item ? "active" : ""} disabled>
-                <span>{["⌂", "◉", "$", "⌁", "▥", "♧", "✦", "◎", "▤", "◇"][index]}</span>
-                {item}
-              </button>
-            ))}
-            <p>MY LISTS</p>
-            <button disabled><span className="violet">●</span>Core watchlist <em>4</em></button>
-            <button disabled><span className="gold">●</span>Future sectors <em>12</em></button>
-            <div className="guard"><strong>◈ Capital guard is on</strong><small>Checking your secure workspace session.</small></div>
+            {navigationGroups.map(group=><div className="loading-nav-group" key={group.name}><p>{group.name}</p>{group.items.map(([item,icon])=><button key={item} className={tab===item?"active":""} disabled><span>{icon}</span>{item}</button>)}</div>)}
           </aside>
           <section className="loading-content">
             <div className="loading-title"><div><i className="skeleton skeleton-kicker" /><i className="skeleton skeleton-heading" /></div><i className="skeleton skeleton-action" /></div>
@@ -889,12 +905,12 @@ export default function Home({ initialTab = "Dashboard" }: { initialTab?: string
           </section>
           <section className="portfolio-builder card">
             <div className="portfolio-head"><div><span>◫ GOAL-BASED PORTFOLIO BUILDER</span><h2>Create and adjust your investment plan</h2><p>Choose when the money is needed, set a target mix, and review possible outcomes before changing real holdings.</p></div><em>READ-ONLY PLAN</em></div>
-            <div className="portfolio-setup"><label>Goal horizon<select value={portfolioGoal} onChange={e=>setPortfolioGoal(e.target.value as "2–3 years"|"5 years")}><option>2–3 years</option><option>5 years</option></select></label><label>Portfolio amount<div className="portfolio-money"><b>$</b><input type="number" min="0" step="500" value={portfolioAmount} onChange={e=>setPortfolioAmount(Math.max(0,+e.target.value))}/></div></label><div className="preset-actions"><button onClick={applyPortfolioPreset}>✦ Build risk-aware mix</button><button onClick={applyCoreDividendGrowthPreset}>◎ Apply 40 / 30 / 30</button></div></div>
+            <div className="portfolio-setup expanded"><label>Strategy / horizon<select value={portfolioGoal} onChange={e=>setPortfolioGoal(e.target.value as "Swing"|"2–3 years"|"5 years"|"10+ years")}><option>Swing</option><option>2–3 years</option><option>5 years</option><option>10+ years</option></select></label><label>Account type<select value={portfolioAccount} onChange={e=>setPortfolioAccount(e.target.value as typeof portfolioAccount)}><option>Taxable brokerage</option><option>401(k)</option><option>Traditional IRA</option><option>Roth IRA</option></select></label><label>Portfolio amount<div className="portfolio-money"><b>$</b><input type="number" min="0" step="500" value={portfolioAmount} onChange={e=>setPortfolioAmount(Math.max(0,+e.target.value))}/></div></label><div className="preset-actions"><button onClick={applyPortfolioPreset}>✦ Build risk-aware mix</button><button onClick={applyCoreDividendGrowthPreset}>◎ Apply 40 / 30 / 30</button></div></div>
             <div className="portfolio-body"><div className="allocation-editor">{([{key:"cash",icon:"◆",label:"Cash & short-term",note:"Stability and near-term needs"},{key:"bonds",icon:"▰",label:"Bonds / fixed income",note:"Income and volatility control"},{key:"diversified",icon:"◎",label:"Core / VOO–VTI type",note:"Broad-market base and diversification"},{key:"dividend",icon:"$",label:"Dividend / SCHD type",note:"Quality income and dividend growth"},{key:"growth",icon:"↗",label:"Growth stocks",note:"Revenue, earnings and cash-flow growth"}] as const).map(asset=><label key={asset.key}><i>{asset.icon}</i><span><b>{asset.label}</b><small>{asset.note}</small></span><input type="range" min="0" max="100" step="5" value={portfolioMix[asset.key]} onChange={e=>setPortfolioMix(current=>({...current,[asset.key]:+e.target.value}))}/><strong>{portfolioMix[asset.key]}%</strong><em>${(portfolioAmount*portfolioMix[asset.key]/100).toLocaleString(undefined,{maximumFractionDigits:0})}</em></label>)}</div><aside className="portfolio-summary"><span className={portfolioTotal===100?"valid":"invalid"}>{portfolioTotal===100?"✓":"!"} ALLOCATION TOTAL · {portfolioTotal}%</span><h3>{portfolioGoal} planning range</h3><div><small>Lower scenario</small><b>${portfolioLow.toLocaleString(undefined,{maximumFractionDigits:0})}</b></div><div><small>Planning midpoint</small><b>${portfolioProjected.toLocaleString(undefined,{maximumFractionDigits:0})}</b></div><div><small>Higher scenario</small><b>${portfolioHigh.toLocaleString(undefined,{maximumFractionDigits:0})}</b></div><p><u>Important:</u> These are uncertain scenarios, not promised returns. A 40/30/30 stock allocation can still lose substantially and may be unsuitable for money required within 2–3 years.</p><button className="primary" onClick={savePortfolio}>Save portfolio goal</button>{portfolioNotice&&<small className="portfolio-notice">{portfolioNotice}</small>}</aside></div>
-            <div className="portfolio-guidance"><section><b>✓ Favorable structure</b><p>{portfolioGoal==="2–3 years"?"Keep most goal-critical money in cash and high-quality short-duration bonds.":"A five-year horizon can support diversified equity exposure, provided you can tolerate temporary losses."}</p></section><section><b>! Rebalance review</b><p>Compare these targets with connected holdings. Buy or sell only after reviewing taxes, fees, debt, emergency reserves, and position concentration.</p></section></div>
+            <div className="portfolio-guidance"><section><b>✓ {portfolioGoal} framework</b><p>{portfolioGoal==="Swing"?"Use a separate risk budget, defined invalidation, small position sizing, and cash reserve. Do not treat retirement money as swing-trading capital.":portfolioGoal==="2–3 years"?"Keep most goal-critical money in cash and high-quality short-duration bonds.":portfolioGoal==="10+ years"?"Long horizons may support broad diversified equity exposure, regular contributions, and contribution-based rebalancing—if your risk capacity permits.":"A five-year horizon can support diversified equity exposure, provided you can tolerate temporary losses."}</p></section><section><b>◎ {portfolioAccount}</b><p>{portfolioAccount==="401(k)"?"Review employer match first, plan fees, available funds, vesting, and contribution limits. Northstar cannot change payroll elections.":portfolioAccount==="Roth IRA"?"Qualified withdrawals may be tax-free, but eligibility, contribution limits, and withdrawal rules require verification for your tax year.":portfolioAccount==="Traditional IRA"?"Deductibility and withdrawals depend on tax rules and your circumstances. Verify current limits before contributing.":"Taxable accounts require capital-gain, dividend, tax-lot, and wash-sale review before rebalancing."}</p></section></div>
           </section>
           <section className="focus-bar">
-            {backendOverview && <div><span>PERSISTENT DATA</span><b>{backendOverview.entities} entities · {backendOverview.transactions} transactions</b><small>D1 financial ledger connected</small></div>}
+            {backendOverview && <div><span>PERSISTENT DATA</span><b>{backendOverview.entities} entities · {backendOverview.transactions} transactions</b><small>AWS PostgreSQL financial ledger connected</small></div>}
             <div>
               <span>LOCAL MARKET TIME</span>
               <b>{activeTimezone.replace(/_/g," ")}</b>
@@ -972,6 +988,8 @@ export default function Home({ initialTab = "Dashboard" }: { initialTab?: string
               <span><small>FIRST OPEN</small><b>${firstCandle[0].toFixed(2)}</b></span><span><small>RANGE HIGH / LOW</small><b>${chartHigh.toFixed(2)} / ${chartLow.toFixed(2)}</b></span>
               <span><small>LATEST VOLUME</small><b>{latestCandle[4]>=1000000?(latestCandle[4]/1000000).toFixed(1)+"M":latestCandle[4].toLocaleString()}</b></span><span><small>RANGE</small><b>{timeframe}</b></span>
             </div>
+            <section className="ma-support-panel"><div><p>MOVING-AVERAGE SUPPORT MAP</p><h3>Which averages may support—or fail to support—price?</h3><span>An average is dynamic context, not a barrier that prevents a decline. A close below it, failed reclaim, high-volume selling, or broken market structure weakens the support thesis.</span></div><div className="ma-support-grid">{movingAverages.map(average=><article key={average.name} className={average.status.startsWith("Above")?"holding":average.status.startsWith("Testing")?"testing":average.status.startsWith("Broken")?"broken":"missing"}><b>{average.name}</b><strong>{average.value===null?"Need more bars":`$${average.value.toFixed(2)}`}</strong><span>{average.status}{average.distance===null?"":` · ${average.distance>=0?"+":""}${average.distance.toFixed(1)}%`}</span><small>{average.use}</small></article>)}</div><footer><b>Swing:</b> prioritize EMA 9/20/21 plus SMA 50. <b>Long-term/401(k)/IRA:</b> use SMA 50/100/200 for regime context, but prioritize allocation, diversification, fees, contributions, and goal horizon.</footer></section>
+            <section className={`chart-interpreter ${chartInterpretation.direction.startsWith("Upward")?"bullish":chartInterpretation.direction.startsWith("Downward")?"bearish":"neutral"}`}><header><div><p>TECHNICAL CHART INTERPRETER</p><h3>{chartSymbol} · {analysisStrategy==="swing"?"Swing trade":"Long-term / retirement portfolio"}</h3></div><label>Interpret as<select value={analysisStrategy} onChange={event=>setAnalysisStrategy(event.target.value as "swing"|"position")}><option value="swing">Swing trade</option><option value="position">Long-term / 401(k) / IRA</option></select></label></header><div className="interpreter-verdict"><span><small>DIRECTIONAL BIAS</small><strong>{chartInterpretation.direction}</strong></span><span><small>MODEL CONFIDENCE</small><strong>{chartInterpretation.confidence}%</strong></span><span><small>DYNAMIC SUPPORT</small><strong>${chartInterpretation.nearestSupport.toFixed(2)}</strong></span><span><small>RECENT RESISTANCE</small><strong>${chartInterpretation.nearestResistance.toFixed(2)}</strong></span></div><div className="interpretation-chain"><article><b>1 · Observation</b><p>{chartInterpretation.observation}</p></article><article><b>2 · Evidence</b><p>{chartInterpretation.evidence}</p></article><article><b>3 · Risk</b><p>{chartInterpretation.risk}</p></article><article className="recommendation"><b>4 · Suggested action</b><p>{chartInterpretation.suggestion}</p></article></div><div className="volume-decision"><article><span>VOLUME ANALYSIS · {volumeInterpretation.ratio.toFixed(2)}×</span><h4>{volumeInterpretation.label}</h4><p>{volumeInterpretation.meaning}</p><small>Close location: {(volumeInterpretation.closeLocation*100).toFixed(0)}% of the candle range. Volume is combined with price direction, candle close, structure, moving averages, and timeframes.</small></article><article><span>CONDITIONAL BUY / SELL PLAN</span><h4>No automatic order</h4><dl><div><dt>Pullback buy-watch zone</dt><dd>${volumeInterpretation.pullbackLow.toFixed(2)}–${volumeInterpretation.pullbackHigh.toFixed(2)}</dd></div><div><dt>Breakout buy trigger</dt><dd>Close above ${volumeInterpretation.breakout.toFixed(2)} + confirmation</dd></div><div><dt>Stop / thesis invalidation</dt><dd>Close below ${volumeInterpretation.stop.toFixed(2)}</dd></div><div><dt>Sell / reduce reviews</dt><dd>${volumeInterpretation.firstTarget.toFixed(2)} then ~${volumeInterpretation.secondTarget.toFixed(2)}</dd></div></dl><small>Only consider a buy when the setup, volume, reward/risk, account fit, market context, and your written rules agree. Sell/trim levels require your explicit decision.</small></article></div><div className="price-paths"><span><b>Bullish scenario</b><strong>~${chartInterpretation.bullCase.toFixed(2)}</strong><small>ATR-based scenario, not a target guarantee</small></span><span><b>Current price</b><strong>${chartInterpretation.latest.toFixed(2)}</strong><small>{chartBars.length?"Connected bars":"Demonstration bars"} · {new Date(technicalAnalysis.timestamp).toLocaleString()}</small></span><span><b>Bearish scenario</b><strong>~${chartInterpretation.bearCase.toFixed(2)}</strong><small>Risk scenario; gaps may exceed it</small></span></div><footer><b>Confirmation:</b> {technicalAnalysis.confirmation} <b>Invalidation:</b> {technicalAnalysis.invalidation}. This is decision support, not an order or a prediction.</footer></section>
             <div className="chart-layout">
               <div className="price-panel">
                 <div className="price-grid"><span>${chartHigh.toFixed(2)}</span><span>${(chartLow+chartSpan*.75).toFixed(2)}</span><span>${(chartLow+chartSpan*.5).toFixed(2)}</span><span>${(chartLow+chartSpan*.25).toFixed(2)}</span><span>${chartLow.toFixed(2)}</span></div>
@@ -1323,6 +1341,7 @@ export default function Home({ initialTab = "Dashboard" }: { initialTab?: string
                 </div>
                 {tab!=="Scanner"&&<button onClick={() => navigate("Scanner")}>View all →</button>}
               </div>
+              <div className={`scanner-source ${chartBars.length?"live":"demo"}`}><b>{chartBars.length?"CONNECTED MARKET EVIDENCE":"ILLUSTRATIVE RESEARCH LIST"}</b><span>{chartBars.length?"Open a candidate’s chart to calculate current support, resistance, moving averages, volume confirmation, and conditional levels.":"These names are examples, not current stock recommendations. Connect Alpaca market data before relying on price or volume."}</span></div>
               {(tab==="Scanner"?scannerOpportunities:opportunities).map((o) => (
                 <button
                   className={pick.ticker === o.ticker ? "opp selected" : "opp"}
@@ -1508,23 +1527,14 @@ export default function Home({ initialTab = "Dashboard" }: { initialTab?: string
                 value={question}
                 onChange={(e) => setQuestion(e.target.value)}
               />
-              <button className="primary" onClick={() => setAnalyzed(true)}>
-                Analyze entry
+              <button className="primary" disabled={aiBusy} onClick={analyzeWithAI}>
+                {aiBusy?"Analyzing evidence…":"Analyze with Investment AI"}
               </button>
               {analyzed && (
                 <div className="answer">
-                  <b>Verdict: wait for evidence.</b>
-                  <p>
-                    At this entry, the idea has reasonable upside but
-                    confirmation is incomplete. A stronger plan is to wait for
-                    price to hold above $180, then form a bullish candle with
-                    improving volume. Do not enter if the broader semiconductor
-                    sector weakens.
-                  </p>
-                  <span>
-                    Invalidation: daily close below $176.90 · Target: $192.50 ·
-                    Risk/reward: {calc.rr.toFixed(1)}:1
-                  </span>
+                  <b>{aiAnswer.includes("not configured")?"Investment AI setup required":"Read-only decision analysis"}</b>
+                  <p className="ai-response">{aiAnswer}</p>
+                  <span>Northstar never submits an order. You must verify current data and act explicitly in your own institution.</span>
                 </div>
               )}
             </section>
@@ -1619,7 +1629,7 @@ export default function Home({ initialTab = "Dashboard" }: { initialTab?: string
                   <p>UPCOMING BILLS</p>
                   <h2>${monthlyBills.toLocaleString()} due this month</h2>
                 </div>
-                <button onClick={()=>notify("Bill creation will save to D1 after authentication is configured.")}>＋ Add bill</button>
+                <button onClick={()=>notify("Bill creation will save to AWS PostgreSQL after authentication is configured.")}>＋ Add bill</button>
               </div>
               <div className="bill-head">
                 <span>Bill</span>
@@ -1937,37 +1947,19 @@ export default function Home({ initialTab = "Dashboard" }: { initialTab?: string
                 <p>HOUSEHOLD & PERMISSIONS</p>
                 <h2>Your shared financial team</h2>
               </div>
-              <button onClick={()=>notify("Invitations require production authentication and verified email delivery. No invitation was sent.")}>＋ Invite member</button>
+              {householdAccess?.role==="owner"&&<button onClick={()=>setInviteOpen(value=>!value)}>＋ Invite member</button>}
             </div>
+            {(householdAccess?.availableHouseholds?.length||0)>1&&<div className="household-switcher"><label>Active household<select value={householdAccess?.household?.id||""} onChange={event=>switchHousehold(event.target.value)}>{householdAccess?.availableHouseholds.map(item=><option key={item.id} value={item.id}>{item.name} · {item.role.replaceAll("_"," ")}</option>)}</select></label></div>}
+            {inviteOpen&&<div className="invite-panel"><label>Email address<input type="email" value={inviteEmail} onChange={event=>setInviteEmail(event.target.value)} placeholder="person@example.com" /></label><label>Access role<select value={inviteRole} onChange={event=>setInviteRole(event.target.value)}><option value="investment_manager">Investment manager</option><option value="manager">Household manager</option><option value="member">Household member</option><option value="accountant">Accountant</option><option value="viewer">Read-only viewer</option></select></label><button className="primary" disabled={!inviteEmail.includes("@")||inviteNotice.includes("Creating")} onClick={inviteMember}>Send secure invitation</button><button onClick={()=>setInviteOpen(false)}>Cancel</button><small className="invite-explainer">Investment managers can review portfolio, research, goals, and plans. They cannot invite users, expose provider credentials, move money, or execute trades.</small></div>}
+            {inviteNotice&&<p className="invite-notice">{inviteNotice}</p>}
             <div className="members">
-              <span>
-                <i className="avatar">{displayInitials}</i>
-                <b>
-                  {displayName}<small>{accountEmail} · Owner · full control</small>
-                </b>
-                <em>YOU</em>
-              </span>
-              <span>
-                <i className="avatar rose">AM</i>
-                <b>
-                  Alex M.<small>Co-manager · can view and update</small>
-                </b>
-                <em>ACTIVE</em>
-              </span>
-              <span>
-                <i className="avatar gold-bg">LM</i>
-                <b>
-                  Lucía M.<small>Viewer · education and goals only</small>
-                </b>
-                <em>INVITED</em>
-              </span>
+              {(householdAccess?.members||[{user_id:"self",display_name:displayName,email:accountEmail,role:"owner",status:"active"}]).map((member,index)=><span key={member.user_id}><i className={`avatar ${index%2?"rose":""}`}>{member.display_name.split(" ").map(value=>value[0]).join("").slice(0,2).toUpperCase()}</i><b>{member.display_name}<small>{member.email} · {member.role.replaceAll("_"," ")}</small></b><em>{member.user_id==="local_owner"||member.email===accountEmail?"YOU":member.status.toUpperCase()}</em></span>)}
+              {householdAccess?.invitations.map(invite=><span key={invite.id}><i className="avatar gold-bg">?</i><b>{invite.email}<small>{invite.role.replaceAll("_"," ")} · expires {new Date(invite.expires_at).toLocaleDateString()}</small></b><em>INVITED</em></span>)}
             </div>
             <div className="role-note">
               <b>Role protection</b>
               <span>
-                Owners manage access. Co-managers can update household finances
-                but cannot remove owners. Viewers see only categories explicitly
-                shared with them. Every sensitive change is logged.
+                Owners manage access. Household managers can update shared finances. Investment managers can analyze portfolios and plans but cannot invite users, access provider tokens, move money, or execute trades. Viewers remain read-only. Every invitation and acceptance is logged.
               </span>
             </div>
           </section>
@@ -2048,16 +2040,10 @@ export default function Home({ initialTab = "Dashboard" }: { initialTab?: string
                   Only IMPORTANT and ACT NOW TO REVIEW events interrupt you.
                   INFO and WATCH stay in the daily digest.
                 </p>
-                <button
-                  className="primary notify"
-                  onClick={enableNotifications}
-                >
-                  Enable device alerts
-                </button>
-                <span className="notify-status">{notifyStatus}</span>
+                <div className="notification-actions"><button className={`primary notify ${notifyClass}`} disabled={notifyClass==="unsupported"} onClick={()=>{if(Notification.permission==="granted"){localStorage.setItem("northstar-push-enabled","true");setPushEnabled(true);setNotifyStatus("Northstar alerts ON · browser permission granted")}else enableNotifications()}}>{pushEnabled?"✓ Northstar alerts enabled":"Enable Northstar alerts"}</button><button className="notification-off" disabled={!pushEnabled} onClick={()=>{localStorage.setItem("northstar-push-enabled","false");setPushEnabled(false);setNotifyStatus("Northstar alerts OFF · browser permission remains granted")}}>Turn off alerts</button></div>
+                <span className={`notify-status ${notifyClass}`} role="status"><i />{notifyStatus}</span>
                 <small className="setup-note">
-                  Web Push delivery requires a deployed HTTPS origin, a
-                  push-signing key, and a server subscription endpoint.
+                  To revoke browser permission completely, open the site controls beside the address bar → Notifications → Block. Web Push delivery also requires HTTPS, a push-signing key, and a server subscription endpoint.
                 </small>
               </div>
               <div className="setting-block provider-setting" id="market-data-settings">
@@ -2119,6 +2105,10 @@ export default function Home({ initialTab = "Dashboard" }: { initialTab?: string
             <div className="academy-library"><div><span>PRIVATE DOCUMENT LIBRARY</span><h3>Mi Libro de Inversión y Trading · 20 Semanas</h3><p>{bookNotice}</p></div><label className="book-upload">Upload PDF<input type="file" accept="application/pdf" onChange={e=>{const file=e.target.files?.[0];if(file)uploadAcademyBook(file)}} /></label>{readerUrl&&<a href={readerUrl} target="_blank" rel="noreferrer">Open full reader ↗</a>}</div>
             {readerUrl&&<div className="book-reader"><iframe src={readerUrl} title="Investment and trading workbook reader" /></div>}
             {academyWeek===4&&<section className="week-five-lab"><div className="candle-anatomy"><i/><b>HIGH</b><span>OPEN ↔ CLOSE BODY</span><b>LOW</b><i/><p>Wicks show rejection; the body shows open-to-close control. Meaning comes from timeframe, location, trend, volume and confirmation.</p></div><div className="candle-exam"><div><b>Week 5 · Eight-question mastery exam</b><span>{Object.keys(examAnswers).length}/8 answered · {candleExam.filter((q,i)=>examAnswers[i]===q[2]).length}/8 correct</span></div>{candleExam.map((q,i)=><fieldset key={q[0]}><legend>{i+1}. {q[0]}</legend>{q[1].map((answer,j)=><button key={answer} className={examAnswers[i]===j?(j===q[2]?"correct":"incorrect"):""} onClick={()=>setExamAnswers(x=>({...x,[i]:j}))}>{String.fromCharCode(65+j)}. {answer}</button>)}{examAnswers[i]!==undefined&&<small>{examAnswers[i]===q[2]?"Correct.":`Answer: ${String.fromCharCode(65+q[2])}.`} {q[1][q[2]]}</small>}</fieldset>)}<p><b>Mastery rule:</b> 7/8 plus one journaled chart example. Answers are revealed only after an attempt.</p></div></section>}
+            <ScenarioGallery />
+            <BuySellGuide />
+            <AdvancedStudyChart />
+            <AcademyLab week={academyWeek} onJournal={text=>{sessionStorage.setItem("northstar-journal-reflection",text);navigate("Journal")}} />
             <div className="academy-layout">
               <nav className="week-list" aria-label="Academy weeks">{academyWeeks.map((week,index)=><button key={week} className={academyWeek===index?"active":""} onClick={()=>{setAcademyWeek(index);setQuizChoice("")}}><i>{completedWeeks.includes(index)?"✓":index+1}</i><span><b>Week {index+1}</b><small>{week}</small></span></button>)}</nav>
               <article className="lesson-panel"><p className="kicker">WEEK {academyWeek+1} · GUIDED LESSON</p><h2>{academyWeeks[academyWeek]}</h2><div className="lesson-objectives"><b>Learning method</b><span>Simple explanation → professional language → practice → mini-exam → journal reflection.</span></div><div className="lesson-columns"><section><small>SIMPLE EXPLANATION</small><p>{academyLessons[academyWeek].simple}</p><b>Required reading</b><p>{academyLessons[academyWeek].reading}</p></section><section><small>PROFESSIONAL VIEW</small><p>{academyLessons[academyWeek].professional}</p><b>Decision standard</b><p>Document the evidence, timeframe, uncertainty, risk, and invalidation before acting.</p></section></div><div className="academy-assignment"><span><b>Week {academyWeek+1} practice</b>{academyLessons[academyWeek].assignment}</span><button onClick={()=>navigate("Market Intel")}>Open market desk</button></div><div className="practice-box"><b>Week {academyWeek+1} knowledge test</b><p>{academyLessons[academyWeek].question}</p>{academyLessons[academyWeek].options.map((answer,index)=><button key={answer} className={quizChoice===answer?(index===academyLessons[academyWeek].correct?"correct":"incorrect"):""} onClick={()=>setQuizChoice(answer)}>{String.fromCharCode(65+index)}. {answer}</button>)}{quizChoice&&<span>{academyLessons[academyWeek].options.indexOf(quizChoice)===academyLessons[academyWeek].correct?`Correct. ${academyLessons[academyWeek].professional}`:`Review Week ${academyWeek+1}, then try again. The correct answer must follow the lesson's decision rule.`}</span>}</div><div className="lesson-actions"><button onClick={()=>{sessionStorage.setItem("northstar-journal-reflection",`Academy Week ${academyWeek+1} — ${academyWeeks[academyWeek]}: `);navigate("Journal")}}>Add journal note</button><button className="primary" onClick={()=>setCompletedWeeks(current=>current.includes(academyWeek)?current:[...current,academyWeek])}>✓ Mark complete</button></div></article>

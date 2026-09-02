@@ -1,0 +1,7 @@
+/* Remove legacy sidebar widgets that duplicated the dashboard and caused overflow. */
+.workspace-view .shell>aside>.nav-group~p,
+.workspace-view .shell>aside>.nav-group~button,
+.workspace-view .shell>aside>.guard,
+.workspace-view .shell>aside>.user{display:none!important}
+@media(min-width:951px){.workspace-view .shell>aside{position:sticky;top:60px;height:calc(100vh - 60px);min-height:calc(100vh - 60px);overflow-y:scroll;overflow-x:hidden;overscroll-behavior:contain;scroll-behavior:smooth;scrollbar-gutter:stable;background:#0d1714!important}.workspace-view .shell>aside::-webkit-scrollbar{width:12px}.workspace-view .shell>aside::-webkit-scrollbar-track{background:#101d18;border-left:1px solid #203229}.workspace-view .shell>aside::-webkit-scrollbar-thumb{min-height:44px;border:3px solid #101d18;border-radius:99px;background:#55776a}.workspace-view .shell>aside::-webkit-scrollbar-thumb:hover{background:#72a18f}.workspace-view .shell>aside{scrollbar-width:auto;scrollbar-color:#55776a #101d18}.workspace-view .shell>aside .nav-group{flex:0 0 auto}.workspace-view .shell>aside .nav-group p{margin-top:9px!important;margin-bottom:2px!important}.workspace-view .shell>aside .nav-group button{min-height:31px!important;padding-top:5px!important;padding-bottom:5px!important}.workspace-view .shell>aside .nav-group:last-of-type{padding-bottom:24px}}
+@media(max-width:950px){.workspace-view .shell>aside{background:#0d1714!important}.workspace-view .shell>aside>.nav-group~p,.workspace-view .shell>aside>.nav-group~button{display:none!important}}
