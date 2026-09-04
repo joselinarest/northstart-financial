@@ -4,7 +4,8 @@ import { requireUser } from "@/lib/auth";
 
 const { Pool } = pg;
 type QueryResult = { rows: Array<Record<string, unknown>>; rowCount: number | null };
-const globalDatabase = globalThis as typeof globalThis & { northstarPool?: InstanceType<typeof Pool>; northstarSchemaReady?: Promise<void> };
+const globalDatabase = globalThis as typeof globalThis & { northstarPool?: InstanceType<typeof Pool>; northstarSchemaReady?: Promise<void>; northstarSchemaVersion?: number };
+const schemaVersion=5;
 
 function pool() {
   const connectionString = process.env.DATABASE_URL;
@@ -49,13 +50,14 @@ export class PostgresDatabase {
 }
 
 export async function database() {
-  if (!globalDatabase.northstarSchemaReady) globalDatabase.northstarSchemaReady = (async () => { const db = new PostgresDatabase(); for (const statement of schemaStatements) await db.prepare(statement).run(); })();
+  if (!globalDatabase.northstarSchemaReady||globalDatabase.northstarSchemaVersion!==schemaVersion) globalDatabase.northstarSchemaReady = (async () => { const db = new PostgresDatabase(); for (const statement of schemaStatements) await db.prepare(statement).run();globalDatabase.northstarSchemaVersion=schemaVersion; })();
   await globalDatabase.northstarSchemaReady; return new PostgresDatabase();
 }
 
 export const id = (prefix: string) => `${prefix}_${crypto.randomUUID()}`;
-export const roleCanWrite = (role: string) => ["owner", "manager", "investment_manager", "member", "accountant"].includes(role);
-export const roleCanManageMembers = (role: string) => role === "owner";
+export const roleCanWrite = (role: string) => ["owner", "co_owner", "manager", "investment_manager", "member", "accountant"].includes(role);
+export const roleCanManageMembers = (role: string) => ["owner","co_owner"].includes(role);
+export const roleCanConnectAccounts = (role:string) => ["owner","co_owner","manager","account_connector"].includes(role);
 
 export async function workspace(request: Request) {
   const user = await requireUser(request), db = await database(), personalHouseholdId = `household_${user.userId}`, personalEntityId = `entity_${user.userId}_personal`;
@@ -68,8 +70,14 @@ export async function workspace(request: Request) {
   const requested = request.headers.get("x-household-id");
   let membership = requested ? await db.prepare("SELECT household_id,role FROM household_members WHERE household_id=? AND user_id=? AND status='active'").bind(requested,user.userId).first<{household_id:string;role:string}>() : null;
   if (requested && !membership) throw new Response(JSON.stringify({error:"You do not have access to this household"}),{status:403,headers:{"Content-Type":"application/json"}});
-  if (!membership) membership = await db.prepare("SELECT household_id,role FROM household_members WHERE user_id=? AND status='active' ORDER BY CASE role WHEN 'owner' THEN 0 ELSE 1 END, household_id LIMIT 1").bind(user.userId).first<{household_id:string;role:string}>();
+  if (!membership) membership = await db.prepare("SELECT household_id,role FROM household_members WHERE user_id=? AND status='active' ORDER BY CASE WHEN household_id=? THEN 1 ELSE 0 END, CASE role WHEN 'owner' THEN 0 WHEN 'co_owner' THEN 1 ELSE 2 END, household_id LIMIT 1").bind(user.userId,personalHouseholdId).first<{household_id:string;role:string}>();
   const householdId = membership?.household_id || personalHouseholdId;
+  const requestPath=new URL(request.url).pathname,studentAllowed=requestPath==="/api/household"||requestPath.startsWith("/api/learning")||requestPath.startsWith("/api/documents")||requestPath.startsWith("/api/paper-trades");
+  if(membership?.role==="student"&&!studentAllowed)throw new Response(JSON.stringify({error:"Student accounts are limited to Northstar Academy and educational simulation"}),{status:403,headers:{"Content-Type":"application/json"}});
+  const mutation=!['GET','HEAD','OPTIONS'].includes(request.method.toUpperCase());
+  if(mutation&&['observer','viewer'].includes(membership?.role||''))throw new Response(JSON.stringify({error:"Your household role is read-only"}),{status:403,headers:{"Content-Type":"application/json"}});
+  if(mutation&&membership?.role==='student'&&!requestPath.startsWith('/api/paper-trades'))throw new Response(JSON.stringify({error:"Student accounts may only save Academy and simulation activity"}),{status:403,headers:{"Content-Type":"application/json"}});
+  if(mutation&&membership?.role==='account_connector'&&!requestPath.startsWith('/api/connections/plaid'))throw new Response(JSON.stringify({error:"Account connectors may only link and synchronize their own financial institutions"}),{status:403,headers:{"Content-Type":"application/json"}});
   const entity = await db.prepare("SELECT id FROM entities WHERE household_id=? ORDER BY CASE type WHEN 'personal' THEN 0 ELSE 1 END,id LIMIT 1").bind(householdId).first<{id:string}>();
   return { db, householdId, entityId: entity?.id || personalEntityId, role: membership?.role || "owner", ...user };
 }

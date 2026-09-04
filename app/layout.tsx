@@ -9,6 +9,10 @@ import './scenario-gallery.css';
 import './buy-sell-guide.css';
 import './state-polish.css';
 import './notification-control.css';
+import './sidebar-contrast.css';
+import './chart-prediction-lab.css';
+import './automatic-market-copilot.css';
+import './paper-trading-simulator.css';
 
 const geistSans = Geist({
   variable: '--font-geist-sans',
@@ -37,6 +41,7 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body
+        suppressHydrationWarning
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
         {children}

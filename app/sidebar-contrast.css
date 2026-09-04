@@ -1,0 +1,108 @@
+/* High-contrast navigation overrides. Keep this stylesheet last in layout.tsx. */
+@media (min-width: 951px) {
+  .workspace-view .shell {
+    grid-template-columns: 232px minmax(0, 1fr);
+  }
+
+  .workspace-view .shell > aside {
+    width: 232px;
+    background: #081510 !important;
+    color: #ffffff !important;
+  }
+
+  .workspace-view .shell > aside .nav-group p {
+    color: #a9beb5 !important;
+    font-size: 11px !important;
+  }
+
+  .workspace-view .shell > aside .nav-group button {
+    min-height: 38px !important;
+    padding: 7px 10px !important;
+    border: 1px solid transparent !important;
+    background: #101f19 !important;
+    color: #f2f8f5 !important;
+    font-size: 13px !important;
+    font-weight: 650 !important;
+    box-shadow: none !important;
+  }
+
+  .workspace-view .shell > aside .nav-group button > span {
+    width: 25px !important;
+    height: 25px !important;
+    border-color: #365448 !important;
+    background: #193429 !important;
+    color: #8de0bc !important;
+    font-size: 13px !important;
+  }
+
+  .workspace-view .shell > aside .nav-group button:hover {
+    border-color: #4f7c69 !important;
+    background: #1a3429 !important;
+    color: #ffffff !important;
+  }
+
+  .workspace-view .shell > aside .nav-group button.active {
+    border-color: #79d7b0 !important;
+    background: #286f55 !important;
+    color: #ffffff !important;
+    box-shadow: inset 4px 0 #a2f0cf !important;
+  }
+
+  .workspace-view .shell > aside .nav-group button.active > span {
+    border-color: #b4f4d8 !important;
+    background: #0d3c2d !important;
+    color: #ffffff !important;
+  }
+
+  .workspace-view .shell > aside .nav-group button:focus-visible {
+    outline: 3px solid #a2f0cf !important;
+    outline-offset: 2px;
+  }
+}
+
+/* Match the loading mask so navigation does not flash to a low-contrast theme. */
+.app-loading .loading-shell {
+  grid-template-columns: 232px 1fr;
+}
+
+.app-loading .loading-sidebar {
+  background: #081510 !important;
+}
+
+.loading-nav-group p {
+  color: #a9beb5 !important;
+}
+
+.loading-nav-group button {
+  min-height: 38px !important;
+  padding: 7px 10px !important;
+  background: #101f19 !important;
+  color: #f2f8f5 !important;
+  font-size: 13px !important;
+}
+
+.loading-nav-group button span {
+  width: 25px !important;
+  height: 25px !important;
+  border: 1px solid #365448;
+  background: #193429 !important;
+  color: #8de0bc !important;
+  font-size: 13px !important;
+}
+
+.loading-nav-group button.active {
+  background: #286f55 !important;
+  color: #ffffff !important;
+}
+
+@media (max-width: 950px) {
+  .workspace-view .shell > aside button {
+    background: #101f19 !important;
+    color: #f2f8f5 !important;
+  }
+
+  .workspace-view .shell > aside button.active {
+    background: #286f55 !important;
+    color: #ffffff !important;
+  }
+}

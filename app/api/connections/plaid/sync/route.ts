@@ -8,10 +8,15 @@ const cents=(value:unknown)=>Math.round(Number(value||0)*100);
 
 export async function POST(request:Request) {
   try {
-    const {db,householdId,entityId}=await workspace(request),body=await request.json() as {connectionId?:string};
+    const {db,householdId,userId,role}=await workspace(request),body=await request.json() as {connectionId?:string};
     if(!body.connectionId) return Response.json({error:"connectionId required"},{status:400});
     const connection=await db.prepare("SELECT * FROM connections WHERE id=? AND household_id=? AND provider='plaid' AND status='active'").bind(body.connectionId,householdId).first<Record<string,string>>();
     if(!connection?.encrypted_access_token) return Response.json({error:"Connection not found"},{status:404});
+    const connectionOwner=connection.connected_by_user_id||userId;
+    if(connection.connected_by_user_id&&connectionOwner!==userId&&!['owner','co_owner','manager'].includes(role)) return Response.json({error:"Only this connection's owner or a household manager can synchronize it"},{status:403});
+    const entityId=`entity_${householdId}_${connectionOwner}_personal`;
+    const owner=await db.prepare("SELECT display_name FROM users WHERE id=?").bind(connectionOwner).first<{display_name?:string}>();
+    await db.prepare("INSERT INTO entities(id,household_id,type,name) VALUES(?,?,?,?) ON CONFLICT(id) DO NOTHING").bind(entityId,householdId,"personal",`${owner?.display_name||"Household member"} finances`).run();
     const token=await decryptSecret(connection.encrypted_access_token),accountData=await plaid("/accounts/get",token),accountWrites=[] as DbStatement[];
     for(const account of accountData.accounts||[]) accountWrites.push(db.prepare("INSERT INTO accounts(id,entity_id,connection_id,provider_account_id,name,official_name,type,subtype,currency,mask,current_balance_cents,available_balance_cents,credit_limit_cents,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,CURRENT_TIMESTAMP) ON CONFLICT(id) DO UPDATE SET name=excluded.name,official_name=excluded.official_name,type=excluded.type,subtype=excluded.subtype,current_balance_cents=excluded.current_balance_cents,available_balance_cents=excluded.available_balance_cents,credit_limit_cents=excluded.credit_limit_cents,updated_at=CURRENT_TIMESTAMP").bind(`plaid_${account.account_id}`,entityId,body.connectionId,account.account_id,account.name,account.official_name||null,account.type,account.subtype||null,account.balances?.iso_currency_code||"USD",account.mask||null,cents(account.balances?.current),account.balances?.available==null?null:cents(account.balances.available),account.balances?.limit==null?null:cents(account.balances.limit)));
     if(accountWrites.length) await db.batch(accountWrites);
