@@ -2,6 +2,8 @@
 
 Northstar is read-only. Do not grant trading, transfer, withdrawal, or money-movement scopes to any provider.
 
+Amplify SSR writes only public Cognito identifiers and `NORTHSTAR_SECRET_ID` to Next.js's server environment file. Database, Plaid, encryption, and provider credentials belong in one AWS Secrets Manager JSON secret and are loaded only by server code at runtime. Grant the Amplify compute role `secretsmanager:GetSecretValue` for that single secret. Never prefix database, Plaid, or encryption secrets with `NEXT_PUBLIC_`.
+
 ## Required for production
 
 | Service | Purpose | Environment values |
@@ -11,6 +13,10 @@ Northstar is read-only. Do not grant trading, transfer, withdrawal, or money-mov
 | Plaid | Read-only bank, card, transaction, liability and investment sync | `PLAID_CLIENT_ID`, `PLAID_SECRET`, `PLAID_ENV`, `PLAID_PRODUCTS`, `PLAID_COUNTRY_CODES`, `PLAID_WEBHOOK_URL` |
 | Northstar server | Encrypt provider access tokens | `TOKEN_ENCRYPTION_KEY` (32 random bytes, base64 encoded) |
 | AWS PostgreSQL | Sole relational database and private Academy PDF storage | `DATABASE_URL`, `DATABASE_POOL_MAX`, `DATABASE_SSL`, `DATABASE_SSL_REJECT_UNAUTHORIZED` |
+
+### Amplify server secret
+
+Create one AWS Secrets Manager secret containing a JSON object with the server-only values, for example `DATABASE_URL`, `TOKEN_ENCRYPTION_KEY`, `PLAID_CLIENT_ID`, `PLAID_SECRET`, `PLAID_ENV`, `PLAID_PRODUCTS`, `PLAID_COUNTRY_CODES`, and `PLAID_REDIRECT_URI`. Set Amplify's non-secret `NORTHSTAR_SECRET_ID` variable to that secret's name or ARN. Attach a compute role that can call `secretsmanager:GetSecretValue` only for that ARN. The application allowlists recognized keys and never returns secret values to the browser.
 
 ### AWS PostgreSQL note
 

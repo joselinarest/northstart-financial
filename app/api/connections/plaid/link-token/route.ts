@@ -11,5 +11,5 @@ export async function POST(r:Request){
   if(process.env.PLAID_ENV==="production"&&redirectUri&&!redirectUri.startsWith("https://"))return Response.json({error:"PLAID_REDIRECT_URI must use HTTPS in Production."},{status:503});
   const response=await fetch(`${host}/link/token/create`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({client_id:process.env.PLAID_CLIENT_ID,secret:process.env.PLAID_SECRET,client_name:"Northstar",language:"en",country_codes:(process.env.PLAID_COUNTRY_CODES||"US").split(",").map(value=>value.trim()),products,user:{client_user_id:userId},webhook:process.env.PLAID_WEBHOOK_URL||undefined,redirect_uri:redirectUri||undefined})});
   return new Response(await response.text(),{status:response.status,headers:{"Content-Type":"application/json"}});
- }catch(e){if(e instanceof Response)return e;throw e}
+ }catch(e){if(e instanceof Response)return e;const message=e instanceof Error?e.message:"Plaid Link configuration failed",configuration=/DATABASE_URL|required|not configured|missing|encryption/i.test(message);return Response.json({error:configuration?message:"Plaid Link could not be created. Review the server log and Plaid environment configuration.",code:configuration?"SERVER_CONFIGURATION":"PLAID_LINK_ERROR"},{status:configuration?503:500})}
 }

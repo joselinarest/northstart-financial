@@ -1,6 +1,7 @@
 import pg from "pg";
 import { schemaStatements } from "@/db/schema";
 import { requireUser } from "@/lib/auth";
+import {loadRuntimeSecrets} from "@/lib/runtime-secrets";
 
 const { Pool } = pg;
 type QueryResult = { rows: Array<Record<string, unknown>>; rowCount: number | null };
@@ -50,7 +51,8 @@ export class PostgresDatabase {
 }
 
 export async function database() {
-  if (!globalDatabase.northstarSchemaReady||globalDatabase.northstarSchemaVersion!==schemaVersion) globalDatabase.northstarSchemaReady = (async () => { const db = new PostgresDatabase(); for (const statement of schemaStatements) await db.prepare(statement).run();globalDatabase.northstarSchemaVersion=schemaVersion; })();
+  await loadRuntimeSecrets();
+  if (!globalDatabase.northstarSchemaReady||globalDatabase.northstarSchemaVersion!==schemaVersion) globalDatabase.northstarSchemaReady = (async () => {const client=await pool().connect();try{await client.query("SELECT pg_advisory_lock(hashtext($1))",["northstar_schema_init"]);for(const statement of schemaStatements)await client.query(postgresSql(statement));globalDatabase.northstarSchemaVersion=schemaVersion}finally{await client.query("SELECT pg_advisory_unlock(hashtext($1))",["northstar_schema_init"]).catch(()=>undefined);client.release()}})();
   await globalDatabase.northstarSchemaReady; return new PostgresDatabase();
 }
 
