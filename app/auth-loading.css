@@ -6,3 +6,5 @@
 .auth-loading section small{color:#687a72;font-size:.66rem}
 .auth-loading-spinner{width:26px;height:26px;margin-top:8px;border:3px solid #d7e5de;border-top-color:#18805f;border-radius:50%;animation:auth-spin .8s linear infinite}
 @keyframes auth-spin{to{transform:rotate(360deg)}}
+.workspace-view .head-actions .header-logout{border-color:#d6aaa4;background:#fff5f3;color:#963f36;font-weight:800}
+.workspace-view .head-actions .header-logout:hover{border-color:#b85a4f;background:#a8473d;color:#fff}

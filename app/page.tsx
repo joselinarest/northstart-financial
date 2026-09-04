@@ -840,6 +840,7 @@ export default function Home({ initialTab = "Dashboard", initialInvestmentId, fo
             ? Help & Guide
           </button>
           <button onClick={() => { const symbol=window.prompt("Enter a stock or ETF symbol",chartSymbol); if(symbol){sessionStorage.setItem("northstar-chart-symbol",symbol.toUpperCase());navigate("Professional Charts");} }}>⌕ Search</button>
+          <button className="header-logout" type="button" onClick={()=>{setSignedIn(false);setAccessToken("");signOutCognito()}}>Log out</button>
           <span className="avatar">{displayInitials}</span>
         </div>
       </header>
