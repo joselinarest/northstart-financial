@@ -74,7 +74,7 @@ export async function workspace(request: Request) {
   await db.prepare("INSERT INTO users(id,email,display_name,last_login_at) VALUES(?,?,?,CURRENT_TIMESTAMP) ON CONFLICT(id) DO UPDATE SET email=excluded.email,display_name=excluded.display_name,last_login_at=CURRENT_TIMESTAMP").bind(user.userId,user.email,user.name).run();
   const existingMembership=await db.prepare("SELECT household_id FROM household_members WHERE user_id=? AND status='active' LIMIT 1").bind(user.userId).first();
   const localBootstrap=user.userId==="local_owner"&&process.env.ALLOW_LOCAL_DEV_AUTH==="true";
-  if(!existingMembership&&!localBootstrap)throw new Response(JSON.stringify({error:"A valid Northstar invitation for this email address is required. Google or Apple sign-in verifies identity but does not create workspace access.",code:"INVITATION_REQUIRED"}),{status:403,headers:{"Content-Type":"application/json"}});
+  if(!existingMembership&&!localBootstrap)throw new Response(JSON.stringify({error:"A valid Northstar invitation for this email address is required. Google sign-in verifies identity but does not create workspace access.",code:"INVITATION_REQUIRED"}),{status:403,headers:{"Content-Type":"application/json"}});
   if(!existingMembership&&localBootstrap)await db.batch([
     db.prepare("INSERT OR IGNORE INTO households(id,name,goal_date) VALUES(?,?,?)").bind(personalHouseholdId,"My Household","2036-12-31"),
     db.prepare("INSERT OR IGNORE INTO household_members(household_id,user_id,role) VALUES(?,?,?)").bind(personalHouseholdId,user.userId,"owner"),

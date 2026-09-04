@@ -434,9 +434,9 @@ export default function Home({ initialTab = "Dashboard", initialInvestmentId, fo
   useEffect(()=>{if(!signedIn)return;if(initialTab==="Household")loadHousehold();if(["Dashboard","Accounts","Portfolio","Market Intel","Scanner","Prepare Trade","Professional Charts"].includes(initialTab))loadConnectedFinance()},[realtimeTick]);
   useEffect(()=>{if(initialTab!=="Household"||!signedIn)return;const timer=window.setInterval(()=>loadHousehold(),10000);return()=>window.clearInterval(timer)},[initialTab,signedIn,accessToken]);
   useEffect(()=>{if(initialTab==="Household"&&sessionStorage.getItem("northstar-open-invite")==="true"){sessionStorage.removeItem("northstar-open-invite");setInviteOpen(true)}},[initialTab]);
-  const socialLogin = async (provider?: "google" | "apple") => {
+  const socialLogin = async () => {
     setAuthNotice("");
-    try { await startCognitoLogin(provider==="google"?"Google":provider==="apple"?"SignInWithApple":undefined); }
+    try { await startCognitoLogin(); }
     catch(error){setAuthNotice(error instanceof Error?error.message:"Unable to start sign-in.")}
   };
   const sendOtp = async () => socialLogin();
@@ -675,15 +675,9 @@ export default function Home({ initialTab = "Dashboard", initialInvestmentId, fo
               <p>Sign in to see your private financial workspace.</p>
               <button
                 className={`oauth ${cognitoConfigured ? "" : "disabled"}`}
-                onClick={() => socialLogin("google")}
+                onClick={socialLogin}
               >
                 <b>G</b> Continue with Google <span>{cognitoConfigured ? "AWS Cognito" : "Setup required"}</span>
-              </button>
-              <button
-                className={`oauth ${cognitoConfigured ? "" : "disabled"}`}
-                onClick={() => socialLogin("apple")}
-              >
-                <b>●</b> Continue with Apple <span>{cognitoConfigured ? "AWS Cognito" : "Setup required"}</span>
               </button>
               <div className="or">
                 <i />
@@ -818,7 +812,7 @@ export default function Home({ initialTab = "Dashboard", initialInvestmentId, fo
       </main>
     );
   if(workspaceAccess==="checking")return <main className="auth-loading" aria-busy="true"><section><div className="auth-loading-mark">N</div><b>NORTHSTAR</b><span className="auth-loading-spinner" aria-hidden="true"/><p>Validating invitation and household access…</p><small>Authentication alone does not grant access.</small></section></main>;
-  if(workspaceAccess==="invitation_required")return <main className="auth-page"><section className="auth-brand"><span>N</span><b>NORTHSTAR</b><p>Private family financial workspaces begin with a verified invitation.</p><blockquote>Identity verified.<br/>Workspace access not granted.</blockquote></section><section className="auth-panel"><div className="auth-box"><p className="kicker">INVITATION REQUIRED</p><h1>Open your invitation link</h1><p>{inviteNotice||"Signing in with Google or Apple is not enough to create a Northstar workspace."}</p><div className="security-note"><b>How to enter</b><span>Ask a Northstar owner to send an invitation to this exact email address. Open the link from your inbox, then authenticate with that same address.</span></div><button className="primary full-auth" type="button" onClick={()=>{setSignedIn(false);setAccessToken("");signOutCognito()}}>Sign out</button><div className="auth-legal"><a href="/privacy">Privacy Policy</a><span>No financial data is available without membership.</span></div></div></section></main>;
+  if(workspaceAccess==="invitation_required")return <main className="auth-page"><section className="auth-brand"><span>N</span><b>NORTHSTAR</b><p>Private family financial workspaces begin with a verified invitation.</p><blockquote>Identity verified.<br/>Workspace access not granted.</blockquote></section><section className="auth-panel"><div className="auth-box"><p className="kicker">INVITATION REQUIRED</p><h1>Open your invitation link</h1><p>{inviteNotice||"Signing in with Google is not enough to create a Northstar workspace."}</p><div className="security-note"><b>How to enter</b><span>Ask a Northstar owner to send an invitation to this exact email address. Open the link from your inbox, then authenticate with that same address.</span></div><button className="primary full-auth" type="button" onClick={()=>{setSignedIn(false);setAccessToken("");signOutCognito()}}>Sign out</button><div className="auth-legal"><a href="/privacy">Privacy Policy</a><span>No financial data is available without membership.</span></div></div></section></main>;
   return (
     <main className={`workspace-view page-${(pathByTab[tab] || "dashboard").replace(/[^a-z-]/g, "")} ${focusInvestmentAnalysis?"page-research-detail":""}`}>
       <RealtimeSync accessToken={accessToken} refreshMinutes={intradayRefreshMinutes} onStatus={setRealtimeStatus} onEvent={()=>setRealtimeTick(value=>value+1)} />

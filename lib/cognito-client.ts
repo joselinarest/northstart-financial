@@ -33,7 +33,7 @@ const decodeClaims = (token: string) => {
 
 export const isCognitoConfigured = () => Boolean(config().domain && config().clientId);
 
-export async function startCognitoLogin(identityProvider?: "Google" | "SignInWithApple") {
+export async function startCognitoLogin() {
   const { domain, clientId } = config();
   if (!domain || !clientId) throw new Error("AWS Cognito environment variables are not configured.");
   const verifier = randomValue(64), state = randomValue(32);
@@ -44,8 +44,8 @@ export async function startCognitoLogin(identityProvider?: "Google" | "SignInWit
   const requestedPath=`${location.pathname}${location.search}${location.hash}`;
   sessionStorage.setItem(NEXT_KEY,requestedPath.startsWith("/")&&!requestedPath.startsWith("//")?requestedPath:"/workspace/dashboard");
   const params = new URLSearchParams({client_id:clientId,response_type:"code",scope:"openid email profile",redirect_uri:`${location.origin}/auth/callback`,state,code_challenge:challenge,code_challenge_method:"S256"});
-  if (identityProvider) params.set("identity_provider", identityProvider);
-  if(identityProvider==="Google")params.set("prompt","select_account");
+  params.set("identity_provider", "Google");
+  params.set("prompt","select_account");
   location.assign(`${domain}/oauth2/authorize?${params}`);
 }
 
