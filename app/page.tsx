@@ -717,6 +717,7 @@ export default function Home({ initialTab = "Dashboard", initialInvestmentId, fo
                 Enter the account email first. Verification and the localhost
                 developer bypass are available on the next step.
               </small>
+              <div className="auth-legal"><a href="/privacy">Privacy Policy</a><span>Northstar uses read-only financial connections and never executes trades.</span></div>
             </div>
           ) : (
             <div className="auth-box">
