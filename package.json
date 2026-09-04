@@ -2,6 +2,7 @@
   "name": "northstar-trading",
   "version": "0.1.0",
   "private": true,
+  "packageManager": "pnpm@11.19.0",
   "engines": {
     "node": ">=22.13.0"
   },
@@ -12,7 +13,7 @@
     "lint": "eslint . --ignore-pattern dist --ignore-pattern .next"
   },
   "dependencies": {
-    "next": "16.2.6",
+    "next": "15.5.25",
     "pg": "^8.23.0",
     "react": "19.2.6",
     "react-dom": "19.2.6"
@@ -24,7 +25,7 @@
     "@types/react": "19.2.14",
     "@types/react-dom": "19.2.3",
     "eslint": "9.39.4",
-    "eslint-config-next": "16.2.6",
+    "eslint-config-next": "15.5.25",
     "tailwindcss": "4.2.1",
     "typescript": "5.9.3"
   },
