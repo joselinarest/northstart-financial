@@ -16,7 +16,8 @@ function pool() {
     const connectionUrl = new URL(connectionString);
     connectionUrl.searchParams.delete("sslmode");
     connectionUrl.searchParams.delete("uselibpqcompat");
-    globalDatabase.northstarPool = new Pool({ connectionString: connectionUrl.toString(), max: Number(process.env.DATABASE_POOL_MAX || 10), idleTimeoutMillis: 30_000, connectionTimeoutMillis: 10_000, ssl: local || process.env.DATABASE_SSL === "disable" ? false : { rejectUnauthorized: process.env.DATABASE_SSL_REJECT_UNAUTHORIZED !== "false" } });
+    const rejectUnauthorized = process.env.DATABASE_SSL_REJECT_UNAUTHORIZED?.trim().toLowerCase() !== "false";
+    globalDatabase.northstarPool = new Pool({ connectionString: connectionUrl.toString(), max: Number(process.env.DATABASE_POOL_MAX || 10), idleTimeoutMillis: 30_000, connectionTimeoutMillis: 10_000, ssl: local || process.env.DATABASE_SSL === "disable" ? false : { rejectUnauthorized } });
   }
   return globalDatabase.northstarPool;
 }
