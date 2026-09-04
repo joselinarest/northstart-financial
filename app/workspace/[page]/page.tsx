@@ -4,6 +4,7 @@ const tabs: Record<string,string> = {
   dashboard:"Dashboard", accounts:"Accounts", markets:"Market Intel", portfolio:"Portfolio", "cash-flow":"Bills & cards",
   opportunities:"Scanner", debt:"Liabilities", household:"Household",
   assistant:"Ask Northstar", planner:"Prepare Trade", simulation:"Paper Simulator", journal:"Journal",
+  "daily-action-plan":"Daily Action Plan",
   academy:"Learn", settings:"Settings", help:"Help", charts:"Professional Charts",
   "market-news":"Market News", growth:"Growth Finder",
 };
