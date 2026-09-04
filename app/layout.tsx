@@ -9,6 +9,7 @@ import './scenario-gallery.css';
 import './buy-sell-guide.css';
 import './state-polish.css';
 import './notification-control.css';
+import './auth-loading.css';
 import './sidebar-contrast.css';
 import './chart-prediction-lab.css';
 import './automatic-market-copilot.css';

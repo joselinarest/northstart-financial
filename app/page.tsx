@@ -648,23 +648,8 @@ export default function Home({ initialTab = "Dashboard", initialInvestmentId, fo
     debts.reduce((sum, d) => sum + d.balance * d.apr, 0) / totalDebt;
   if (!authReady)
     return (
-      <main className="app-loading" aria-busy="true" aria-label="Loading your Northstar workspace">
-        <header className="loading-header">
-          <div className="loading-brand"><span>N</span><b>NORTHSTAR</b></div>
-          <i className="skeleton skeleton-pill" />
-        </header>
-        <div className="loading-shell">
-          <aside className="loading-sidebar">
-            {navigationGroups.map(group=><div className="loading-nav-group" key={group.name}><p>{group.name}</p>{group.items.map(([item,icon])=><button key={item} className={tab===item?"active":""} disabled><span>{icon}</span>{navigationLabels[item]||item}</button>)}</div>)}
-          </aside>
-          <section className="loading-content">
-            <div className="loading-title"><div><i className="skeleton skeleton-kicker" /><i className="skeleton skeleton-heading" /></div><i className="skeleton skeleton-action" /></div>
-            <div className="skeleton skeleton-summary" />
-            <div className="loading-card-grid"><div className="skeleton skeleton-card" /><div className="skeleton skeleton-card" /></div>
-            <div className="skeleton skeleton-wide" />
-          </section>
-        </div>
-        <span className="loading-status">Securely loading your financial workspace…</span>
+      <main className="auth-loading" aria-busy="true" aria-live="polite" aria-label="Checking secure sign-in">
+        <section><div className="auth-loading-mark">N</div><b>NORTHSTAR</b><span className="auth-loading-spinner" aria-hidden="true"/><p>Checking secure sign-in…</p><small>No financial workspace is displayed until authentication is confirmed.</small></section>
       </main>
     );
   if (!signedIn)
