@@ -6,6 +6,6 @@ const permitted=new Set(["DATABASE_URL","DATABASE_POOL_MAX","DATABASE_SSL","DATA
 export async function loadRuntimeSecrets(){
  const secretId=process.env.NORTHSTAR_SECRET_ID?.trim();
  if(!secretId)return;
- if(!loading)loading=(async()=>{const client=new SecretsManagerClient({}),result=await client.send(new GetSecretValueCommand({SecretId:secretId}));if(!result.SecretString)throw new Error("Northstar AWS secret has no SecretString JSON value");let values:Record<string,unknown>;try{values=JSON.parse(result.SecretString)}catch{throw new Error("Northstar AWS secret must contain a JSON object")};for(const[key,value]of Object.entries(values))if(permitted.has(key)&&typeof value==="string"&&value&&!process.env[key])process.env[key]=value})();
+ if(!loading)loading=(async()=>{const arnRegion=secretId.startsWith("arn:")?secretId.split(":")[3]:undefined,client=new SecretsManagerClient(arnRegion?{region:arnRegion}:{}),result=await client.send(new GetSecretValueCommand({SecretId:secretId}));if(!result.SecretString)throw new Error("Northstar AWS secret has no SecretString JSON value");let values:Record<string,unknown>;try{values=JSON.parse(result.SecretString)}catch{throw new Error("Northstar AWS secret must contain a JSON object")};for(const[key,value]of Object.entries(values))if(permitted.has(key)&&typeof value==="string"&&value&&!process.env[key])process.env[key]=value})();
  try{await loading}catch(error){loading=null;throw new Error(`Secure server configuration could not be loaded: ${error instanceof Error?error.message:"AWS Secrets Manager error"}`)}
 }

@@ -1,3 +1,4 @@
+import {loadRuntimeSecrets} from "@/lib/runtime-secrets";
 export const dynamic="force-dynamic";
 
 type AlpacaBar={t:string;o:number;h:number;l:number;c:number;v:number};
@@ -16,6 +17,7 @@ const avg=(values:number[])=>values.length?values.reduce((sum,value)=>sum+value,
 const ema=(values:number[],period:number)=>{const k=2/(period+1);return values.reduce((value,close,index)=>index?close*k+value*(1-k):close,values[0]||0)};
 
 export async function GET(request:Request){
+ await loadRuntimeSecrets();
   const strategy=new URL(request.url).searchParams.get("strategy")==="long-term"?"long-term":"swing",universe=strategy==="long-term"?longTermUniverse:swingUniverse;
   const key=process.env.ALPACA_API_KEY,secret=process.env.ALPACA_API_SECRET;
   if(!key||!secret)return Response.json({status:"not_configured",error:"Connect Alpaca market data to generate the automatic market shortlist."},{status:503});

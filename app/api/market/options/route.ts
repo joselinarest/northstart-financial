@@ -1,3 +1,4 @@
+import {loadRuntimeSecrets} from "@/lib/runtime-secrets";
 export const dynamic = "force-dynamic";
 
 type ChainSnapshot = {
@@ -18,6 +19,7 @@ function decodeContract(symbol: string) {
 }
 
 export async function POST(request: Request) {
+  await loadRuntimeSecrets();
   const body = await request.json().catch(() => ({}));
   const symbol = String(body.symbol || "SPY").toUpperCase().trim();
   const outlook = body.outlook === "bearish" ? "bearish" : "bullish";

@@ -1,3 +1,4 @@
+import {loadRuntimeSecrets} from "@/lib/runtime-secrets";
 export const dynamic = "force-dynamic";
 
 type NewsApiAiArticle = {
@@ -12,6 +13,7 @@ type NewsApiAiResponse = {
 };
 
 export async function GET(request: Request) {
+  await loadRuntimeSecrets();
   // Keep NEWS_API_KEY compatibility so existing deployments do not need a rename.
   const key = process.env.NEWSAPI_AI_KEY || process.env.NEWS_API_KEY;
   if (!key) return Response.json({ status: "not_configured", error: "Configure NEWSAPI_AI_KEY (or NEWS_API_KEY) to enable NewsAPI.ai market news." }, { status: 503 });

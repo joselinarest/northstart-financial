@@ -1,8 +1,10 @@
+import {loadRuntimeSecrets} from "@/lib/runtime-secrets";
 export const dynamic = "force-dynamic";
 
 const validSymbol = /^[A-Z][A-Z0-9.-]{0,9}$/;
 
 export async function GET(request:Request) {
+  await loadRuntimeSecrets();
   const key=process.env.FINNHUB_API_KEY;
   if(!key)return Response.json({status:"not_configured",error:"Configure FINNHUB_API_KEY to enable company research."},{status:503});
   const url=new URL(request.url),symbol=(url.searchParams.get("symbol")||"").trim().toUpperCase();

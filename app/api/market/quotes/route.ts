@@ -1,6 +1,8 @@
+import {loadRuntimeSecrets} from "@/lib/runtime-secrets";
 export const dynamic = "force-dynamic";
 
 export async function GET(request:Request){
+  await loadRuntimeSecrets();
   const raw=new URL(request.url).searchParams.get("symbols")||"",symbols=[...new Set(raw.toUpperCase().split(",").map(value=>value.trim()).filter(value=>/^[A-Z.]{1,10}$/.test(value)))].slice(0,50);
   if(!symbols.length)return Response.json({error:"Provide at least one valid symbol"},{status:400});
   if(!process.env.ALPACA_API_KEY||!process.env.ALPACA_API_SECRET)return Response.json({status:"not_configured",error:"Connect Alpaca to show live bid and ask prices."},{status:503});

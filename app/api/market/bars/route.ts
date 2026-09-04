@@ -1,8 +1,10 @@
+import {loadRuntimeSecrets} from "@/lib/runtime-secrets";
 export const dynamic = "force-dynamic";
 
 const ranges: Record<string,{days:number;timeframe:string}> = {"1M":{days:35,timeframe:"1Day"},"3M":{days:100,timeframe:"1Day"},"6M":{days:195,timeframe:"1Day"},"1Y":{days:370,timeframe:"1Day"},"5Y":{days:1835,timeframe:"1Week"}};
 
 export async function GET(request:Request){
+  await loadRuntimeSecrets();
   const url=new URL(request.url),symbol=(url.searchParams.get("symbol")||"SPY").toUpperCase(),range=url.searchParams.get("range")||"1Y",config=ranges[range]||ranges["1Y"];
   if(!/^[A-Z.]{1,10}$/.test(symbol))return Response.json({error:"Invalid stock or ETF symbol"},{status:400});
   if(!process.env.ALPACA_API_KEY||!process.env.ALPACA_API_SECRET)return Response.json({status:"not_configured",error:"Connect Alpaca market data to load charts for every stock and ETF."},{status:503});
