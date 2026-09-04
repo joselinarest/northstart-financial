@@ -5,8 +5,16 @@ import {loadRuntimeSecrets} from "@/lib/runtime-secrets";
 
 const { Pool } = pg;
 type QueryResult = { rows: Array<Record<string, unknown>>; rowCount: number | null };
-const globalDatabase = globalThis as typeof globalThis & { northstarPool?: InstanceType<typeof Pool>; northstarSchemaReady?: Promise<void>; northstarSchemaVersion?: number };
+const globalDatabase = globalThis as typeof globalThis & { northstarPool?: InstanceType<typeof Pool>; northstarSchemaReady?: Promise<void>; northstarSchemaVersion?: number; northstarRdsCa?: string; northstarRdsCaReady?: Promise<string> };
 const schemaVersion=6;
+const awsRdsCaUrl="https://truststore.pki.rds.amazonaws.com/global/global-bundle.pem";
+
+async function loadAwsRdsCa(){
+  const connectionString=process.env.DATABASE_URL||"";
+  if(/(?:localhost|127\.0\.0\.1)/.test(connectionString)||process.env.DATABASE_SSL==="disable")return;
+  if(!globalDatabase.northstarRdsCaReady)globalDatabase.northstarRdsCaReady=(async()=>{const response=await fetch(awsRdsCaUrl,{cache:"force-cache",signal:AbortSignal.timeout(10_000)});if(!response.ok)throw new Error(`AWS RDS CA bundle could not be loaded (${response.status})`);const certificate=await response.text();if(!certificate.includes("-----BEGIN CERTIFICATE-----"))throw new Error("AWS RDS CA bundle response was invalid");globalDatabase.northstarRdsCa=certificate;return certificate})();
+  await globalDatabase.northstarRdsCaReady;
+}
 
 function pool() {
   const connectionString = process.env.DATABASE_URL;
@@ -15,8 +23,7 @@ function pool() {
     const local = /(?:localhost|127\.0\.0\.1)/.test(connectionString);
     const connectionUrl = new URL(connectionString);
     for (const parameter of ["ssl", "sslmode", "sslcert", "sslkey", "sslrootcert", "uselibpqcompat"]) connectionUrl.searchParams.delete(parameter);
-    const rejectUnauthorized = process.env.DATABASE_SSL_REJECT_UNAUTHORIZED?.trim().toLowerCase() !== "false";
-    globalDatabase.northstarPool = new Pool({ connectionString: connectionUrl.toString(), max: Number(process.env.DATABASE_POOL_MAX || 10), idleTimeoutMillis: 30_000, connectionTimeoutMillis: 10_000, ssl: local || process.env.DATABASE_SSL === "disable" ? false : { rejectUnauthorized } });
+    globalDatabase.northstarPool = new Pool({ connectionString: connectionUrl.toString(), max: Number(process.env.DATABASE_POOL_MAX || 10), idleTimeoutMillis: 30_000, connectionTimeoutMillis: 10_000, ssl: local || process.env.DATABASE_SSL === "disable" ? false : { ca:globalDatabase.northstarRdsCa, rejectUnauthorized:true } });
   }
   return globalDatabase.northstarPool;
 }
@@ -52,6 +59,7 @@ export class PostgresDatabase {
 
 export async function database() {
   await loadRuntimeSecrets();
+  await loadAwsRdsCa();
   if (!globalDatabase.northstarSchemaReady||globalDatabase.northstarSchemaVersion!==schemaVersion) globalDatabase.northstarSchemaReady = (async () => {const client=await pool().connect();try{await client.query("SELECT pg_advisory_lock(hashtext($1))",["northstar_schema_init"]);for(const statement of schemaStatements)await client.query(postgresSql(statement));globalDatabase.northstarSchemaVersion=schemaVersion}finally{await client.query("SELECT pg_advisory_unlock(hashtext($1))",["northstar_schema_init"]).catch(()=>undefined);client.release()}})();
   await globalDatabase.northstarSchemaReady; return new PostgresDatabase();
 }
