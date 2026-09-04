@@ -3,7 +3,8 @@ let jwksCache:{keys:JsonWebKey[];expires:number}|null=null;
 const decode=(value:string)=>{const normalized=value.replace(/-/g,"+").replace(/_/g,"/").padEnd(Math.ceil(value.length/4)*4,"=");return JSON.parse(new TextDecoder().decode(Uint8Array.from(atob(normalized),c=>c.charCodeAt(0))))};
 async function verifyCognitoJwt(token:string):Promise<Claims>{
   const region=process.env.AWS_REGION,poolId=process.env.COGNITO_USER_POOL_ID,issuer=(process.env.COGNITO_ISSUER||(region&&poolId?`https://cognito-idp.${region}.amazonaws.com/${poolId}`:"")).replace(/\/$/,""),clientId=process.env.NEXT_PUBLIC_COGNITO_CLIENT_ID||process.env.COGNITO_CLIENT_ID;
-  if(!issuer||!clientId)throw new Error("AWS Cognito authentication is not configured");
+  if(!issuer)throw new Error("AWS Cognito token verification is missing COGNITO_ISSUER");
+  if(!clientId)throw new Error("AWS Cognito token verification is missing COGNITO_CLIENT_ID");
   const [h,p,s]=token.split(".");if(!h||!p||!s)throw new Error("Invalid token");
   const header=decode(h) as {kid?:string;alg?:string},claims=decode(p) as Claims;
   if(header.alg!=="RS256"||!header.kid)throw new Error("Unsupported token algorithm");
