@@ -154,3 +154,5 @@ footer{font-size:max(.7rem,12px);line-height:1.55}
 .manual-holding-list article{grid-template-columns:1.4fr repeat(3,.7fr) auto}
 .manual-holding-list .edit-holding{padding:7px 12px;border:1px solid #8fb9a7;border-radius:6px;background:#edf7f2;color:#075f43;font-weight:900;cursor:pointer}
 .manual-holding-form .secondary{background:#fff;color:#175f49}
+/* Portfolio analysis input: visually separate holdings from account setup. */
+.portfolio-builder>.analysis-holdings{margin:0;border:0;border-bottom:1px solid #aebfe0;border-radius:0;background:#f4f7ff}.portfolio-builder>.analysis-holdings h3{display:flex;flex-direction:column;gap:4px;padding:15px 20px;background:#243b73;color:#fff}.portfolio-builder>.analysis-holdings h3 small{color:#9fc2ff;font:800 .53rem Arial;letter-spacing:.13em}.portfolio-builder>.analysis-holdings article{border-color:#d8e1f2;background:#f8faff}.portfolio-builder>.analysis-holdings article:nth-child(even){background:#eef3fc}
