@@ -1,4 +1,4 @@
-import { requireUser } from "@/lib/auth";
+import { workspace } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
 
@@ -6,7 +6,7 @@ const system = `You are Northstar Investment Coach, a read-only financial educat
 
 export async function POST(request:Request){
   try{
-    await requireUser(request);
+    await workspace(request);
     const key=process.env.OPENAI_API_KEY;
     if(!key)return Response.json({status:"not_configured",error:"OpenAI decision coach is not configured. Add OPENAI_API_KEY on the server."},{status:503});
     const body=await request.json() as {question?:string;context?:unknown};

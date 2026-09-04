@@ -6,7 +6,7 @@ import {loadRuntimeSecrets} from "@/lib/runtime-secrets";
 const { Pool } = pg;
 type QueryResult = { rows: Array<Record<string, unknown>>; rowCount: number | null };
 const globalDatabase = globalThis as typeof globalThis & { northstarPool?: InstanceType<typeof Pool>; northstarSchemaReady?: Promise<void>; northstarSchemaVersion?: number; northstarRdsCa?: string; northstarRdsCaReady?: Promise<string> };
-const schemaVersion=6;
+const schemaVersion=7;
 const awsRdsCaUrl="https://truststore.pki.rds.amazonaws.com/global/global-bundle.pem";
 
 async function loadAwsRdsCa(){
@@ -73,12 +73,9 @@ export async function workspace(request: Request) {
   const user = await requireUser(request), db = await database(), personalHouseholdId = `household_${user.userId}`, personalEntityId = `entity_${user.userId}_personal`;
   await db.prepare("INSERT INTO users(id,email,display_name,last_login_at) VALUES(?,?,?,CURRENT_TIMESTAMP) ON CONFLICT(id) DO UPDATE SET email=excluded.email,display_name=excluded.display_name,last_login_at=CURRENT_TIMESTAMP").bind(user.userId,user.email,user.name).run();
   const existingMembership=await db.prepare("SELECT household_id FROM household_members WHERE user_id=? AND status='active' LIMIT 1").bind(user.userId).first();
-  const approvers=(process.env.FAMILY_APPROVER_EMAILS||"lisdanay.dm@gmail.com,jose.linaret@gmail.com").split(",").map(value=>value.trim().toLowerCase()).filter(Boolean),isApprover=approvers.includes(user.email.toLowerCase())||(user.userId==="local_owner"&&process.env.ALLOW_LOCAL_DEV_AUTH==="true"),requestRow=await db.prepare("SELECT id,status FROM family_access_requests WHERE user_id=?").bind(user.userId).first<{id:string;status:string}>();
-  if(!existingMembership&&!isApprover&&requestRow?.status!=="approved"){
-    if(!requestRow){const requestId=id("access"),escapeHtml=(value:string)=>value.replace(/[&<>"']/g,char=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[char]!));await db.prepare("INSERT INTO family_access_requests(id,user_id,email,display_name,status) VALUES(?,?,?,?,'pending') ON CONFLICT(user_id) DO NOTHING").bind(requestId,user.userId,user.email,user.name).run();if(process.env.RESEND_API_KEY&&process.env.EMAIL_FROM){await fetch("https://api.resend.com/emails",{method:"POST",headers:{Authorization:`Bearer ${process.env.RESEND_API_KEY}`,"Content-Type":"application/json"},body:JSON.stringify({from:process.env.EMAIL_FROM,to:approvers,subject:"Northstar family access approval required",html:`<p><strong>${escapeHtml(user.name)}</strong> (${escapeHtml(user.email)}) requested a new Northstar account.</p><p>Sign in to Northstar Settings to approve or deny access. No financial data is available while this request is pending.</p>`})}).catch(()=>undefined)}}
-    throw new Response(JSON.stringify({error:requestRow?.status==="denied"?"Family access was denied. Contact a Northstar family administrator.":"Account approval is pending. Family administrators have been notified; no financial data is accessible."}),{status:403,headers:{"Content-Type":"application/json"}});
-  }
-  await db.batch([
+  const localBootstrap=user.userId==="local_owner"&&process.env.ALLOW_LOCAL_DEV_AUTH==="true";
+  if(!existingMembership&&!localBootstrap)throw new Response(JSON.stringify({error:"A valid Northstar invitation for this email address is required. Google or Apple sign-in verifies identity but does not create workspace access.",code:"INVITATION_REQUIRED"}),{status:403,headers:{"Content-Type":"application/json"}});
+  if(!existingMembership&&localBootstrap)await db.batch([
     db.prepare("INSERT OR IGNORE INTO households(id,name,goal_date) VALUES(?,?,?)").bind(personalHouseholdId,"My Household","2036-12-31"),
     db.prepare("INSERT OR IGNORE INTO household_members(household_id,user_id,role) VALUES(?,?,?)").bind(personalHouseholdId,user.userId,"owner"),
     db.prepare("INSERT OR IGNORE INTO entities(id,household_id,type,name) VALUES(?,?,?,?)").bind(personalEntityId,personalHouseholdId,"personal","Personal Finances"),
