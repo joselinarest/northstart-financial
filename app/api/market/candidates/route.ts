@@ -2,11 +2,14 @@ import {loadRuntimeSecrets} from "@/lib/runtime-secrets";
 export const dynamic="force-dynamic";
 
 type AlpacaBar={t:string;o:number;h:number;l:number;c:number;v:number};
-const swingUniverse=["SPY","QQQ","IWM","DIA","AAPL","MSFT","NVDA","AMZN","GOOGL","META","AVGO","AMD","JPM","V","MA","XOM","CVX","LLY","UNH","COST","WMT","HD","CAT","CRM","ORCL","NFLX"];
-const longTermUniverse=["VTI","VOO","SCHD","VXUS","BND","QQQ","IWM","AAPL","MSFT","NVDA","AMZN","GOOGL","META","AVGO","AMD","CRM","ORCL","PLTR","CRWD","DDOG","NET","SHOP","UBER","ABNB","MELI","CAVA","DUOL","SOFI"];
-const fundSymbols=new Set(["VTI","VOO","SCHD","VXUS","BND","QQQ","IWM"]);
+const swingUniverse=["SPY","QQQ","IWM","DIA","AAPL","MSFT","NVDA","AMZN","GOOGL","META","AVGO","AMD","JPM","V","MA","XOM","CVX","LLY","UNH","COST","WMT","HD","CAT","CRM","ORCL","NFLX","CEG","VST","CCJ","LEU","BWXT","OKLO","SMR","URA","NLR"];
+const longTermUniverse=["VTI","VOO","SCHD","VXUS","BND","QQQ","IWM","AAPL","MSFT","NVDA","AMZN","GOOGL","META","AVGO","AMD","CRM","ORCL","PLTR","CRWD","DDOG","NET","SHOP","UBER","ABNB","MELI","CAVA","DUOL","SOFI","CEG","VST","NEE","CCJ","LEU","BWXT","OKLO","SMR","URA","NLR"];
+const fundSymbols=new Set(["VTI","VOO","SCHD","VXUS","BND","QQQ","IWM","URA","NLR"]);
+const speculativeNuclearSymbols=new Set(["OKLO","SMR","LEU"]);
+const nuclearSymbols=new Set(["CEG","VST","NEE","CCJ","LEU","BWXT","OKLO","SMR","URA","NLR"]);
 const classifyLongTermCandidate=(symbol:string,marketCap:number|null)=>{
   if(fundSymbols.has(symbol))return{companyStage:"DIVERSIFIED EXCHANGE-TRADED FUND",portfolioRole:"Core or diversifier",setup:"Diversified fund—verify fees, holdings, overlap and plan availability"};
+  if(speculativeNuclearSymbols.has(symbol))return{companyStage:"SPECULATIVE NUCLEAR / FUEL CYCLE",portfolioRole:"High-risk thematic satellite only",setup:"Nuclear-policy and commercialization candidate—verify cash runway, contracts, dilution, regulation and execution"};
   if(marketCap===null)return{companyStage:"COMPANY STAGE DATA UNAVAILABLE",portfolioRole:"Do not assign until market capitalization is verified",setup:"Fundamentals incomplete—classification not assigned"};
   if(marketCap!==null&&marketCap>=200000)return{companyStage:"ESTABLISHED MEGA-CAP GROWTH",portfolioRole:"Growth allocation / concentrated satellite",setup:"Established market leader—review valuation and concentration"};
   if(marketCap!==null&&marketCap>=10000)return{companyStage:"ESTABLISHED GROWTH COMPANY",portfolioRole:"Diversified growth satellite",setup:"Established company—validate quality, valuation and portfolio fit"};
@@ -21,7 +24,7 @@ export async function GET(request:Request){
   const strategy=new URL(request.url).searchParams.get("strategy")==="long-term"?"long-term":"swing",universe=strategy==="long-term"?longTermUniverse:swingUniverse;
   const key=process.env.ALPACA_API_KEY,secret=process.env.ALPACA_API_SECRET;
   if(!key||!secret)return Response.json({status:"not_configured",error:"Connect Alpaca market data to generate the automatic market shortlist."},{status:503});
-  const start=new Date(Date.now()-500*86400000).toISOString(),feed=process.env.ALPACA_DATA_FEED||"iex";
+  const start=new Date(Date.now()-360*86400000).toISOString(),feed=process.env.ALPACA_DATA_FEED||"iex";
   const response=await fetch(`https://data.alpaca.markets/v2/stocks/bars?symbols=${universe.join(",")}&timeframe=1Day&start=${encodeURIComponent(start)}&limit=10000&adjustment=all&feed=${encodeURIComponent(feed)}`,{headers:{"APCA-API-KEY-ID":key,"APCA-API-SECRET-KEY":secret},cache:"no-store"});
   if(!response.ok)return Response.json({status:"provider_error",error:"The automatic market scan could not load historical bars.",providerStatus:response.status},{status:502});
   const data=await response.json() as {bars?:Record<string,AlpacaBar[]>};
@@ -35,7 +38,7 @@ export async function GET(request:Request){
     const action=score>=76?"Prepare conditional buy":score>=62?"No entry — monitor trigger":"Avoid — conditions failed";
     const invalidation=Math.max(low20,last.c-2*atr),riskPct=(last.c-invalidation)/last.c*100;
     return[{symbol,price:last.c,dayChange,score,setup,action,trend:last.c>sma50?(ema20>sma50?"Bullish":"Mixed"):"Bearish",ema20,sma50,sma100,sma200,rsi,relVol,avgVolume,support:low20,resistance:high20,invalidation,riskPct,asOf:last.t}];
-  }).sort((a,b)=>b.score-a.score).slice(0,strategy==="long-term"?12:8);
+  }).sort((a,b)=>b.score-a.score).slice(0,strategy==="long-term"?40:16);
   let candidates:Record<string,unknown>[]=technicalCandidates;
   if(strategy==="long-term"&&process.env.FINNHUB_API_KEY){
     const finnhubKey=process.env.FINNHUB_API_KEY;
@@ -52,7 +55,7 @@ export async function GET(request:Request){
       const classification=classifyLongTermCandidate(candidate.symbol,profile.marketCapitalization??null);
       return{...candidate,...classification,name:profile.name||candidate.symbol,score,tier,fundamentals:{revenueGrowth3Y,revenueGrowth5Y,epsGrowth3Y,epsGrowth5Y,pe,forwardPE,peg,grossMargin,operatingMargin,marketCap:profile.marketCapitalization??null},fairValue,fairValueLow,fairValueHigh,fairValueSource,fairValueAsOf:new Date().toISOString(),news:[],missingData:coverage<4,valuationConfidence:valuationInputs.length>=2?"medium":valuationInputs.length===1?"low":"unavailable",forecast:"Continuation is plausible only if multi-year growth, margins and cash generation persist without excessive valuation or dilution."};
     }catch{return{...candidate,companyStage:"COMPANY STAGE DATA UNAVAILABLE",portfolioRole:"Do not assign until fundamentals are restored",setup:"Fundamental provider unavailable—classification not assigned",tier:"Technical candidate · incomplete data",missingData:true,forecast:"Technical evidence is available, but company growth and maturity have not been verified."}}}));
-    candidates=candidates.sort((a,b)=>Number(b.score)-Number(a.score)).slice(0,8);
+    const ranked=candidates.sort((a,b)=>Number(b.score)-Number(a.score)),nuclear=ranked.filter(item=>nuclearSymbols.has(String(item.symbol))),general=ranked.filter(item=>!nuclearSymbols.has(String(item.symbol))).slice(0,8);candidates=[...general,...nuclear.slice(0,4)].sort((a,b)=>Number(b.score)-Number(a.score));
   }
   if(strategy==="long-term"&&!process.env.FINNHUB_API_KEY){
     candidates=candidates.map(candidate=>({...candidate,companyStage:fundSymbols.has(String(candidate.symbol))?"DIVERSIFIED EXCHANGE-TRADED FUND":"COMPANY STAGE DATA UNAVAILABLE",portfolioRole:fundSymbols.has(String(candidate.symbol))?"Core or diversifier":"Do not assign until fundamentals are connected",missingData:true}));
