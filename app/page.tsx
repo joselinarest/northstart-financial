@@ -523,134 +523,20 @@ export default function Home({ initialTab = "Dashboard", initialInvestmentId, fo
       action: "Study, do not copy",
     },
   ];
-  const alerts=liveNews.length?liveNews.slice(0,20).map(article=>({level:/fed|rate|inflation|earnings|tariff|sec |fda|merger/i.test(article.title)?"IMPORTANT":"INFO",category:"MARKET NEWS",time:article.publishedAt?new Date(article.publishedAt).toLocaleString():"Timestamp unavailable",title:article.title,source:`${article.source} · NewsAPI.ai discovery`,impact:article.description||"Open the source and evaluate portfolio exposure, financial impact, and price reaction.",confidence:55,move:"Not calculated",action:"Read and verify",url:article.url})):demonstrationAlerts;
+  const alerts=liveNews.map(article=>({level:/fed|rate|inflation|earnings|tariff|sec |fda|merger/i.test(article.title)?"IMPORTANT":"INFO",category:"MARKET NEWS",time:article.publishedAt?new Date(article.publishedAt).toLocaleString():"Timestamp unavailable",title:article.title,source:`${article.source} · NewsAPI.ai discovery`,impact:article.description||"Open the source and evaluate portfolio exposure, financial impact, and price reaction.",confidence:55,move:"Not calculated",action:"Read and verify",url:article.url}));
   const visibleAlerts =
     alertFilter === "All"
       ? alerts
       : alerts.filter((a) => a.level === alertFilter);
-  const bills = [
-    {
-      name: "Mortgage",
-      category: "Housing",
-      amount: 2148,
-      due: "Sep 1",
-      autopay: true,
-      change: 0,
-    },
-    {
-      name: "APS Electricity",
-      category: "Utilities",
-      amount: 186,
-      due: "Sep 4",
-      autopay: true,
-      change: 18,
-    },
-    {
-      name: "Internet",
-      category: "Utilities",
-      amount: 79,
-      due: "Sep 8",
-      autopay: true,
-      change: 0,
-    },
-    {
-      name: "Auto Insurance",
-      category: "Insurance",
-      amount: 214,
-      due: "Sep 12",
-      autopay: false,
-      change: 12,
-    },
-    {
-      name: "Mobile Family Plan",
-      category: "Phone",
-      amount: 164,
-      due: "Sep 15",
-      autopay: true,
-      change: 0,
-    },
-    {
-      name: "Streaming bundle",
-      category: "Subscriptions",
-      amount: 47,
-      due: "Sep 19",
-      autopay: true,
-      change: 7,
-    },
-  ];
-  const cards = [
-    {
-      name: "Visa Signature",
-      balance: 8420,
-      limit: 12000,
-      statement: 7910,
-      min: 248,
-      due: "Sep 6",
-      apr: 24.9,
-      rewards: "12,480 pts",
-    },
-    {
-      name: "Everyday Cash",
-      balance: 1260,
-      limit: 8500,
-      statement: 1184,
-      min: 45,
-      due: "Sep 14",
-      apr: 19.49,
-      rewards: "$86.20",
-    },
-    {
-      name: "Travel Card",
-      balance: 390,
-      limit: 15000,
-      statement: 390,
-      min: 35,
-      due: "Sep 22",
-      apr: 21.99,
-      rewards: "34,120 mi",
-    },
-  ];
+  const bills:Array<{name:string;category:string;amount:number;due:string;autopay:boolean;change:number}>=[];
+  const cards:Array<{name:string;balance:number;limit:number;statement:number;min:number;due:string;apr:number;rewards:string}>=[];
   const monthlyBills = bills.reduce((s, b) => s + b.amount, 0);
   const cardMinimums = cards.reduce((s, c) => s + c.min, 0);
-  const monthlyIncome = 9200;
-  const freeCash = monthlyIncome - monthlyBills - cardMinimums - 3258;
-  const debts = [
-    {
-      name: "Visa Signature",
-      type: "Credit card",
-      balance: 8420,
-      apr: 24.9,
-      payment: 260,
-      urgency: "Critical",
-    },
-    {
-      name: "Home Mortgage",
-      type: "Mortgage",
-      balance: 287640,
-      apr: 4.125,
-      payment: 2148,
-      urgency: "Manage",
-    },
-    {
-      name: "Tesla Model Y",
-      type: "Auto loan",
-      balance: 31800,
-      apr: 6.49,
-      payment: 612,
-      urgency: "Review",
-    },
-    {
-      name: "Federal Student Loans",
-      type: "Student loan",
-      balance: 22450,
-      apr: 4.8,
-      payment: 238,
-      urgency: "Manage",
-    },
-  ];
+  const monthlyIncome = monthlySpending.income;
+  const freeCash = Math.max(0,monthlyIncome-monthlySpending.spending-monthlySpending.debtPayments);
+  const debts:Array<{name:string;type:string;balance:number;apr:number;payment:number;urgency:string}>=[];
   const totalDebt = debts.reduce((sum, d) => sum + d.balance, 0);
-  const weightedApr =
-    debts.reduce((sum, d) => sum + d.balance * d.apr, 0) / totalDebt;
+  const weightedApr = totalDebt?debts.reduce((sum, d) => sum + d.balance * d.apr, 0) / totalDebt:0;
   if (!authReady)
     return (
       <main className="auth-loading" aria-busy="true" aria-live="polite" aria-label="Checking secure sign-in">
@@ -942,6 +828,7 @@ export default function Home({ initialTab = "Dashboard", initialInvestmentId, fo
             <div className="portfolio-body"><div className="allocation-editor">{([{key:"cash",icon:"◆",label:"Cash & short-term",note:"Stability and near-term needs"},{key:"bonds",icon:"▰",label:"Bonds / fixed income",note:"Income and volatility control"},{key:"diversified",icon:"◎",label:"Core / VOO–VTI type",note:"Broad-market base and diversification"},{key:"dividend",icon:"$",label:"Dividend / SCHD type",note:"Quality income and dividend growth"},{key:"growth",icon:"↗",label:"Growth stocks",note:"Revenue, earnings and cash-flow growth"}] as const).map(asset=><label key={asset.key}><i>{asset.icon}</i><span><b>{asset.label}</b><small>{asset.note}</small></span><input type="range" min="0" max="100" step="5" value={portfolioMix[asset.key]} onChange={e=>setPortfolioMix(current=>({...current,[asset.key]:+e.target.value}))}/><strong>{portfolioMix[asset.key]}%</strong><em>${(portfolioAmount*portfolioMix[asset.key]/100).toLocaleString(undefined,{maximumFractionDigits:0})}</em></label>)}</div><aside className="portfolio-summary"><span className={portfolioTotal===100?"valid":"invalid"}>{portfolioTotal===100?"✓":"!"} ALLOCATION TOTAL · {portfolioTotal}%</span><h3>{portfolioGoal} planning range</h3><div><small>Lower scenario</small><b>${portfolioLow.toLocaleString(undefined,{maximumFractionDigits:0})}</b></div><div><small>Planning midpoint</small><b>${portfolioProjected.toLocaleString(undefined,{maximumFractionDigits:0})}</b></div><div><small>Higher scenario</small><b>${portfolioHigh.toLocaleString(undefined,{maximumFractionDigits:0})}</b></div><p><u>Important:</u> These are uncertain scenarios, not promised returns. A 40/30/30 stock allocation can still lose substantially and may be unsuitable for money required within 2–3 years.</p><button className="primary" onClick={savePortfolio}>Save portfolio goal</button>{portfolioNotice&&<small className="portfolio-notice">{portfolioNotice}</small>}</aside></div>
             <div className="portfolio-guidance"><section><b>✓ {portfolioGoal} framework</b><p>{portfolioGoal==="Swing"?"Use a separate risk budget, defined invalidation, small position sizing, and cash reserve. Do not treat retirement money as swing-trading capital.":portfolioGoal==="2–3 years"?"Keep most goal-critical money in cash and high-quality short-duration bonds.":portfolioGoal==="10+ years"?"Long horizons may support broad diversified equity exposure, regular contributions, and contribution-based rebalancing—if your risk capacity permits.":"A five-year horizon can support diversified equity exposure, provided you can tolerate temporary losses."}</p></section><section><b>◎ {portfolioAccount}</b><p>{portfolioAccount==="401(k)"?"Review employer match first, plan fees, available funds, vesting, and contribution limits. Northstar cannot change payroll elections.":portfolioAccount==="Roth IRA"?"Qualified withdrawals may be tax-free, but eligibility, contribution limits, and withdrawal rules require verification for your tax year.":portfolioAccount==="Traditional IRA"?"Deductibility and withdrawals depend on tax rules and your circumstances. Verify current limits before contributing.":"Taxable accounts require capital-gain, dividend, tax-lot, and wash-sale review before rebalancing."}</p></section></div>
           </section>
+          {tab==="Portfolio"&&<section className="portfolio-growth-opportunities"><header><span>LIVE MARKET SYNC · NEW HOLDINGS</span><h2>Growth candidates and action alerts</h2><p>Ranked securities not already owned can be researched here. Owned positions may generate buy-more or sell/trim reviews when the evidence changes.</p></header><AutomaticMarketCopilot accessToken={accessToken} initialStrategy="long-term" ownedSymbols={ownedInvestmentSymbols} onPrepare={(symbol,action)=>{sessionStorage.setItem("northstar-chart-symbol",symbol);sessionStorage.setItem("northstar-prepared-action",JSON.stringify({symbol,action}));navigate("Prepare Trade")}} onSelect={symbol=>{sessionStorage.setItem("northstar-chart-symbol",symbol);setChartSymbol(symbol);setMarketLookup(symbol);navigate("Professional Charts")}} /></section>}
           <section className="focus-bar">
             {backendOverview && <div><span>PERSISTENT DATA</span><b>{backendOverview.entities} entities · {backendOverview.transactions} transactions</b><small>AWS PostgreSQL financial ledger connected</small></div>}
             <div>
