@@ -1,0 +1,16 @@
+"use client";
+
+import {useCallback,useEffect,useMemo,useState} from "react";
+
+type Holding=Record<string,unknown>;
+type Limit={symbol:string;target_price:number|null;invalidation_price:number|null};
+
+export default function HoldingPriceLimits({holdings,accessToken}:{holdings:Holding[];accessToken:string}){
+  const symbols=useMemo(()=>[...new Map(holdings.filter(item=>item.ticker).map(item=>[String(item.ticker).toUpperCase(),item])).entries()],[holdings]);
+  const[limits,setLimits]=useState<Record<string,{min:string;max:string}>>({});
+  const[status,setStatus]=useState<Record<string,string>>({});
+  const headers=useCallback(()=>({"Content-Type":"application/json",...(accessToken?{Authorization:`Bearer ${accessToken}`}:{}) ,...(localStorage.getItem("northstar-household-id")?{"X-Household-ID":localStorage.getItem("northstar-household-id")!}:{})}),[accessToken]);
+  useEffect(()=>{let active=true;fetch("/api/watchlist",{headers:headers(),cache:"no-store"}).then(response=>response.json()).then(data=>{if(!active)return;const saved:Record<string,{min:string;max:string}>={};for(const item of (data.items||[]) as Array<Limit&{purpose:string}>)if(item.purpose==="Holding price limits")saved[item.symbol]={min:item.invalidation_price==null?"":String(item.invalidation_price),max:item.target_price==null?"":String(item.target_price)};setLimits(saved)}).catch(()=>undefined);return()=>{active=false}},[headers]);
+  const save=async(symbol:string)=>{const value=limits[symbol]||{min:"",max:""},min=Number(value.min),max=Number(value.max);if(!Number.isFinite(min)||min<=0||!Number.isFinite(max)||max<=0||min>=max){setStatus(current=>({...current,[symbol]:"Enter positive prices; minimum must be below maximum."}));return}setStatus(current=>({...current,[symbol]:"Saving…"}));try{const response=await fetch("/api/watchlist",{method:"POST",headers:headers(),body:JSON.stringify({symbol,purpose:"Holding price limits",invalidationPrice:min,targetPrice:max,notes:"User-defined holding loss and profit review levels"})}),data=await response.json();if(!response.ok)throw new Error(data.error||"Unable to save limits");setStatus(current=>({...current,[symbol]:"✓ Saved and monitored"}))}catch(error){setStatus(current=>({...current,[symbol]:error instanceof Error?error.message:"Unable to save limits"}))}};
+  return <section className="holding-price-limits"><header><b>YOUR PRICE LIMITS · DATABASE-SAVED ALERTS</b><span>Minimum = loss review. Maximum = profit/sell review. Crossing a level creates an alert, never an automatic order.</span></header>{symbols.map(([symbol,holding])=>{const value=limits[symbol]||{min:"",max:""};return <div key={symbol}><span><b>{symbol}</b><small>{String(holding.name||"Holding")}</small></span><label>Minimum loss-review price $<input type="number" min="0.01" step="0.01" value={value.min} placeholder="Example 100.00" onChange={event=>setLimits(current=>({...current,[symbol]:{...value,min:event.target.value}}))}/></label><label>Maximum sell-review price $<input type="number" min="0.01" step="0.01" value={value.max} placeholder="Example 150.00" onChange={event=>setLimits(current=>({...current,[symbol]:{...value,max:event.target.value}}))}/></label><button onClick={()=>save(symbol)}>Save levels</button><em>{status[symbol]||"Not configured"}</em></div>})}</section>;
+}
