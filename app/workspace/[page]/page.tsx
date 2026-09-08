@@ -2,11 +2,11 @@ import Home from "@/app/page";
 
 const tabs: Record<string,string> = {
   dashboard:"Dashboard", accounts:"Accounts", markets:"Market Intel", portfolio:"Portfolio", "cash-flow":"Bills & cards",
-  opportunities:"Scanner", debt:"Liabilities", household:"Household",
+  opportunities:"Market Intel", debt:"Liabilities", household:"Household",
   assistant:"Ask Northstar", planner:"Prepare Trade", simulation:"Paper Simulator", journal:"Journal",
   "daily-action-plan":"Daily Action Plan",
   academy:"Learn", settings:"Settings", help:"Help", charts:"Professional Charts",
-  "market-news":"Market News", growth:"Growth Finder", "dividend-growth":"Dividend Growth",
+  "market-news":"Market News", growth:"Growth Finder", "dividend-growth":"Growth Finder",
 };
 
 export default async function WorkspacePage({ params }: { params: Promise<{page:string}> }) {
