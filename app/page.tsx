@@ -1274,7 +1274,7 @@ export default function Home({ initialTab = "Dashboard", initialInvestmentId, fo
                 {tab!=="Scanner"&&<button onClick={() => navigate("Scanner")}>View all →</button>}
               </div>
               <div className={`scanner-source ${chartBars.length?"live":"demo"}`}><b>{chartBars.length?"CONNECTED MARKET EVIDENCE":"ILLUSTRATIVE RESEARCH LIST"}</b><span>{chartBars.length?"Open a candidate’s chart to calculate current support, resistance, moving averages, volume confirmation, and conditional levels.":"These names are examples, not current stock recommendations. Connect Alpaca market data before relying on price or volume."}</span></div>
-              {(tab==="Scanner"?scannerOpportunities:opportunities).map((o) => (
+              {(tab==="Scanner"?scannerOpportunities:opportunities).slice().sort((a,b)=>Number(b.trend==="Bullish")-Number(a.trend==="Bullish")||b.score-a.score).map((o) => (
                 <div className="opp-row" key={o.ticker}><button
                   className={pick.ticker === o.ticker ? "opp selected" : "opp"}
                   onClick={() => {
