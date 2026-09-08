@@ -1374,7 +1374,7 @@ export default function Home({ initialTab = "Dashboard", initialInvestmentId, fo
               </span>
             </div>
             <div className="plan-grid">
-              <div className="fields">
+              <div className="plan-preparation"><div className="fields">
                 <label>
                   Account size ($)
                   <input
@@ -1417,7 +1417,7 @@ export default function Home({ initialTab = "Dashboard", initialInvestmentId, fo
                     onChange={(e) => setTarget(+e.target.value)}
                   />
                 </label>
-              </div>
+              </div><ol className="prepare-condition-list"><li className={advisorAccount?"pass":"warn"}><b>Confirm investment account</b><span>{advisorAccount?`${advisorAccount.nickname||advisorAccount.name} · ${advisorAccount.investment_purpose||advisorAccount.subtype||"Investment"}`:"Select the account this decision belongs to."}</span></li><li className={pick.trend==="Bullish"?"pass":"warn"}><b>Confirm setup direction</b><span>{pick.ticker} is {pick.trend.toLowerCase()}. Do not prepare a long buy while its required trend confirmation is missing.</span></li><li className={entry>stop?"pass":"warn"}><b>Define entry and invalidation</b><span>{entry>stop?`Entry $${entry.toFixed(2)} is above the $${stop.toFixed(2)} loss-review level.`:"The stop must be below the intended long entry."}</span></li><li className={risk>0&&risk<=1?"pass":"warn"}><b>Keep risk within the plan</b><span>{risk>0&&risk<=1?`${risk.toFixed(2)}% of account capital; maximum planned loss $${calc.max.toFixed(2)}.`:"Use a positive maximum risk no greater than 1% per idea."}</span></li><li className={calc.rr>=2?"pass":"warn"}><b>Require sufficient reward/risk</b><span>{calc.rr>=2?`${calc.rr.toFixed(1)}:1 passes the minimum 2:1 planning rule.`:`${calc.rr.toFixed(1)}:1 is below the 2:1 planning rule; change entry, stop, or target.`}</span></li><li className={calc.shares>0&&calc.exposure<=capital?"pass":"warn"}><b>Verify shares and buying power</b><span>{calc.shares>0&&calc.exposure<=capital?`Up to ${calc.shares.toLocaleString()} shares uses about $${calc.exposure.toLocaleString(undefined,{maximumFractionDigits:0})}.`:`Calculated exposure exceeds the account or produces no valid shares.`}</span></li><li className="warn"><b>Review event and gap risk</b><span>{pick.catalyst}. News or an overnight gap can exceed the stop; confirm this immediately before acting.</span></li></ol></div>
               <div className="blueprint">
                 <p>MAXIMUM POSITION</p>
                 <strong>
