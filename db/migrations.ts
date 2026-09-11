@@ -185,5 +185,35 @@ export const migrations: readonly Migration[] = [
       `CREATE INDEX IF NOT EXISTS idx_portfolio_snapshots_account_time ON portfolio_snapshots(account_id, captured_at DESC)`,
     ],
   },
+  {
+    id: "0010_persistent_alert_delivery",
+    description: "Persistent alert delivery state and notification preferences",
+    statements: [
+      `CREATE TABLE IF NOT EXISTS alert_deliveries (
+        id TEXT PRIMARY KEY,
+        alert_id TEXT NOT NULL REFERENCES alerts(id) ON DELETE CASCADE,
+        user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        channel TEXT NOT NULL CHECK(channel IN ('IN_APP','BROWSER_PUSH','EMAIL')),
+        status TEXT NOT NULL DEFAULT 'PENDING' CHECK(status IN ('PENDING','DELIVERED','FAILED','DISMISSED')),
+        attempted_at TIMESTAMPTZ,
+        delivered_at TIMESTAMPTZ,
+        error_code TEXT,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(alert_id,user_id,channel)
+      )`,
+      `CREATE TABLE IF NOT EXISTS notification_preferences (
+        household_id TEXT NOT NULL REFERENCES households(id) ON DELETE CASCADE,
+        user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        in_app_enabled BOOLEAN NOT NULL DEFAULT TRUE,
+        browser_push_enabled BOOLEAN NOT NULL DEFAULT FALSE,
+        email_enabled BOOLEAN NOT NULL DEFAULT FALSE,
+        quiet_hours_json JSONB NOT NULL DEFAULT '{}'::jsonb,
+        timezone TEXT NOT NULL DEFAULT 'America/Phoenix',
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        PRIMARY KEY(household_id,user_id)
+      )`,
+      `CREATE INDEX IF NOT EXISTS idx_alerts_household_unread ON alerts(household_id,read_at,created_at DESC)`,
+      `CREATE INDEX IF NOT EXISTS idx_alert_deliveries_user_status ON alert_deliveries(user_id,status,created_at DESC)`,
+    ],
+  },
 ] as const;
-
