@@ -507,17 +507,16 @@ export function NorthstarWorkspace({ initialTab = "Dashboard", initialInvestment
   useEffect(()=>{if(!("Notification" in window)){setNotifyStatus("Not supported on this device");return}const appOn=localStorage.getItem("northstar-push-enabled")!=="false"&&Notification.permission==="granted";setPushEnabled(appOn);setNotifyStatus(Notification.permission==="granted"?(appOn?"Northstar alerts ON · browser permission granted":"Northstar alerts OFF · browser permission remains granted"):Notification.permission==="denied"?"Blocked in browser settings":"Not enabled")},[]);
   const notifyClass=notifyStatus.includes("alerts ON")||notifyStatus.startsWith("Enabled")||notifyStatus.startsWith("Device permission")?"enabled":notifyStatus.startsWith("Blocked")?"blocked":notifyStatus.startsWith("Not supported")?"unsupported":notifyStatus.startsWith("Checking")?"checking":"disabled";
   const navigationGroups = [
-    {name:"Household Finance",items:[["Dashboard","⌂"],["Accounts","▣"],["Bills & cards","$"],["Liabilities","▥"],["Household","♧"],["Real Estate","⌂"]]},
-    {name:"Long-Term / Retirement Accounts",items:[["Portfolio","◫"],["Growth Finder","↗"]]},
-    {name:"Swing / Options Accounts",items:[["Daily Action Plan","☀"]]},
-    {name:"Research & Analysis",items:[["Professional Charts","⌁"],["Journal","▤"]]},
-    {name:"Market News & Context",items:[["Market News","●"]]},
-    {name:"Academy & Simulation",items:[["Learn","◇"],["Paper Simulator","◎"]]},
+    {name:"Command Center",items:[["Dashboard","⌂"],["Daily Action Plan","☀"],["Portfolio","◫"]]},
+    {name:"Invest",items:[["Growth Finder","↗"],["Real Estate","⌂"],["Professional Charts","⌁"]]},
+    {name:"Financial Life",items:[["Accounts","▣"],["Household","♧"],["Bills & cards","$"],["Liabilities","▥"]]},
+    {name:"Intelligence",items:[["Market News","●"],["Ask Northstar","✦"],["Journal","▤"]]},
+    {name:"Learn & Practice",items:[["Learn","◇"],["Paper Simulator","◎"]]},
     {name:"System",items:[["Settings","⚙"]]},
   ];
-  const navigationLabels:Record<string,string>={"Market Intel":"Investment Research","Prepare Trade":"Prepare Trade Plan","Professional Charts":"Chart & Technical Analysis",Journal:"Decision Journal",Learn:"Trading Academy","Paper Simulator":"Practice Simulator"};
+  const navigationLabels:Record<string,string>={Dashboard:"Home","Daily Action Plan":"Today","Growth Finder":"Long-Term Opportunities","Professional Charts":"Markets & Charts","Market News":"News",Household:"Household Overview","Bills & cards":"Cash Flow & Spending",Liabilities:"Debt & Liabilities","Ask Northstar":"Advisor",Journal:"History & Decision Journal",Learn:"Academy","Paper Simulator":"Practice Simulator"};
   const familyRole=householdAccess?.role||"owner",studentOnly=familyRole==="student";
-  const visibleNavigationGroups=studentOnly?navigationGroups.filter(group=>group.name==="Academy & Simulation").map(group=>({...group,items:group.items.filter(([name])=>name==="Learn"||name==="Paper Simulator")})):navigationGroups;
+  const visibleNavigationGroups=studentOnly?navigationGroups.filter(group=>group.name==="Learn & Practice").map(group=>({...group,items:group.items.filter(([name])=>name==="Learn"||name==="Paper Simulator")})):navigationGroups;
   useEffect(()=>{if(studentOnly&&!['Learn','Paper Simulator'].includes(initialTab))window.location.replace('/workspace/academy')},[studentOnly,initialTab]);
   const demonstrationAlerts = [
     {
@@ -831,7 +830,7 @@ export function NorthstarWorkspace({ initialTab = "Dashboard", initialInvestment
               <p className="kicker">
                 {tab==="Daily Action Plan"?"LIVE MARKET DATA · DAILY ACTION PLAN":`MARKET BRIEF · ${tab.toUpperCase()}`}
               </p>
-              <h1>{tab==="Dashboard"?"Start here: understand today, then choose one action.":tab==="Portfolio"?"Build your strongest account-specific portfolio.":tab==="Daily Action Plan"?"Today’s live market action plan.":tab==="Dividend Growth"?"Find durable dividends with room to grow.":tab==="Household"?"Your household financial command center.":tab==="Learn"?"Learn investing from foundation to professional practice.":tab==="Paper Simulator"?"Practice decisions without risking real money.":"Your professional trading copilot."}</h1>
+              <h1>{tab==="Dashboard"?"Home — What matters most right now?":tab==="Portfolio"?"Portfolio — Is my money allocated correctly?":tab==="Daily Action Plan"?"Today — What should I prepare to do now?":tab==="Growth Finder"?"Long-Term — What should I accumulate, and why?":tab==="Professional Charts"?"Markets & Charts — What does current evidence show?":tab==="Market News"?"News — What actually matters to me today?":tab==="Real Estate"?"Real Estate — Is this property a good investment?":tab==="Household"?"Household — Is my financial foundation safe?":tab==="Learn"?"Academy — What do I need to learn next?":tab==="Ask Northstar"?"Advisor — What decision should we evaluate?":tab==="Paper Simulator"?"Practice — Can I apply the process without risking money?":"Your professional investment workspace."}</h1>
               <p>
                 {tab==="Dashboard"?"First review household health. Then open the Daily Action Plan for market candidates, or Portfolio for long-term accounts. Every proposal requires your confirmation.":tab==="Portfolio"?"Select one long-term account. Northstar compares its holdings with a suggested target, opens the largest gap first, ranks suitable candidates, calculates the approximate dollars needed, and links every real ticker to its complete evaluation.":tab==="Daily Action Plan"?"This is the real provider-backed market workspace—not an Academy exercise or paper simulation. It is built after the close for the next session, then re-ranked as current price, volume, fundamentals, news, and market structure change. Forecasts remain probabilistic.":tab==="Dividend Growth"?"Compare income, dividend growth, business growth, company size, valuation and trend. Modeled ranges show uncertainty; they are not promised returns.":tab==="Household"?"One shared family workspace with separate named users, controlled roles, connected accounts, and accountable access.":tab==="Learn"?"Structured lessons, interactive charts, exams, prediction practice, and decision journaling for adults and supervised young learners.":tab==="Paper Simulator"?"Use live market references to practice long-term investing, swing plans, calls, and puts. Every transaction remains simulated.":"Built for every experience level. Protect capital first. Find opportunities second. Profit is the result of a repeatable process—not a prediction."}
               </p>

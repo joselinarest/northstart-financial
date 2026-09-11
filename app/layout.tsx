@@ -11,6 +11,7 @@ import './state-polish.css';
 import './notification-control.css';
 import './auth-loading.css';
 import './sidebar-contrast.css';
+import './execution-board.css';
 import './chart-prediction-lab.css';
 import './professional-prediction-overlay.css';
 import './action-guidance.css';
