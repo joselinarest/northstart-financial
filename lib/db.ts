@@ -24,7 +24,13 @@ function pool() {
     const local = /(?:localhost|127\.0\.0\.1)/.test(connectionString);
     const connectionUrl = new URL(connectionString);
     for (const parameter of ["ssl", "sslmode", "sslcert", "sslkey", "sslrootcert", "uselibpqcompat"]) connectionUrl.searchParams.delete(parameter);
-    globalDatabase.northstarPool = new Pool({ connectionString: connectionUrl.toString(), max: Number(process.env.DATABASE_POOL_MAX || 10), idleTimeoutMillis: 30_000, connectionTimeoutMillis: 10_000, ssl: local || process.env.DATABASE_SSL === "disable" ? false : { ca:globalDatabase.northstarRdsCa, rejectUnauthorized:true } });
+    // Amplify can run several warm SSR instances at once. A large pool in every
+    // instance quickly exhausts a small RDS database, so keep the per-instance
+    // budget deliberately small and bound any environment override.
+    const configuredMax=Number.parseInt(process.env.DATABASE_POOL_MAX||"2",10);
+    const max=Number.isFinite(configuredMax)?Math.min(5,Math.max(1,configuredMax)):2;
+    globalDatabase.northstarPool = new Pool({ connectionString: connectionUrl.toString(), max, min:0, idleTimeoutMillis: 10_000, connectionTimeoutMillis: 8_000, maxLifetimeSeconds:300, allowExitOnIdle:true, ssl: local || process.env.DATABASE_SSL === "disable" ? false : { ca:globalDatabase.northstarRdsCa, rejectUnauthorized:true } });
+    globalDatabase.northstarPool.on("error",error=>console.error("Idle PostgreSQL client error",error.message));
   }
   return globalDatabase.northstarPool;
 }
@@ -71,7 +77,7 @@ export class PostgresDatabase {
 export async function database() {
   await loadRuntimeSecrets();
   await loadAwsRdsCa();
-  if (!globalDatabase.northstarSchemaReady||globalDatabase.northstarSchemaVersion!==schemaVersion) globalDatabase.northstarSchemaReady = (async () => {const client=await pool().connect();try{await client.query("SELECT pg_advisory_lock(hashtext($1))",["northstar_schema_init"]);for(const statement of schemaStatements)await client.query(postgresSql(statement));await runMigrations(client);globalDatabase.northstarSchemaVersion=schemaVersion}finally{await client.query("SELECT pg_advisory_unlock(hashtext($1))",["northstar_schema_init"]).catch(()=>undefined);client.release()}})();
+  if (!globalDatabase.northstarSchemaReady||globalDatabase.northstarSchemaVersion!==schemaVersion) globalDatabase.northstarSchemaReady = (async () => {const client=await pool().connect();try{await client.query("SELECT pg_advisory_lock(hashtext($1))",["northstar_schema_init"]);for(const statement of schemaStatements)await client.query(postgresSql(statement));await runMigrations(client);globalDatabase.northstarSchemaVersion=schemaVersion}finally{await client.query("SELECT pg_advisory_unlock(hashtext($1))",["northstar_schema_init"]).catch(()=>undefined);client.release()}})().catch(error=>{globalDatabase.northstarSchemaReady=undefined;throw error});
   await globalDatabase.northstarSchemaReady; return new PostgresDatabase();
 }
 
