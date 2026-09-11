@@ -14,6 +14,7 @@ import './sidebar-contrast.css';
 import './chart-prediction-lab.css';
 import './professional-prediction-overlay.css';
 import './action-guidance.css';
+import './investment-command-center.css';
 import './automatic-market-copilot.css';
 import './paper-trading-simulator.css';
 
