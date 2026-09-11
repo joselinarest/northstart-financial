@@ -9,5 +9,5 @@ export async function GET(r:Request){
    db.prepare("SELECT h.id,h.name,hm.role,CASE WHEN hm.household_id=? THEN 'personal' ELSE 'shared' END workspace_type FROM household_members hm JOIN households h ON h.id=hm.household_id WHERE hm.user_id=? AND hm.status='active' ORDER BY CASE WHEN hm.household_id=? THEN 1 ELSE 0 END,h.name").bind(`household_${userId}`,userId,`household_${userId}`).all(),
   ]);
   return Response.json({household,role,members:members.results,invitations:invitations.results,availableHouseholds:available.results});
- }catch(e){if(e instanceof Response)return e;throw e}
+ }catch(e){if(e instanceof Response)return e;const message=e instanceof Error?e.message:"Household service unavailable",capacity=/remaining connection slots|53300|too many clients/i.test(message);console.error("Household access failed",e);return Response.json({error:capacity?"The household database is at capacity. Please retry in a moment.":"Household access is temporarily unavailable.",code:capacity?"DATABASE_CAPACITY":"HOUSEHOLD_UNAVAILABLE",retryable:true},{status:503,headers:{"Cache-Control":"no-store"}})}
 }
