@@ -1,4 +1,4 @@
-import Home from "@/app/page";
+import { NorthstarWorkspace } from "@/app/northstar-workspace";
 
 const tabs: Record<string,string> = {
   dashboard:"Dashboard", accounts:"Accounts", markets:"Daily Action Plan", portfolio:"Portfolio", "cash-flow":"Bills & cards",
@@ -11,5 +11,5 @@ const tabs: Record<string,string> = {
 
 export default async function WorkspacePage({ params }: { params: Promise<{page:string}> }) {
   const { page } = await params;
-  return <Home initialTab={tabs[page] || "Dashboard"} />;
+  return <NorthstarWorkspace initialTab={tabs[page] || "Dashboard"} />;
 }

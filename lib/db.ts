@@ -2,11 +2,12 @@ import pg from "pg";
 import { schemaStatements } from "@/db/schema";
 import { requireUser } from "@/lib/auth";
 import {loadRuntimeSecrets} from "@/lib/runtime-secrets";
+import {runMigrations} from "@/lib/migrations";
 
 const { Pool } = pg;
 type QueryResult = { rows: Array<Record<string, unknown>>; rowCount: number | null };
 const globalDatabase = globalThis as typeof globalThis & { northstarPool?: InstanceType<typeof Pool>; northstarSchemaReady?: Promise<void>; northstarSchemaVersion?: number; northstarRdsCa?: string; northstarRdsCaReady?: Promise<string> };
-const schemaVersion=8;
+const schemaVersion=9;
 const awsRdsCaUrl="https://truststore.pki.rds.amazonaws.com/global/global-bundle.pem";
 
 async function loadAwsRdsCa(){
@@ -60,7 +61,7 @@ export class PostgresDatabase {
 export async function database() {
   await loadRuntimeSecrets();
   await loadAwsRdsCa();
-  if (!globalDatabase.northstarSchemaReady||globalDatabase.northstarSchemaVersion!==schemaVersion) globalDatabase.northstarSchemaReady = (async () => {const client=await pool().connect();try{await client.query("SELECT pg_advisory_lock(hashtext($1))",["northstar_schema_init"]);for(const statement of schemaStatements)await client.query(postgresSql(statement));globalDatabase.northstarSchemaVersion=schemaVersion}finally{await client.query("SELECT pg_advisory_unlock(hashtext($1))",["northstar_schema_init"]).catch(()=>undefined);client.release()}})();
+  if (!globalDatabase.northstarSchemaReady||globalDatabase.northstarSchemaVersion!==schemaVersion) globalDatabase.northstarSchemaReady = (async () => {const client=await pool().connect();try{await client.query("SELECT pg_advisory_lock(hashtext($1))",["northstar_schema_init"]);for(const statement of schemaStatements)await client.query(postgresSql(statement));await runMigrations(client);globalDatabase.northstarSchemaVersion=schemaVersion}finally{await client.query("SELECT pg_advisory_unlock(hashtext($1))",["northstar_schema_init"]).catch(()=>undefined);client.release()}})();
   await globalDatabase.northstarSchemaReady; return new PostgresDatabase();
 }
 
