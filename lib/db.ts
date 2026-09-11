@@ -46,8 +46,10 @@ export class DbStatement {
 }
 
 export class PostgresDatabase {
-  prepare(sql: string) { return new DbStatement(sql); }
+  constructor(private client?: { query(text: string, values?: unknown[]): Promise<QueryResult> }) {}
+  prepare(sql: string) { return new DbStatement(sql,this.client); }
   async batch(statements: DbStatement[]) {
+    if(this.client){const output=[];for(const statement of statements){const result=await new DbStatement(statement.sql,this.client).bind(...statement.values).execute();output.push({results:result.rows,success:true,meta:{changes:result.rowCount||0}})}return output}
     const client = await pool().connect();
     try {
       await client.query("BEGIN"); const output = [];
@@ -55,6 +57,11 @@ export class PostgresDatabase {
       await client.query("COMMIT"); return output;
     } catch (error) { await client.query("ROLLBACK"); throw error; }
     finally { client.release(); }
+  }
+  async transaction<T>(work:(db:PostgresDatabase)=>Promise<T>){
+    if(this.client)return work(this);
+    const client=await pool().connect();
+    try{await client.query("BEGIN");const result=await work(new PostgresDatabase(client));await client.query("COMMIT");return result}catch(error){await client.query("ROLLBACK");throw error}finally{client.release()}
   }
 }
 
