@@ -1,5 +1,6 @@
 import { id, type PostgresDatabase, workspace } from "@/lib/db";
-import { formatQuantity, parseInvestmentTransaction, parseQuantity, quantityScale } from "@/lib/domain/investment-ledger";
+import { formatQuantity, parseInvestmentTransaction, parseQuantity, quantityPriceAmount, quantityScale } from "@/lib/domain/investment-ledger";
+import {allocationCategories,classifyHolding} from "@/lib/domain/portfolio";
 
 export const dynamic = "force-dynamic";
 
@@ -18,6 +19,12 @@ async function ownedAccount(db:PostgresDatabase,householdId:string,accountId:str
   return db.prepare(`SELECT a.id,a.investment_purpose,COALESCE(s.share_mode,'WHOLE') share_mode,COALESCE(s.available_cash_cents,0) available_cash_cents
     FROM accounts a JOIN entities e ON e.id=a.entity_id LEFT JOIN investment_account_settings s ON s.account_id=a.id
     WHERE a.id=? AND e.household_id=? AND a.type='investment' ${lock?"FOR UPDATE OF a":""}`).bind(accountId,householdId).first<AccountRow>();
+}
+
+async function persistPortfolioSnapshot(db:PostgresDatabase,householdId:string,accountId:string,capturedAt:string){
+  const[rows,settings,realized]=await Promise.all([db.prepare("SELECT h.quantity::text,h.price_cents::text,h.cost_basis_cents::text,s.ticker,s.name,s.type FROM holdings h JOIN securities s ON s.id=h.security_id WHERE h.account_id=? AND h.quantity>0").bind(accountId).all<any>(),db.prepare("SELECT COALESCE(available_cash_cents,0)::text cash FROM investment_account_settings WHERE account_id=?").bind(accountId).first<{cash:string}>(),db.prepare("SELECT COALESCE(SUM(d.realized_pnl_cents),0)::text total FROM tax_lot_disposals d JOIN investment_transactions t ON t.id=d.sell_transaction_id WHERE t.account_id=?").bind(accountId).first<{total:string}>()]);
+  const allocation=Object.fromEntries(allocationCategories.map(category=>[category,"0"]))as Record<string,string>;let market=0n,cost=0n;for(const row of rows.results){const value=quantityPriceAmount(parseQuantity(row.quantity),BigInt(row.price_cents||0)),basis=BigInt(row.cost_basis_cents||0),category=classifyHolding({securityType:row.type,name:row.name,ticker:row.ticker});market+=value;cost+=basis;allocation[category]=(BigInt(allocation[category])+value).toString()}const cash=BigInt(settings?.cash||0);allocation.CASH=(BigInt(allocation.CASH)+cash).toString();
+  await db.prepare("INSERT INTO portfolio_snapshots(id,household_id,account_id,captured_at,market_value_cents,cash_cents,cost_basis_cents,realized_pnl_cents,unrealized_pnl_cents,allocation_json,source_freshness_json) VALUES(?,?,?,?,?,?,?,?,?,?,?)").bind(id("portfolio_snapshot"),householdId,accountId,capturedAt,market.toString(),cash.toString(),cost.toString(),realized?.total||"0",(market-cost).toString(),JSON.stringify(allocation),JSON.stringify({kind:"transaction_refresh",prices:"stored",asOf:capturedAt})).run();
 }
 
 export async function GET(request:Request){
@@ -99,9 +106,10 @@ export async function POST(request:Request){
         await tx.prepare("UPDATE holdings SET quantity=quantity*?::numeric/?::numeric WHERE account_id=? AND security_id=?").bind(parsed.splitNumerator,parsed.splitDenominator,accountId,securityId).run();
       }
       await tx.prepare("INSERT INTO audit_log(id,household_id,user_id,action,target_type,target_id,metadata_json) VALUES(?,?,?,?,?,?,?)").bind(id("audit"),householdId,userId,"investment_transaction.created","investment_transaction",transactionId,JSON.stringify({accountId,type:parsed.transactionType,symbol:parsed.symbol})).run();
+      await persistPortfolioSnapshot(tx,householdId,accountId,new Date().toISOString());
+      if(parsed.transactionType==="TRANSFER"&&parsed.transferAccountId)await persistPortfolioSnapshot(tx,householdId,parsed.transferAccountId,new Date().toISOString());
       return{transactionId,type:parsed.transactionType,symbol:parsed.symbol,quantity:parsed.quantityText,amountCents:gross.toString(),cashAfterCents:(cashBefore+cashDelta).toString()};
     });
     return Response.json({ok:true,transaction:result},{status:201});
   }catch(error){if(error instanceof Response)return error;return Response.json({error:error instanceof Error?error.message:"Investment transaction could not be saved"},{status:400})}
 }
-

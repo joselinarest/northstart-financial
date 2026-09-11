@@ -1,0 +1,3 @@
+export type PerformancePoint={at:string;valueCents:string;externalFlowCents:string};
+export function timeWeightedReturn(points:PerformancePoint[]){if(points.length<2)return null;let factor=1,observations=0;for(let index=1;index<points.length;index++){const start=Number(points[index-1].valueCents),end=Number(points[index].valueCents),flow=Number(points[index].externalFlowCents);if(start<=0||!Number.isFinite(start+end+flow))continue;factor*=Math.max(0,(end-flow)/start);observations++}return observations?factor-1:null}
+export function simpleReturn(start:number,end:number){return start>0&&Number.isFinite(start+end)?end/start-1:null}
