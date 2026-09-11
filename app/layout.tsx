@@ -20,6 +20,7 @@ import './automatic-market-copilot.css';
 import './paper-trading-simulator.css';
 import './holding-disclosure.css';
 import './selected-account-plan.css';
+import './responsive-mobile.css';
 import HoldingDisclosureController from './holding-disclosure-controller';
 
 const geistSans = Geist({
