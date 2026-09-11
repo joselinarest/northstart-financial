@@ -4,6 +4,7 @@ import {marketSessionAt} from "@/lib/market-session";
 export const dynamic="force-dynamic";
 
 type AlpacaBar={t:string;o:number;h:number;l:number;c:number;v:number};
+type AlpacaSnapshot={latestQuote?:{t?:string};latestTrade?:{p?:number;t?:string};dailyBar?:{c?:number;v?:number;t?:string};prevDailyBar?:{c?:number}};
 const swingUniverse=["SPY","QQQ","IWM","DIA","AAPL","MSFT","NVDA","AMZN","GOOGL","META","AVGO","AMD","JPM","V","MA","XOM","CVX","LLY","UNH","COST","WMT","HD","CAT","CRM","ORCL","NFLX","CEG","VST","CCJ","LEU","BWXT","OKLO","SMR","URA","NLR"];
 const longTermUniverse=["VTI","VOO","SCHD","VXUS","BND","QQQ","IWM","AAPL","MSFT","NVDA","AMZN","GOOGL","META","AVGO","AMD","CRM","ORCL","PLTR","CRWD","DDOG","NET","SHOP","UBER","ABNB","MELI","CAVA","DUOL","SOFI","CEG","VST","NEE","CCJ","LEU","BWXT","OKLO","SMR","URA","NLR"];
 const fundSymbols=new Set(["VTI","VOO","SCHD","VXUS","BND","QQQ","IWM","URA","NLR"]);
@@ -27,9 +28,9 @@ export async function GET(request:Request){
   const key=process.env.ALPACA_API_KEY,secret=process.env.ALPACA_API_SECRET;
   if(!key||!secret)return Response.json({status:"not_configured",error:"Connect Alpaca market data to generate the automatic market shortlist."},{status:503});
   const start=new Date(Date.now()-360*86400000).toISOString(),feed=process.env.ALPACA_DATA_FEED||"iex";
-  const response=await fetch(`https://data.alpaca.markets/v2/stocks/bars?symbols=${universe.join(",")}&timeframe=1Day&start=${encodeURIComponent(start)}&limit=10000&adjustment=all&feed=${encodeURIComponent(feed)}`,{headers:{"APCA-API-KEY-ID":key,"APCA-API-SECRET-KEY":secret},cache:"no-store"});
+  const headers={"APCA-API-KEY-ID":key,"APCA-API-SECRET-KEY":secret},[response,snapshotResponse]=await Promise.all([fetch(`https://data.alpaca.markets/v2/stocks/bars?symbols=${universe.join(",")}&timeframe=1Day&start=${encodeURIComponent(start)}&limit=10000&adjustment=all&feed=${encodeURIComponent(feed)}`,{headers,cache:"no-store"}),fetch(`https://data.alpaca.markets/v2/stocks/snapshots?symbols=${universe.join(",")}&feed=${encodeURIComponent(feed)}`,{headers,cache:"no-store"})]);
   if(!response.ok)return Response.json({status:"provider_error",error:"The automatic market scan could not load historical bars.",providerStatus:response.status},{status:502});
-  const data=await response.json() as {bars?:Record<string,AlpacaBar[]>};
+  const data=await response.json() as {bars?:Record<string,AlpacaBar[]>},snapshots=snapshotResponse.ok?await snapshotResponse.json() as Record<string,AlpacaSnapshot>:{};
   const technicalCandidates=Object.entries(data.bars||{}).flatMap(([symbol,bars])=>{
     if(bars.length<55)return[];const recent=bars.slice(-60),last=recent.at(-1)!,previous=recent.at(-2)!,closes=recent.map(x=>x.c),allCloses=bars.map(x=>x.c),volumes=recent.map(x=>x.v),sma20=avg(closes.slice(-20)),sma50=avg(closes.slice(-50)),sma100=allCloses.length>=100?avg(allCloses.slice(-100)):null,sma200=allCloses.length>=200?avg(allCloses.slice(-200)):null,ema20=ema(closes.slice(-40),20),avgVolume=avg(volumes.slice(-21,-1)),relVol=avgVolume?last.v/avgVolume:0;
     const changes=closes.slice(-15).map((value,index,array)=>index?value-array[index-1]:0).slice(1),gains=avg(changes.map(x=>Math.max(0,x))),losses=avg(changes.map(x=>Math.max(0,-x))),rsi=losses===0?100:100-(100/(1+gains/losses));
@@ -39,8 +40,8 @@ export async function GET(request:Request){
     const setup=strategy==="long-term"?(fundSymbols.has(symbol)?"Diversified fund—fund-specific review required":"Company stage not assigned until fundamentals are verified"):last.c>high20?`Breakout detected · require a close above $${high20.toFixed(2)} with supporting volume`:last.c>=ema20&&last.c<=ema20*1.025?`Controlled pullback near EMA 20 ($${ema20.toFixed(2)})`:last.c>sma50?`Uptrend intact · current price is not at a low-risk entry zone; monitor $${ema20.toFixed(2)} or breakout $${high20.toFixed(2)}`:`Trend damaged below SMA 50 ($${sma50.toFixed(2)}) · no new long until reclaimed`;
     const action=score>=76?"Prepare conditional buy":score>=62?"No entry — monitor trigger":"Avoid — conditions failed";
     const invalidation=Math.max(low20,last.c-2*atr),riskPct=(last.c-invalidation)/last.c*100;
-    const dataAge=freshness(last.t,marketSessionAt(Date.now()));
-    return[{symbol,price:last.c,dayChange,score,setup,action,trend:last.c>sma50?(ema20>sma50?"Bullish":"Mixed"):"Bearish",ema20,sma50,sma100,sma200,rsi,relVol,avgVolume,support:low20,resistance:high20,invalidation,riskPct,asOf:last.t,dataFreshness:dataAge.freshness,dataAgeSeconds:dataAge.ageSeconds}];
+    const snapshot=snapshots[symbol],liveTimestamp=snapshot?.latestQuote?.t||snapshot?.latestTrade?.t||snapshot?.dailyBar?.t||last.t,livePrice=Number(snapshot?.latestTrade?.p||snapshot?.dailyBar?.c||last.c),dataAge=freshness(liveTimestamp,marketSessionAt(Date.now()));
+    return[{symbol,price:livePrice,dayChange,score,setup,action,trend:last.c>sma50?(ema20>sma50?"Bullish":"Mixed"):"Bearish",ema20,sma50,sma100,sma200,rsi,relVol,avgVolume,support:low20,resistance:high20,invalidation,riskPct,asOf:liveTimestamp,dataFreshness:dataAge.freshness,dataAgeSeconds:dataAge.ageSeconds}];
   }).sort((a,b)=>b.score-a.score).slice(0,strategy==="long-term"?40:16);
   let candidates:Record<string,unknown>[]=technicalCandidates;
   if(strategy==="long-term"&&process.env.FINNHUB_API_KEY){
