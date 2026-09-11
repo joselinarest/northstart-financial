@@ -27,9 +27,11 @@ function pool() {
     // Amplify can run several warm SSR instances at once. A large pool in every
     // instance quickly exhausts a small RDS database, so keep the per-instance
     // budget deliberately small and bound any environment override.
-    const configuredMax=Number.parseInt(process.env.DATABASE_POOL_MAX||"2",10);
-    const max=Number.isFinite(configuredMax)?Math.min(5,Math.max(1,configuredMax)):2;
-    globalDatabase.northstarPool = new Pool({ connectionString: connectionUrl.toString(), max, min:0, idleTimeoutMillis: 10_000, connectionTimeoutMillis: 8_000, maxLifetimeSeconds:300, allowExitOnIdle:true, ssl: local || process.env.DATABASE_SSL === "disable" ? false : { ca:globalDatabase.northstarRdsCa, rejectUnauthorized:true } });
+    const configuredMax=Number.parseInt(process.env.DATABASE_POOL_MAX||"1",10);
+    // Serverless instances multiply this number. Keep production at one client;
+    // local development may use two for parallel route work.
+    const hardLimit=local?2:1,max=Number.isFinite(configuredMax)?Math.min(hardLimit,Math.max(1,configuredMax)):1;
+    globalDatabase.northstarPool = new Pool({ connectionString: connectionUrl.toString(), max, min:0, idleTimeoutMillis: 1_000, connectionTimeoutMillis: 5_000, maxLifetimeSeconds:60, allowExitOnIdle:true, ssl: local || process.env.DATABASE_SSL === "disable" ? false : { ca:globalDatabase.northstarRdsCa, rejectUnauthorized:true } });
     globalDatabase.northstarPool.on("error",error=>console.error("Idle PostgreSQL client error",error.message));
   }
   return globalDatabase.northstarPool;
@@ -77,8 +79,13 @@ export class PostgresDatabase {
 export async function database() {
   await loadRuntimeSecrets();
   await loadAwsRdsCa();
-  if (!globalDatabase.northstarSchemaReady||globalDatabase.northstarSchemaVersion!==schemaVersion) globalDatabase.northstarSchemaReady = (async () => {const client=await pool().connect();try{await client.query("SELECT pg_advisory_lock(hashtext($1))",["northstar_schema_init"]);for(const statement of schemaStatements)await client.query(postgresSql(statement));await runMigrations(client);globalDatabase.northstarSchemaVersion=schemaVersion}finally{await client.query("SELECT pg_advisory_unlock(hashtext($1))",["northstar_schema_init"]).catch(()=>undefined);client.release()}})().catch(error=>{globalDatabase.northstarSchemaReady=undefined;throw error});
-  await globalDatabase.northstarSchemaReady; return new PostgresDatabase();
+  const local=/(?:localhost|127\.0\.0\.1)/.test(process.env.DATABASE_URL||"");
+  // Schema work belongs in deployment/migration jobs. Running it from every
+  // serverless cold start consumes scarce RDS slots and serializes requests.
+  const shouldMigrate=local||process.env.AUTO_MIGRATE_DATABASE==="true";
+  if(shouldMigrate&&(!globalDatabase.northstarSchemaReady||globalDatabase.northstarSchemaVersion!==schemaVersion))globalDatabase.northstarSchemaReady=(async()=>{const client=await pool().connect();try{await client.query("SELECT pg_advisory_lock(hashtext($1))",["northstar_schema_init"]);for(const statement of schemaStatements)await client.query(postgresSql(statement));await runMigrations(client);globalDatabase.northstarSchemaVersion=schemaVersion}finally{await client.query("SELECT pg_advisory_unlock(hashtext($1))",["northstar_schema_init"]).catch(()=>undefined);client.release()}})().catch(error=>{globalDatabase.northstarSchemaReady=undefined;throw error});
+  if(globalDatabase.northstarSchemaReady)await globalDatabase.northstarSchemaReady;
+  return new PostgresDatabase();
 }
 
 export const id = (prefix: string) => `${prefix}_${crypto.randomUUID()}`;
