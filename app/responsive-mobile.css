@@ -49,3 +49,5 @@ html,body{max-width:100%;overflow-x:hidden}.workspace-view,.workspace-view .shel
 }
 
 @media(prefers-reduced-motion:reduce){.workspace-view .shell>aside{transition:none}}
+
+.watchlist-refresh{display:flex;align-items:center;gap:8px}.watchlist-refresh button{padding:7px 10px;border:1px solid #5b8f79;border-radius:7px;background:#173f32;color:#fff;font-size:.58rem;font-weight:800}@media(max-width:600px){.watchlist-refresh{align-items:flex-start;flex-direction:column}}

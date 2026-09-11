@@ -2,7 +2,7 @@
 
 import {useEffect, useMemo, useState} from "react";
 
-type Props={symbol:string;strategy:"swing"|"position";accountName:string;accountValue:number;cashAvailable:number;ownedShares:number;ownedValue:number;price:number;bid:number|null;ask:number|null;relativeVolume:number;confidence:number;support:number;resistance:number;entryLow:number;entryHigh:number;stop:number;target1:number;target2:number;fresh:boolean};
+type Props={symbol:string;strategy:"swing"|"position";accountName:string;accountValue:number;cashAvailable:number;ownedShares:number;ownedValue:number;price:number;bid:number|null;ask:number|null;relativeVolume:number;confidence:number;support:number;resistance:number;entryLow:number;entryHigh:number;stop:number;target1:number;target2:number;fresh:boolean;marketOpen?:boolean};
 type Research={status?:string;asOf?:string;profile?:Record<string,any>;metrics?:Record<string,any>;news?:Array<Record<string,any>>;filings?:Array<Record<string,any>>;error?:string};
 
 const money=(value:number)=>`$${value.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}`;
@@ -10,7 +10,7 @@ const metric=(data:Record<string,any>|undefined,...keys:string[])=>{for(const ke
 
 export default function ChartDecisionWorkspace(props:Props){
   const [research,setResearch]=useState<Research|null>(null),[loading,setLoading]=useState(true);
-  useEffect(()=>{let active=true;const load=async()=>{setLoading(true);try{const response=await fetch(`/api/market/research?symbol=${encodeURIComponent(props.symbol)}`,{cache:"no-store"}),data=await response.json();if(active)setResearch(data)}catch{if(active)setResearch({status:"unavailable",error:"Company research is temporarily unavailable."})}finally{if(active)setLoading(false)}};load();const timer=setInterval(load,60000);return()=>{active=false;clearInterval(timer)}},[props.symbol]);
+  useEffect(()=>{let active=true;const load=async()=>{setLoading(true);try{const response=await fetch(`/api/market/research?symbol=${encodeURIComponent(props.symbol)}`,{cache:"no-store"}),data=await response.json();if(active)setResearch(data)}catch{if(active)setResearch({status:"unavailable",error:"Company research is temporarily unavailable."})}finally{if(active)setLoading(false)}};load();const timer=props.marketOpen?setInterval(load,60000):null;return()=>{active=false;if(timer)clearInterval(timer)}},[props.symbol,props.marketOpen]);
   const decision=useMemo(()=>{
     const riskPerShare=Math.max(.01,props.price-props.stop),riskBudget=Math.max(0,props.accountValue*.005),riskShares=Math.floor(riskBudget/riskPerShare),cashShares=Math.floor(Math.max(0,props.cashAvailable)/(props.ask||props.price||1)),positionLimit=Math.max(0,props.accountValue*.10-props.ownedValue),fitShares=Math.floor(positionLimit/(props.ask||props.price||1)),shares=Math.max(0,Math.min(riskShares,cashShares,fitShares));
     const liquid=props.bid!==null&&props.ask!==null&&props.ask>=props.bid&&((props.ask-props.bid)/props.price)<.005;
