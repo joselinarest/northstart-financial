@@ -227,6 +227,7 @@ export function NorthstarWorkspace({ initialTab = "Dashboard", initialInvestment
   const [pushEnabled,setPushEnabled]=useState(false);
   const [isLocal, setIsLocal] = useState(false);
   const [mobileMenuOpen,setMobileMenuOpen]=useState(false);
+  useEffect(()=>{document.body.classList.toggle("northstar-mobile-menu-open",mobileMenuOpen);const close=(event:KeyboardEvent)=>{if(event.key==="Escape")setMobileMenuOpen(false)};window.addEventListener("keydown",close);return()=>{document.body.classList.remove("northstar-mobile-menu-open");window.removeEventListener("keydown",close)}},[mobileMenuOpen]);
   const [chartSymbol, setChartSymbol] = useState("NVDA");
   const [timeframe, setTimeframe] = useState("1Y");
   const [chartBars, setChartBars] = useState<Array<[number,number,number,number,number]>>([]);
@@ -752,7 +753,7 @@ export function NorthstarWorkspace({ initialTab = "Dashboard", initialInvestment
     <main className={`workspace-view page-${(pathByTab[tab] || "dashboard").replace(/[^a-z-]/g, "")} ${focusInvestmentAnalysis?"page-research-detail":""}`}>
       <RealtimeSync accessToken={accessToken} refreshMinutes={1} onStatus={setRealtimeStatus} onEvent={()=>setRealtimeTick(value=>value+1)} />
       <header>
-        <button className="mobile-nav-toggle" type="button" aria-label="Open navigation" aria-expanded={mobileMenuOpen} onClick={()=>setMobileMenuOpen(value=>!value)}>☰</button>
+        <button className="mobile-nav-toggle" type="button" aria-label={mobileMenuOpen?"Close navigation":"Open navigation"} aria-controls="workspace-navigation" aria-expanded={mobileMenuOpen} onClick={()=>setMobileMenuOpen(value=>!value)}>{mobileMenuOpen?"×":"☰"}</button>
         <div className="brand">
           <span>N</span>
           <b>NORTHSTAR</b>
@@ -777,7 +778,7 @@ export function NorthstarWorkspace({ initialTab = "Dashboard", initialInvestment
         </div>
       </header>
       <div className="shell">
-        {mobileMenuOpen&&<button className="mobile-nav-backdrop" aria-label="Close navigation" onClick={()=>setMobileMenuOpen(false)}/>}<aside className={mobileMenuOpen?"mobile-open":""} onClick={event=>{if((event.target as HTMLElement).closest("button"))setMobileMenuOpen(false)}}>
+        {mobileMenuOpen&&<button className="mobile-nav-backdrop" aria-label="Close navigation" onClick={()=>setMobileMenuOpen(false)}/>}<aside id="workspace-navigation" aria-label="Main navigation" className={mobileMenuOpen?"mobile-open":""} onClick={event=>{if((event.target as HTMLElement).closest("button"))setMobileMenuOpen(false)}}>
           {visibleNavigationGroups.map(group => <div className="nav-group" key={group.name}><p>{group.name}</p>{group.items.map(([x,icon]) => (
             <button
               key={x}
