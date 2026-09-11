@@ -1,4 +1,6 @@
 import {loadRuntimeSecrets} from "@/lib/runtime-secrets";
+import {freshness} from "@/lib/providers/market-data";
+import {marketSessionAt} from "@/lib/market-session";
 export const dynamic="force-dynamic";
 
 type AlpacaBar={t:string;o:number;h:number;l:number;c:number;v:number};
@@ -37,7 +39,8 @@ export async function GET(request:Request){
     const setup=strategy==="long-term"?(fundSymbols.has(symbol)?"Diversified fund—fund-specific review required":"Company stage not assigned until fundamentals are verified"):last.c>high20?`Breakout detected · require a close above $${high20.toFixed(2)} with supporting volume`:last.c>=ema20&&last.c<=ema20*1.025?`Controlled pullback near EMA 20 ($${ema20.toFixed(2)})`:last.c>sma50?`Uptrend intact · current price is not at a low-risk entry zone; monitor $${ema20.toFixed(2)} or breakout $${high20.toFixed(2)}`:`Trend damaged below SMA 50 ($${sma50.toFixed(2)}) · no new long until reclaimed`;
     const action=score>=76?"Prepare conditional buy":score>=62?"No entry — monitor trigger":"Avoid — conditions failed";
     const invalidation=Math.max(low20,last.c-2*atr),riskPct=(last.c-invalidation)/last.c*100;
-    return[{symbol,price:last.c,dayChange,score,setup,action,trend:last.c>sma50?(ema20>sma50?"Bullish":"Mixed"):"Bearish",ema20,sma50,sma100,sma200,rsi,relVol,avgVolume,support:low20,resistance:high20,invalidation,riskPct,asOf:last.t}];
+    const dataAge=freshness(last.t,marketSessionAt(Date.now()));
+    return[{symbol,price:last.c,dayChange,score,setup,action,trend:last.c>sma50?(ema20>sma50?"Bullish":"Mixed"):"Bearish",ema20,sma50,sma100,sma200,rsi,relVol,avgVolume,support:low20,resistance:high20,invalidation,riskPct,asOf:last.t,dataFreshness:dataAge.freshness,dataAgeSeconds:dataAge.ageSeconds}];
   }).sort((a,b)=>b.score-a.score).slice(0,strategy==="long-term"?40:16);
   let candidates:Record<string,unknown>[]=technicalCandidates;
   if(strategy==="long-term"&&process.env.FINNHUB_API_KEY){
@@ -60,5 +63,6 @@ export async function GET(request:Request){
   if(strategy==="long-term"&&!process.env.FINNHUB_API_KEY){
     candidates=candidates.map(candidate=>({...candidate,companyStage:fundSymbols.has(String(candidate.symbol))?"DIVERSIFIED EXCHANGE-TRADED FUND":"COMPANY STAGE DATA UNAVAILABLE",portfolioRole:fundSymbols.has(String(candidate.symbol))?"Core or diversifier":"Do not assign until fundamentals are connected",missingData:true}));
   }
-  return Response.json({status:"connected",provider:"Alpaca",feed,strategy,asOf:new Date().toISOString(),universeSize:universe.length,method:strategy==="swing"?"Liquid securities ranked for swing timing using structure, EMA20/SMA50, RSI, relative volume, breakout state and invalidation.":"Separate long-term discovery universe ranked for liquid technical health and portfolio role. Individual-company candidates still require revenue, EPS, free-cash-flow, ROIC, debt, dilution, valuation, moat and filing validation before inclusion.",candidates},{headers:{"Cache-Control":"private, no-store"}});
+  const freshCount=candidates.filter(item=>item.dataFreshness==="FRESH").length;
+  return Response.json({status:"connected",provider:"Alpaca",feed,strategy,asOf:new Date().toISOString(),universeSize:universe.length,freshCount,actionableMarketData:strategy==="long-term"||freshCount>0,method:strategy==="swing"?"Liquid securities ranked for swing timing using structure, EMA20/SMA50, RSI, relative volume, breakout state and invalidation.":"Separate long-term discovery universe ranked for liquid technical health and portfolio role. Individual-company candidates still require revenue, EPS, free-cash-flow, ROIC, debt, dilution, valuation, moat and filing validation before inclusion.",candidates},{headers:{"Cache-Control":"private, no-store"}});
 }

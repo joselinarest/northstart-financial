@@ -1,12 +1,7 @@
-import {loadRuntimeSecrets} from "@/lib/runtime-secrets";
+import{marketDataProvider}from"@/lib/providers/alpaca-market-data";
+import{MarketProviderError}from"@/lib/providers/market-data";
 export const dynamic = "force-dynamic";
 
 export async function GET() {
-  await loadRuntimeSecrets();
-  if (!process.env.ALPACA_API_KEY || !process.env.ALPACA_API_SECRET) return Response.json({ status: "not_configured", error: "Connect Alpaca to enable the official U.S. exchange clock." }, { status: 503 });
-  const base = (process.env.ALPACA_CLOCK_BASE_URL || "https://paper-api.alpaca.markets").replace(/\/(?:v2(?:\/clock)?)?\/?$/, "");
-  const response = await fetch(`${base}/v2/clock`, { headers: { "APCA-API-KEY-ID": process.env.ALPACA_API_KEY, "APCA-API-SECRET-KEY": process.env.ALPACA_API_SECRET }, cache: "no-store" });
-  if (!response.ok) return Response.json({ status: "provider_error", error: "The official market clock could not be loaded." }, { status: response.status });
-  const clock = await response.json() as { timestamp:string; is_open:boolean; next_open:string; next_close:string };
-  return Response.json({ status: "connected", timestamp: clock.timestamp, isOpen: clock.is_open, nextOpen: clock.next_open, nextClose: clock.next_close }, { headers: { "Cache-Control": "private, max-age=30" } });
+  try{const clock=await marketDataProvider().getClock();return Response.json({status:"connected",...clock},{headers:{"Cache-Control":"private, max-age=15"}})}catch(error){const known=error instanceof MarketProviderError;return Response.json({status:known?error.code:"provider_error",error:error instanceof Error?error.message:"Market clock unavailable"},{status:known?error.status:502})}
 }
