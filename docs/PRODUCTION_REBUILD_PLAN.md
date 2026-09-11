@@ -212,3 +212,9 @@ The next code slice should be Phase 0, not prediction UI. It should add:
 7. extraction of account and recommendation code from `app/page.tsx`.
 
 Do not deploy new tables or transform current holding data until the migration is rehearsed against a production-shaped backup and verified to preserve every manually entered account and holding.
+
+## Mandatory Action Guidance Engine
+
+Every account-facing analysis must resolve through one account-scoped Action Guidance Engine. Its concise output answers: WHAT, WHICH SECURITY, HOW MANY SHARES, AT WHAT PRICE, WHEN, WHY, and CAPITAL SOURCE. It combines strategy settings, goal/horizon, holdings, available cash, allocation drift, position limits, household reserve/debt gates, current market evidence, fundamentals, valuation, technical confirmation, predictions, events, and existing plans. Missing or stale required evidence produces WAIT/WATCH/DO NOTHING, never an invented actionable answer.
+
+Planned Actions are persistent, non-executing objects with `PROPOSED`, `MONITORING`, `READY`, `TRIGGERED`, `INVALIDATED`, `EXPIRED`, `COMPLETED`, and `MISSED` states. READY only means the stored conditions still pass. A manual investment transaction may be created only after explicit user confirmation. Daily and monthly plans, cash deployment, contribution-first rebalancing, thesis failures, unusually strong multi-factor opportunities, and the cross-account priority queue all use these same objects and retain their full history.
