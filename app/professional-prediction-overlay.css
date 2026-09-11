@@ -1,0 +1,12 @@
+.prediction-controls{display:flex;align-items:center;gap:8px;padding:5px 8px;border:1px solid #c8d7d1;border-radius:8px;background:#f4f8f6}
+.prediction-controls label{display:flex;align-items:center;gap:4px;font-size:.68rem;font-weight:750;white-space:nowrap}.prediction-controls select{min-width:112px}
+.price-panel.prediction-active{overflow:hidden}.prediction-active .candle-field{right:24%;width:auto}
+.ai-prediction-overlay{position:absolute;inset:0;width:100%;height:337px;z-index:4;pointer-events:none;overflow:visible}
+.prediction-boundary{stroke:#78817e;stroke-width:1;stroke-dasharray:3 6;vector-effect:non-scaling-stroke}.prediction-band{fill:#8e9995;opacity:.2}
+.prediction-path{fill:none;stroke:#5f6764;stroke-width:4;stroke-dasharray:11 8;stroke-linecap:round;stroke-linejoin:round;vector-effect:non-scaling-stroke}
+.prediction-end{fill:#f4f6f5;stroke:#555f5b;stroke-width:3}.prediction-label{fill:#424b48;font-size:14px;font-weight:900;letter-spacing:.045em}
+.prediction-summary{position:absolute;right:12px;bottom:50px;z-index:7;display:flex;width:min(210px,22%);flex-direction:column;gap:2px;padding:8px 10px;border:1px solid #aeb9b5;border-radius:7px;background:rgba(248,250,249,.94);box-shadow:0 6px 18px rgba(17,39,31,.12);color:#263832}
+.prediction-summary b{font-size:.7rem}.prediction-summary span{font-size:.67rem;font-weight:800}.prediction-summary small{font-size:.56rem;line-height:1.35;color:#596963}
+.prediction-summary button{margin-top:4px;padding:5px 7px;border:1px solid #66736e;border-radius:5px;background:#fff;color:#34433e;font-size:.56rem;font-weight:800}.prediction-summary button:disabled{cursor:not-allowed;opacity:.55}.prediction-summary em{max-height:30px;overflow:auto;color:#456158;font-size:.52rem;font-style:normal}
+@media(max-width:768px){.prediction-controls{width:100%;overflow:auto}.prediction-active .candle-field{right:32%}.prediction-summary{right:5px;width:29%;padding:6px}.prediction-label{font-size:11px}.ai-prediction-overlay{height:300px}}
+@media(max-width:430px){.prediction-controls label{font-size:.6rem}.prediction-controls select{min-width:100px}.prediction-summary{bottom:44px;width:34%}.prediction-summary small,.prediction-summary em{display:none}.prediction-active .candle-field{right:36%}}
