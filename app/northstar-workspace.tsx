@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { getCognitoSession, isCognitoConfigured, signOutCognito, startCognitoLogin } from "@/lib/cognito-client";
 import { patternLibrary, probabilityEngine, type Bar } from "@/lib/technical-analysis";
 import AcademyLab from "@/app/academy-lab";
@@ -234,6 +234,8 @@ export function NorthstarWorkspace({ initialTab = "Dashboard", initialInvestment
   const [predictionBandVisible,setPredictionBandVisible]=useState(true);
   const [predictionScenario,setPredictionScenario]=useState<"BULL"|"BASE"|"BEAR">("BASE");
   const [predictionSaveNotice,setPredictionSaveNotice]=useState("");
+  const [predictionCardPosition,setPredictionCardPosition]=useState({x:0,y:0});
+  const predictionDrag=useRef<{x:number;y:number;originX:number;originY:number}|null>(null);
   const [feedNotice, setFeedNotice] = useState("Provider credentials required");
   const [accessToken, setAccessToken] = useState("");
   const [backendOverview, setBackendOverview] = useState<Record<string, number> | null>(null);
@@ -949,7 +951,7 @@ export function NorthstarWorkspace({ initialTab = "Dashboard", initialInvestment
                 {["NVDA","SPY","QQQ","AAPL","MSFT"].map(symbol => <button key={symbol} className={chartSymbol===symbol?"active":""} onClick={()=>{setChartSymbol(symbol);setMarketLookup(symbol)}}>{symbol}</button>)}
               </div>
               <div className="time-picks">
-                {["1M","3M","6M","1Y","5Y"].map(frame => <button key={frame} className={timeframe===frame?"active":""} onClick={()=>setTimeframe(frame)}>{frame}</button>)}
+                {["1m","5m","15m","1h","4h","1D","1M","3M","1Y","5Y"].map(frame => <button key={frame} className={timeframe===frame?"active":""} onClick={()=>setTimeframe(frame)}>{frame}</button>)}
               </div>
               <select aria-label="Technical indicator" value={indicator} onChange={e=>setIndicator(e.target.value)}>
                 <option>Bollinger Bands</option><option>EMA 20/50</option><option>SMA 50/200</option><option>VWAP</option>
@@ -979,7 +981,7 @@ export function NorthstarWorkspace({ initialTab = "Dashboard", initialInvestment
                   })}
                 </div>
                 <div className="ema ema-fast">{indicator}</div><div className="ema ema-slow">Trend confirmation</div>
-                {predictionVisible&&<div className="prediction-summary"><b>{predictionScenario} · {predictionOverlay.confidence}% confidence</b><span>${predictionOverlay.final.toFixed(2)} modeled endpoint</span><small>Expected range ${predictionOverlay.low.toFixed(2)}–${predictionOverlay.high.toFixed(2)} · {predictionOverlay.horizonLabel}. Forecast, not observed price.</small><button type="button" disabled={!chartBars.length} onClick={saveChartPrediction}>{chartBars.length?"Save forecast history":"Connected bars required"}</button>{predictionSaveNotice&&<em>{predictionSaveNotice}</em>}</div>}
+                {predictionVisible&&<div className="prediction-summary" style={{transform:`translate(${predictionCardPosition.x}px,${predictionCardPosition.y}px)`}}><b className="prediction-drag-handle" onPointerDown={event=>{event.currentTarget.setPointerCapture(event.pointerId);predictionDrag.current={x:event.clientX,y:event.clientY,originX:predictionCardPosition.x,originY:predictionCardPosition.y}}} onPointerMove={event=>{const drag=predictionDrag.current;if(!drag)return;setPredictionCardPosition({x:drag.originX+event.clientX-drag.x,y:drag.originY+event.clientY-drag.y})}} onPointerUp={event=>{event.currentTarget.releasePointerCapture(event.pointerId);predictionDrag.current=null}} onDoubleClick={()=>setPredictionCardPosition({x:0,y:0})} title="Drag to move · double-click to reset">⠿ {predictionScenario} · {predictionOverlay.confidence}% confidence</b><span>${predictionOverlay.final.toFixed(2)} modeled endpoint</span><small>Expected range ${predictionOverlay.low.toFixed(2)}–${predictionOverlay.high.toFixed(2)} · {predictionOverlay.horizonLabel}. Forecast, not observed price.</small><button type="button" onClick={()=>setPredictionCardPosition(position=>position.x||position.y?{x:0,y:0}:{x:-260,y:0})}>Move card {predictionCardPosition.x||predictionCardPosition.y?"home":"left"}</button><button type="button" disabled={!chartBars.length} onClick={saveChartPrediction}>{chartBars.length?"Save forecast history":"Connected bars required"}</button>{predictionSaveNotice&&<em>{predictionSaveNotice}</em>}</div>}
                 <span className="event-marker earnings" tabIndex={0} aria-label="Earnings event marker" title="E · Earnings event"><b>E</b><div role="tooltip"><strong>Earnings event</strong><small>A scheduled company report that can cause gaps, higher volume, and volatility. Check the confirmed date before acting.</small></div></span><span className="event-marker news" tabIndex={0} aria-label="Verified news marker" title="N · Verified market news"><b>N</b><div role="tooltip"><strong>Verified news</strong><small>A confirmed company or market headline. Read the primary source and observe price and volume reaction before making a decision.</small></div></span>
               </div>
               <aside className="chart-side">

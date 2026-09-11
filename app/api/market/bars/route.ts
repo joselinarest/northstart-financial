@@ -2,7 +2,7 @@ import{marketDataProvider}from"@/lib/providers/alpaca-market-data";
 import{MarketProviderError}from"@/lib/providers/market-data";
 export const dynamic = "force-dynamic";
 
-const ranges: Record<string,{days:number;timeframe:string}> = {"1M":{days:35,timeframe:"1Day"},"3M":{days:100,timeframe:"1Day"},"6M":{days:195,timeframe:"1Day"},"1Y":{days:370,timeframe:"1Day"},"5Y":{days:1835,timeframe:"1Week"}};
+const ranges: Record<string,{days:number;timeframe:string}> = {"1m":{days:1,timeframe:"1Min"},"5m":{days:4,timeframe:"5Min"},"15m":{days:10,timeframe:"15Min"},"1h":{days:35,timeframe:"1Hour"},"4h":{days:120,timeframe:"4Hour"},"1D":{days:370,timeframe:"1Day"},"1M":{days:35,timeframe:"1Day"},"3M":{days:100,timeframe:"1Day"},"6M":{days:195,timeframe:"1Day"},"1Y":{days:370,timeframe:"1Day"},"5Y":{days:1835,timeframe:"1Week"}};
 
 export async function GET(request:Request){
   const url=new URL(request.url),symbol=(url.searchParams.get("symbol")||"").toUpperCase(),range=url.searchParams.get("range")||"1Y",config=ranges[range]||ranges["1Y"];

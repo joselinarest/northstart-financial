@@ -31,6 +31,9 @@ function pool() {
 
 function postgresSql(source: string) {
   let index = 0, sql = source.replace(/\?/g, () => `$${++index}`);
+  // Legacy date fields are ISO text. PostgreSQL will not compare TEXT directly
+  // with CURRENT_TIMESTAMP, so normalize those comparisons at the adapter edge.
+  sql = sql.replace(/\b([a-z][a-z0-9_]*\.(?:posted_at|created_at|updated_at|expires_at|evidence_as_of|point_at))\s*(>=|<=|>|<)\s*CURRENT_TIMESTAMP/gi,"NULLIF($1,'')::timestamptz $2 CURRENT_TIMESTAMP");
   if (/^\s*INSERT\s+OR\s+IGNORE\s+/i.test(sql)) { sql = sql.replace(/^\s*INSERT\s+OR\s+IGNORE\s+/i, "INSERT "); sql = `${sql} ON CONFLICT DO NOTHING`; }
   return sql;
 }
