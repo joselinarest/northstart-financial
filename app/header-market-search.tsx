@@ -1,0 +1,10 @@
+"use client";
+import{useEffect,useState}from"react";
+
+type Result={symbol:string;name:string;exchange?:string;tradable?:boolean};
+export default function HeaderMarketSearch({currentSymbol,onSelect}:{currentSymbol:string;onSelect:(symbol:string)=>void}){
+ const[open,setOpen]=useState(false),[query,setQuery]=useState(""),[results,setResults]=useState<Result[]>([]),[status,setStatus]=useState("");
+ useEffect(()=>{if(!open||query.trim().length<1){setResults([]);return}const controller=new AbortController(),timer=setTimeout(()=>{setStatus("Searching live U.S. market…");fetch(`/api/market/search?q=${encodeURIComponent(query.trim())}`,{cache:"no-store",signal:controller.signal}).then(async response=>({ok:response.ok,data:await response.json()})).then(({ok,data})=>{setResults(ok?data.results||[]:[]);setStatus(ok&&data.results?.length?"":"No active U.S.-listed match found")}).catch(error=>{if(error.name!=="AbortError")setStatus("Market search unavailable")})},250);return()=>{clearTimeout(timer);controller.abort()}},[open,query]);
+ const choose=(symbol:string)=>{setOpen(false);setQuery("");setResults([]);onSelect(symbol)};
+ return <div className="header-market-search"><button type="button" onClick={()=>{setOpen(value=>!value);if(!open)setQuery(currentSymbol)}} aria-expanded={open}>⌕ Search</button>{open&&<div className="header-search-popover"><label><span>STOCK &amp; ETF SEARCH</span><input autoFocus value={query} onChange={event=>setQuery(event.target.value)} onKeyDown={event=>{if(event.key==="Escape")setOpen(false);if(event.key==="Enter"&&results[0])choose(results[0].symbol)}} placeholder="Ticker or company name"/></label>{results.length?<ul>{results.map(item=><li key={item.symbol}><button type="button" onClick={()=>choose(item.symbol)}><b>{item.symbol}</b><span>{item.name}<small>{item.exchange||"U.S. market"}{item.tradable===false?" · not tradable":""}</small></span></button></li>)}</ul>:<p>{status||"Type a ticker or company name."}</p>}<small>Opens read-only chart analysis. No order is submitted.</small></div>}</div>
+}

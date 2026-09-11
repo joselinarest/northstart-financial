@@ -2,7 +2,7 @@
 import{useEffect}from"react";
 
 type LiveEvent={type?:string;title?:string;explanation?:string;severity?:string;id?:string};
-export default function RealtimeSync({accessToken,onStatus,onEvent,refreshMinutes=15}:{accessToken:string;onStatus:(status:string)=>void;onEvent:()=>void;refreshMinutes?:number}){
+export default function RealtimeSync({accessToken,onStatus,onEvent,refreshMinutes=1}:{accessToken:string;onStatus:(status:string)=>void;onEvent:()=>void;refreshMinutes?:number}){
  useEffect(()=>{
   const websocketUrl=process.env.NEXT_PUBLIC_REALTIME_WS_URL;let socket:WebSocket|null=null,retry:ReturnType<typeof setTimeout>|null=null,poll:number|null=null,stopped=false,abort:AbortController|null=null,delay=1000;
   const publish=(detail:LiveEvent)=>{window.dispatchEvent(new CustomEvent("northstar:realtime",{detail}));onEvent();if(detail.type!=="alert"||!("Notification"in window)||Notification.permission!=="granted"||localStorage.getItem("northstar-push-enabled")==="false")return;new Notification(detail.title||"Northstar action review",{body:detail.explanation||"Material evidence changed. Open Northstar to review; no order was placed.",tag:detail.id||"northstar-alert"})};
