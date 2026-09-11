@@ -18,6 +18,8 @@ import './action-guidance.css';
 import './investment-command-center.css';
 import './automatic-market-copilot.css';
 import './paper-trading-simulator.css';
+import './holding-disclosure.css';
+import HoldingDisclosureController from './holding-disclosure-controller';
 
 const geistSans = Geist({
   variable: '--font-geist-sans',
@@ -49,7 +51,7 @@ export default function RootLayout({
         suppressHydrationWarning
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
-        {children}
+        <HoldingDisclosureController />{children}
       </body>
     </html>
   );
