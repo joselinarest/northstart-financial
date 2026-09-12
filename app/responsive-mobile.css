@@ -1,5 +1,5 @@
 /* Application-wide responsive contract. Loaded last to resolve legacy mobile rules. */
-html,body{max-width:100%;overflow-x:hidden}.workspace-view,.workspace-view .shell,.workspace-view .content{min-width:0;max-width:100%}.workspace-view .content>*{min-width:0}.workspace-view img,.workspace-view svg,.workspace-view canvas{max-width:100%}.workspace-view input,.workspace-view select,.workspace-view textarea,.workspace-view button{max-width:100%}
+html,body{max-width:100%;overflow-x:clip}.workspace-view,.workspace-view .shell,.workspace-view .content{min-width:0;max-width:100%}.workspace-view .content>*{min-width:0}.workspace-view img,.workspace-view svg,.workspace-view canvas{max-width:100%}.workspace-view input,.workspace-view select,.workspace-view textarea,.workspace-view button{max-width:100%}
 
 @media(max-width:950px){
   body.northstar-mobile-menu-open{overflow:hidden!important;touch-action:none}
