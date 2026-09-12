@@ -1,0 +1,71 @@
+/* Northstar application design system. This file is intentionally loaded last. */
+:root{
+  --ns-ink:#13231d;--ns-muted:#60736b;--ns-faint:#87978f;
+  --ns-bg:#f3f6f4;--ns-surface:#fff;--ns-surface-soft:#f7faf8;
+  --ns-line:#d8e2dd;--ns-line-strong:#becfc6;
+  --ns-brand:#087a5b;--ns-brand-dark:#0b3d30;--ns-brand-soft:#e8f5ef;
+  --ns-success:#13795b;--ns-warning:#a56416;--ns-danger:#b43b34;--ns-info:#246a8a;
+  --ns-r-sm:8px;--ns-r-md:12px;--ns-r-lg:16px;--ns-r-xl:22px;
+  --ns-shadow-sm:0 1px 2px rgba(11,36,27,.05),0 5px 18px rgba(11,36,27,.04);
+  --ns-shadow-md:0 12px 35px rgba(11,36,27,.09);
+  --ns-header-h:64px;--ns-sidebar-w:252px;--ns-content-max:1520px;
+  --ns-control-h:42px;--ns-z-header:1000;--ns-z-drawer:1200;--ns-z-modal:1400;
+}
+*{box-sizing:border-box}
+html{background:var(--ns-bg);scroll-behavior:smooth}
+body{margin:0;background:var(--ns-bg);color:var(--ns-ink);font-family:var(--font-geist-sans),Inter,system-ui,-apple-system,"Segoe UI",sans-serif;-webkit-font-smoothing:antialiased}
+button,input,select,textarea{font:inherit}
+button,a,input,select,textarea{transition:border-color .16s ease,background-color .16s ease,color .16s ease,box-shadow .16s ease,transform .16s ease}
+button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{outline:3px solid rgba(8,122,91,.22);outline-offset:2px}
+
+.workspace-view{min-height:100dvh;background:var(--ns-bg);color:var(--ns-ink);isolation:isolate}
+.workspace-view>.app-topbar{position:sticky!important;top:0!important;z-index:var(--ns-z-header)!important;height:var(--ns-header-h)!important;min-height:var(--ns-header-h)!important;padding:0 20px!important;border-bottom:1px solid var(--ns-line)!important;background:rgba(255,255,255,.94)!important;box-shadow:0 4px 20px rgba(11,36,27,.045)!important;backdrop-filter:blur(18px) saturate(1.25)}
+.workspace-view>.app-shell{display:grid!important;grid-template-columns:var(--ns-sidebar-w) minmax(0,1fr)!important;align-items:start;min-height:calc(100dvh - var(--ns-header-h))!important}
+.workspace-view>.app-shell>.app-sidebar{position:sticky!important;top:var(--ns-header-h)!important;z-index:20;height:calc(100dvh - var(--ns-header-h))!important;min-height:0!important;padding:16px 12px 24px!important;overflow-x:hidden!important;overflow-y:auto!important;border-right:1px solid #29463b!important;background:linear-gradient(180deg,#0d211a 0%,#091610 100%)!important;box-shadow:none!important;scrollbar-width:thin;scrollbar-color:#527668 transparent}
+.workspace-view>.app-shell>.app-sidebar::-webkit-scrollbar{width:6px}.workspace-view>.app-shell>.app-sidebar::-webkit-scrollbar-track{background:transparent}.workspace-view>.app-shell>.app-sidebar::-webkit-scrollbar-thumb{border-radius:10px;background:#527668}
+.workspace-view .app-sidebar .nav-group{display:grid!important;gap:4px!important;margin:0 0 13px!important}
+.workspace-view .app-sidebar .nav-group p{margin:0 9px 5px!important;color:#9db5aa!important;font-size:10px!important;font-weight:800!important;letter-spacing:.14em!important;text-transform:uppercase}
+.workspace-view .app-sidebar .nav-group button{display:grid!important;grid-template-columns:32px minmax(0,1fr)!important;align-items:center!important;gap:9px!important;width:100%!important;min-height:42px!important;padding:5px 9px!important;border:1px solid transparent!important;border-radius:var(--ns-r-sm)!important;background:transparent!important;color:#e9f2ee!important;font-size:13px!important;font-weight:650!important;line-height:1.16!important;text-align:left!important;white-space:normal!important}
+.workspace-view .app-sidebar .nav-group button>span{display:grid!important;place-items:center!important;width:30px!important;height:30px!important;margin:0!important;border:1px solid #315044!important;border-radius:8px!important;background:#153328!important;color:#8fe0bd!important;font-size:14px!important}
+.workspace-view .app-sidebar .nav-group button:hover{border-color:#36584a!important;background:#142c23!important;transform:translateX(2px)}
+.workspace-view .app-sidebar .nav-group button.active{border-color:#44866e!important;background:#1b513f!important;box-shadow:inset 3px 0 #8de0bc!important;color:#fff!important}
+.workspace-view>.app-shell>.page-container{width:100%!important;max-width:var(--ns-content-max)!important;min-width:0!important;margin:0 auto!important;padding:22px clamp(18px,2.2vw,36px) 48px!important;overflow:visible!important}
+.workspace-view .workspace-breadcrumb{margin:0 0 16px!important;padding:0!important}
+.workspace-view .hero{display:flex!important;align-items:flex-end!important;justify-content:space-between!important;gap:20px!important;margin:0 0 18px!important;padding:0 0 18px!important;border-bottom:1px solid var(--ns-line)!important}
+.workspace-view .hero h1{max-width:950px!important;margin:3px 0 0!important;color:var(--ns-ink)!important;font-family:var(--font-geist-sans),Inter,system-ui,sans-serif!important;font-size:clamp(25px,2.4vw,38px)!important;font-weight:720!important;line-height:1.08!important;letter-spacing:-.035em!important}
+.workspace-view .kicker,.workspace-view header>span,.workspace-view section>header span{color:var(--ns-brand)!important;font-size:10px!important;font-weight:820!important;letter-spacing:.14em!important;text-transform:uppercase}
+
+.workspace-view .card,.workspace-view section.card,.workspace-view .transaction-chart,.workspace-view .account-transactions.standalone{border:1px solid var(--ns-line)!important;border-radius:var(--ns-r-lg)!important;background:var(--ns-surface)!important;box-shadow:var(--ns-shadow-sm)!important}
+.workspace-view .card:hover{border-color:var(--ns-line-strong)!important}
+.workspace-view button,.workspace-view input,.workspace-view select{min-height:var(--ns-control-h)}
+.workspace-view button{border-radius:var(--ns-r-sm);font-weight:700}
+.workspace-view input,.workspace-view select,.workspace-view textarea{border:1px solid var(--ns-line-strong)!important;border-radius:var(--ns-r-sm)!important;background:#fff!important;color:var(--ns-ink)!important;box-shadow:inset 0 1px 1px rgba(11,36,27,.025)}
+.workspace-view input:hover,.workspace-view select:hover,.workspace-view textarea:hover{border-color:#91aea1!important}
+.workspace-view input:focus,.workspace-view select:focus,.workspace-view textarea:focus{border-color:var(--ns-brand)!important;box-shadow:0 0 0 3px rgba(8,122,91,.12)!important}
+.workspace-view table{width:100%;border-collapse:separate;border-spacing:0;background:#fff}
+.workspace-view th{padding:11px 13px;border-bottom:1px solid var(--ns-line);background:var(--ns-surface-soft);color:var(--ns-muted);font-size:11px;letter-spacing:.05em;text-align:left;text-transform:uppercase}
+.workspace-view td{padding:12px 13px;border-bottom:1px solid #e8eeeb;font-size:13px}
+.workspace-view tr:hover td{background:#f8fbf9}
+.workspace-view [role="dialog"],.workspace-view .modal{z-index:var(--ns-z-modal)!important;border-radius:var(--ns-r-xl)!important;box-shadow:0 28px 90px rgba(5,24,17,.25)!important}
+.workspace-view .status-healthy{color:var(--ns-success)}.workspace-view .status-watch{color:var(--ns-warning)}.workspace-view .status-critical{color:var(--ns-danger)}
+
+@media(max-width:1180px){:root{--ns-sidebar-w:224px}.workspace-view>.app-shell>.page-container{padding-inline:20px!important}.workspace-view .app-sidebar .nav-group button{font-size:12px!important}}
+@media(max-width:950px){
+  :root{--ns-header-h:58px}
+  .workspace-view>.app-shell{display:block!important}
+  .workspace-view>.app-shell>.app-sidebar{position:fixed!important;top:var(--ns-header-h)!important;left:0!important;z-index:var(--ns-z-drawer)!important;width:min(86vw,330px)!important;height:calc(100dvh - var(--ns-header-h))!important;padding:14px 11px calc(26px + env(safe-area-inset-bottom))!important;transform:translate3d(-104%,0,0)!important;visibility:hidden!important;pointer-events:none!important;box-shadow:20px 0 60px rgba(2,16,10,.4)!important}
+  .workspace-view>.app-shell>.app-sidebar.mobile-open{transform:translate3d(0,0,0)!important;visibility:visible!important;pointer-events:auto!important}
+  .workspace-view .mobile-nav-backdrop{z-index:calc(var(--ns-z-drawer) - 1)!important;inset:var(--ns-header-h) 0 0!important;height:calc(100dvh - var(--ns-header-h))!important;background:rgba(5,18,13,.58)!important;backdrop-filter:blur(4px)}
+  .workspace-view>.app-shell>.page-container{padding:16px 14px 36px!important}
+  .workspace-view .hero{align-items:flex-start!important;flex-direction:column!important;gap:12px!important}.workspace-view .hero h1{font-size:clamp(24px,5vw,32px)!important}
+}
+@media(max-width:600px){
+  .workspace-view>.app-topbar{padding-inline:9px!important}
+  .workspace-view>.app-shell>.page-container{padding:12px 9px 30px!important}
+  .workspace-view .workspace-breadcrumb{margin-bottom:12px!important}.workspace-view .history-controls button span{display:none}
+  .workspace-view .hero{margin-bottom:14px!important;padding-bottom:14px!important}.workspace-view .hero h1{font-size:24px!important;line-height:1.12!important}
+  .workspace-view .card,.workspace-view section.card,.workspace-view .transaction-chart,.workspace-view .account-transactions.standalone{border-radius:12px!important}
+  .workspace-view table{display:block;max-width:100%;overflow-x:auto;-webkit-overflow-scrolling:touch}
+}
+@media(max-width:950px) and (orientation:landscape){.workspace-view>.app-shell>.app-sidebar{width:min(48vw,330px)!important}.workspace-view>.app-shell>.page-container{padding-block:12px 26px!important}}
+@media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}.workspace-view *{scroll-behavior:auto!important;transition-duration:.01ms!important}}

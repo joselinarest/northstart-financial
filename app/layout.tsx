@@ -22,6 +22,7 @@ import './paper-trading-simulator.css';
 import './holding-disclosure.css';
 import './selected-account-plan.css';
 import './responsive-mobile.css';
+import './design-system.css';
 import HoldingDisclosureController from './holding-disclosure-controller';
 
 const geistSans = Geist({

@@ -767,7 +767,7 @@ export function NorthstarWorkspace({ initialTab = "Dashboard", initialInvestment
   return (
     <main className={`workspace-view page-${(pathByTab[tab] || "dashboard").replace(/[^a-z-]/g, "")} ${focusInvestmentAnalysis?"page-research-detail":""}`}>
       <RealtimeSync accessToken={accessToken} refreshMinutes={1} marketOpen={marketPhase==="open"} onStatus={setRealtimeStatus} onEvent={()=>setRealtimeTick(value=>value+1)} />
-      <header>
+      <header className="app-topbar">
         <button className="mobile-nav-toggle" type="button" aria-label={mobileMenuOpen?"Close navigation":"Open navigation"} aria-controls="workspace-navigation" aria-expanded={mobileMenuOpen} onClick={()=>setMobileMenuOpen(value=>!value)}>{mobileMenuOpen?"×":"☰"}</button>
         <div className="brand">
           <span>N</span>
@@ -792,8 +792,8 @@ export function NorthstarWorkspace({ initialTab = "Dashboard", initialInvestment
           <span className="avatar">{displayInitials}</span>
         </div>
       </header>
-      <div className="shell">
-        {mobileMenuOpen&&<button className="mobile-nav-backdrop" aria-label="Close navigation" onClick={()=>setMobileMenuOpen(false)}/>}<aside id="workspace-navigation" aria-label="Main navigation" className={mobileMenuOpen?"mobile-open":""} onClick={event=>{if((event.target as HTMLElement).closest("button"))setMobileMenuOpen(false)}}>
+      <div className="shell app-shell">
+        {mobileMenuOpen&&<button className="mobile-nav-backdrop" aria-label="Close navigation" onClick={()=>setMobileMenuOpen(false)}/>}<aside id="workspace-navigation" aria-label="Main navigation" className={`app-sidebar ${mobileMenuOpen?"mobile-open":""}`} onClick={event=>{if((event.target as HTMLElement).closest("button"))setMobileMenuOpen(false)}}>
           {visibleNavigationGroups.map(group => <div className="nav-group" key={group.name}><p>{group.name}</p>{group.items.map(([x,icon]) => (
             <button
               key={x}
@@ -830,7 +830,7 @@ export function NorthstarWorkspace({ initialTab = "Dashboard", initialInvestment
             </button>
           </div>
         </aside>
-        <section className="content">
+        <section className="content page-container">
           {actionNotice && <div className="action-toast" role="status">{actionNotice}</div>}
           <nav className="workspace-breadcrumb" aria-label="Page navigation">
             <div className="history-controls" aria-label="Navigation history">
