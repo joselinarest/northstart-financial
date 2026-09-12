@@ -7,7 +7,7 @@ import {runMigrations} from "@/lib/migrations";
 const { Pool } = pg;
 type QueryResult = { rows: Array<Record<string, unknown>>; rowCount: number | null };
 const globalDatabase = globalThis as typeof globalThis & { northstarPool?: InstanceType<typeof Pool>; northstarSchemaReady?: Promise<void>; northstarSchemaVersion?: number; northstarRdsCa?: string; northstarRdsCaReady?: Promise<string> };
-const schemaVersion=13;
+const schemaVersion=14;
 const awsRdsCaUrl="https://truststore.pki.rds.amazonaws.com/global/global-bundle.pem";
 
 async function loadAwsRdsCa(){

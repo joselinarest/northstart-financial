@@ -27,6 +27,7 @@ import ChartDecisionWorkspace from "@/app/chart-decision-workspace";
 import HouseholdMoneyCenter from "@/app/household-money-center";
 import DebtLiabilityCenter from "@/app/debt-liability-center";
 import { useConfirm } from "@/app/confirmation-modal";
+import TransactionNotificationCenter from "@/app/transaction-notification-center";
 
 const opportunities = [
   {
@@ -514,14 +515,14 @@ export function NorthstarWorkspace({ initialTab = "Dashboard", initialInvestment
       return;
     }
     const result = await Notification.requestPermission();
-    if(result==="granted"){localStorage.setItem("northstar-push-enabled","true");setPushEnabled(true)}
-    setNotifyStatus(
-      result === "granted"
-        ? "Device permission granted · server push setup required"
-        : result === "denied"
-          ? "Blocked in browser settings"
-          : "Not enabled",
-    );
+    if(result==="granted"){
+      try{
+        const registration=await navigator.serviceWorker.ready,response=await fetch("/api/notifications/push-subscription",{headers:financeHeaders()}),configuration=await response.json();
+        if(response.ok&&configuration.publicKey){const normalized=String(configuration.publicKey).replace(/-/g,"+").replace(/_/g,"/"),padded=normalized+"=".repeat((4-normalized.length%4)%4),applicationServerKey=Uint8Array.from(atob(padded),value=>value.charCodeAt(0)),subscription=await registration.pushManager.subscribe({userVisibleOnly:true,applicationServerKey});await fetch("/api/notifications/push-subscription",{method:"POST",headers:financeHeaders(),body:JSON.stringify(subscription.toJSON())})}
+        localStorage.setItem("northstar-push-enabled","true");setPushEnabled(true);setNotifyStatus(configuration.configured?"Northstar alerts ON · secure push registered":"Device permission granted · push provider setup required");return;
+      }catch(error){setNotifyStatus(error instanceof Error?error.message:"Push registration failed");return}
+    }
+    setNotifyStatus(result === "denied" ? "Blocked in browser settings" : "Not enabled");
   };
   useEffect(()=>{if(!("Notification" in window)){setNotifyStatus("Not supported on this device");return}const appOn=localStorage.getItem("northstar-push-enabled")!=="false"&&Notification.permission==="granted";setPushEnabled(appOn);setNotifyStatus(Notification.permission==="granted"?(appOn?"Northstar alerts ON · browser permission granted":"Northstar alerts OFF · browser permission remains granted"):Notification.permission==="denied"?"Blocked in browser settings":"Not enabled")},[]);
   const notifyClass=notifyStatus.includes("alerts ON")||notifyStatus.startsWith("Enabled")||notifyStatus.startsWith("Device permission")?"enabled":notifyStatus.startsWith("Blocked")?"blocked":notifyStatus.startsWith("Not supported")?"unsupported":notifyStatus.startsWith("Checking")?"checking":"disabled";
@@ -2074,6 +2075,7 @@ export function NorthstarWorkspace({ initialTab = "Dashboard", initialInvestment
                 <small className="setup-note">{marketClock.error||"Credentials are never entered into this browser page or exposed to client code."}</small>
               </div>
             </div>
+            <TransactionNotificationCenter accessToken={accessToken}/>
             <div className="discipline-rules">
               <span>✓ No alerts during sleep hours</span>
               <span>✓ Maximum 3 urgent alerts/day</span>
