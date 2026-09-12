@@ -317,4 +317,39 @@ export const migrations: readonly Migration[] = [
       `CREATE INDEX IF NOT EXISTS idx_property_opportunities_household_status ON property_opportunities(household_id,status,updated_at DESC)`,
     ],
   },
+  {
+    id: "0013_property_financial_account_links",
+    description: "Central-account property roles, allocation-safe transaction context, and reusable classification rules",
+    statements: [
+      `CREATE TABLE IF NOT EXISTS property_account_links (
+        id TEXT PRIMARY KEY, property_id TEXT NOT NULL REFERENCES properties(id) ON DELETE CASCADE,
+        account_id TEXT NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+        role TEXT NOT NULL CHECK(role IN ('PRIMARY_INCOME','MORTGAGE_PAYMENT','OPERATING_EXPENSE','RESERVE','CREDIT_CARD','SECURITY_DEPOSIT','TAX_INSURANCE','LOAN','OTHER')),
+        active BOOLEAN NOT NULL DEFAULT TRUE, notes TEXT,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(property_id,account_id,role)
+      )`,
+      `CREATE TABLE IF NOT EXISTS property_transaction_allocations (
+        id TEXT PRIMARY KEY, property_id TEXT NOT NULL REFERENCES properties(id) ON DELETE CASCADE,
+        transaction_id TEXT NOT NULL REFERENCES transactions(id) ON DELETE CASCADE,
+        allocated_amount_cents BIGINT NOT NULL, category TEXT NOT NULL,
+        capital_improvement BOOLEAN NOT NULL DEFAULT FALSE, assignment_source TEXT NOT NULL DEFAULT 'MANUAL',
+        reviewed BOOLEAN NOT NULL DEFAULT FALSE, notes TEXT,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(property_id,transaction_id,category)
+      )`,
+      `CREATE TABLE IF NOT EXISTS property_transaction_rules (
+        id TEXT PRIMARY KEY, household_id TEXT NOT NULL REFERENCES households(id) ON DELETE CASCADE,
+        property_id TEXT REFERENCES properties(id) ON DELETE CASCADE,
+        account_id TEXT REFERENCES accounts(id) ON DELETE CASCADE,
+        merchant_pattern TEXT, description_pattern TEXT, direction TEXT,
+        property_category TEXT NOT NULL, assignment_mode TEXT NOT NULL DEFAULT 'PROMPT' CHECK(assignment_mode IN ('AUTOMATIC','PROMPT')),
+        active BOOLEAN NOT NULL DEFAULT TRUE, priority INTEGER NOT NULL DEFAULT 100,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+      )`,
+      `CREATE INDEX IF NOT EXISTS idx_property_account_links_account ON property_account_links(account_id,active,property_id)`,
+      `CREATE INDEX IF NOT EXISTS idx_property_allocations_transaction ON property_transaction_allocations(transaction_id,property_id)`,
+      `CREATE INDEX IF NOT EXISTS idx_property_rules_household_active ON property_transaction_rules(household_id,active,priority)`,
+    ],
+  },
 ] as const;
