@@ -99,6 +99,7 @@ button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,te
  .workspace-view>.app-shell>.page-container{width:calc(100% - var(--ns-sidebar-w))!important;max-width:none!important;margin:0 0 0 var(--ns-sidebar-w)!important;padding-inline:max(22px,calc((100vw - var(--ns-sidebar-w) - var(--ns-content-max))/2))!important}
 }
 .workspace-view .page-container,.workspace-view .page-container>*{min-width:0!important}
+.workspace-view.page-real-estate .page-container>.real-estate-command-center{display:grid!important;visibility:visible!important}
 .workspace-view .page-container>section,.workspace-view .page-container>div{max-width:100%}
 .workspace-view .main-grid,.workspace-view .lower-grid,.workspace-view .household,.workspace-view .finance-grid,.workspace-view .real-estate-grid,.workspace-view .property-workflow-grid{min-width:0}
 .workspace-view .main-grid>*,.workspace-view .lower-grid>*,.workspace-view .household>*,.workspace-view .finance-grid>*,.workspace-view .real-estate-grid>*,.workspace-view .property-workflow-grid>*{min-width:0;max-width:100%}
