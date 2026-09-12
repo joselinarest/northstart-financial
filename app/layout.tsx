@@ -24,6 +24,7 @@ import './selected-account-plan.css';
 import './responsive-mobile.css';
 import './design-system.css';
 import HoldingDisclosureController from './holding-disclosure-controller';
+import { ConfirmProvider } from './confirmation-modal';
 
 const geistSans = Geist({
   variable: '--font-geist-sans',
@@ -55,7 +56,7 @@ export default function RootLayout({
         suppressHydrationWarning
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
-        <HoldingDisclosureController />{children}
+        <ConfirmProvider><HoldingDisclosureController />{children}</ConfirmProvider>
       </body>
     </html>
   );

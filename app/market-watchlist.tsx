@@ -1,5 +1,6 @@
 "use client";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useConfirm } from "./confirmation-modal";
 type Item = {
   id: string;
   symbol: string;
@@ -45,6 +46,7 @@ export default function MarketWatchlist({
   onOpen: (symbol: string) => void;
   marketOpen?: boolean;
 }) {
+  const confirmAction = useConfirm();
   const [symbol, setSymbol] = useState(""),
     [purpose, setPurpose] = useState("Research"),
     [target, setTarget] = useState(""),
@@ -141,6 +143,8 @@ export default function MarketWatchlist({
     await load();
   };
   const remove = async (id: string) => {
+    const item=items.find(value=>value.id===id);
+    if(!await confirmAction({title:`Remove ${item?.symbol||"symbol"} from watchlist?`,description:"Its saved price levels and monitoring context will be removed. No holding or transaction is affected.",confirmLabel:"Remove from watchlist",variant:"warning",context:item?.symbol?<strong>{item.symbol} · {item.purpose}</strong>:undefined}))return;
     await fetch("/api/watchlist", {
       method: "DELETE",
       headers: headers(),
