@@ -1,6 +1,7 @@
 "use client";
 import {Component,type ErrorInfo,type ReactNode} from "react";
 import RealEstateWorkspace from "./real-estate-workspace";
+import {AppPanel,SectionHeader} from "./ui/app-primitives";
 
 class PropertyWorkspaceBoundary extends Component<{children:ReactNode},{failed:boolean,message:string}>{
  state={failed:false,message:""};
@@ -10,7 +11,7 @@ class PropertyWorkspaceBoundary extends Component<{children:ReactNode},{failed:b
 }
 
 export default function RealEstateCommandCenter(){return <section className="real-estate-command-center">
- <header className="property-command-head"><div><span>HOUSEHOLD REAL ESTATE</span><h2>Property portfolio command center</h2><p>Track where you live, rental operations, property-linked cash flow, debt, reserves, projects, and potential purchases in one place.</p></div><div className="property-command-actions"><a href="#owned-properties">Manage properties</a><a href="#property-opportunities">Analyze a purchase</a></div></header>
+ <AppPanel className="property-command-head"><SectionHeader eyebrow="HOUSEHOLD REAL ESTATE" title="Property portfolio command center" description="Track where you live, rental operations, property-linked cash flow, debt, reserves, projects, and potential purchases in one place." action={<div className="property-command-actions"><a href="#owned-properties">Manage properties</a><a href="#property-opportunities">Analyze a purchase</a></div>}/></AppPanel>
  <div className="property-workflow-grid" aria-label="Real estate workflows">
   <article><i>01</i><div><b>Owned & occupied</b><p>Home value, mortgage, equity, insurance, maintenance, affordability, and sell/hold timing.</p></div></article>
   <article><i>02</i><div><b>Rental operations</b><p>Rent, occupancy, expenses, reserves, repairs, NOI, cash flow, cap rate, and tenant activity.</p></div></article>
