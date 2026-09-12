@@ -310,7 +310,7 @@ export function NorthstarWorkspace({ initialTab = "Dashboard", initialInvestment
   const [invitedHouseholdName,setInvitedHouseholdName]=useState("");
   const [inviteNotice,setInviteNotice]=useState("");
   const [realtimeTick,setRealtimeTick]=useState(0),[realtimeStatus,setRealtimeStatus]=useState("AUTO REFRESH");
-  const pathByTab: Record<string,string> = { Dashboard:"dashboard", Accounts:"accounts", "Market Intel":"markets", Portfolio:"portfolio", "Real Estate":"real-estate", "Professional Charts":"charts", "Market News":"market-news", "Growth Finder":"growth", "Bills & cards":"cash-flow", "Daily Action Plan":"daily-action-plan", Liabilities:"debt", Household:"household", "Ask Northstar":"assistant", "Prepare Trade":"daily-action-plan", "Paper Simulator":"simulation", Journal:"journal", Learn:"academy", Settings:"settings", Help:"help" };
+  const pathByTab: Record<string,string> = { Dashboard:"dashboard", Accounts:"accounts", "Account Transactions":"account-transactions", "Market Intel":"markets", Portfolio:"portfolio", "Real Estate":"real-estate", "Professional Charts":"charts", "Market News":"market-news", "Growth Finder":"growth", "Bills & cards":"cash-flow", "Daily Action Plan":"daily-action-plan", Liabilities:"debt", Household:"household", "Ask Northstar":"assistant", "Prepare Trade":"daily-action-plan", "Paper Simulator":"simulation", Journal:"journal", Learn:"academy", Settings:"settings", Help:"help" };
   const navigate = (next:string) => { window.location.assign(`/workspace/${pathByTab[next] || "dashboard"}`); };
   const marketPages = ["Market Intel", "Professional Charts", "Market News", "Growth Finder"];
   const breadcrumbParent = marketPages.includes(tab) && tab !== "Market Intel" ? "Market Intel" : null;
