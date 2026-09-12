@@ -93,10 +93,11 @@ export default function ConnectedHoldingsAnalysis({
       } catch {}
     };
     refresh();
-    const timer = setInterval(refresh, 60000);
+    const update=()=>void refresh();
+    window.addEventListener("northstar:portfolio-changed",update);
     return () => {
       active = false;
-      clearInterval(timer);
+      window.removeEventListener("northstar:portfolio-changed",update);
     };
   }, [accessToken, holdings]);
   const analyze = async () => {

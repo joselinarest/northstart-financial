@@ -114,13 +114,11 @@ export default function MarketWatchlist({
       return;
     }
     load();
-    const timer = setInterval(() => {
-        if (document.visibilityState === "visible") load();
-      }, 15000),
-      update = () => load();
+    const update = () => {
+      if (document.visibilityState === "visible") void load();
+    };
     window.addEventListener("northstar:realtime", update);
     return () => {
-      clearInterval(timer);
       window.removeEventListener("northstar:realtime", update);
     };
   }, [load, marketOpen]);
