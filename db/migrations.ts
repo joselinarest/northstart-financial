@@ -252,4 +252,69 @@ export const migrations: readonly Migration[] = [
       `CREATE INDEX IF NOT EXISTS idx_planned_actions_security ON planned_actions(security_id,account_id,created_at DESC)`,
     ],
   },
+  {
+    id: "0012_real_estate_operations",
+    description: "Property ownership, operating activity, debt, occupancy, projects, watchlists, and historical performance",
+    statements: [
+      `ALTER TABLE properties ADD COLUMN IF NOT EXISTS use_type TEXT NOT NULL DEFAULT 'OTHER'`,
+      `ALTER TABLE properties ADD COLUMN IF NOT EXISTS ownership_bps INTEGER NOT NULL DEFAULT 10000`,
+      `ALTER TABLE properties ADD COLUMN IF NOT EXISTS acquisition_date DATE`,
+      `ALTER TABLE properties ADD COLUMN IF NOT EXISTS include_in_net_worth BOOLEAN NOT NULL DEFAULT TRUE`,
+      `ALTER TABLE properties ADD COLUMN IF NOT EXISTS include_in_cash_flow BOOLEAN NOT NULL DEFAULT TRUE`,
+      `ALTER TABLE properties ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'ACTIVE'`,
+      `ALTER TABLE properties ADD COLUMN IF NOT EXISTS reserve_balance_cents BIGINT NOT NULL DEFAULT 0`,
+      `ALTER TABLE properties ADD COLUMN IF NOT EXISTS target_reserve_cents BIGINT NOT NULL DEFAULT 0`,
+      `CREATE TABLE IF NOT EXISTS property_loans (
+        id TEXT PRIMARY KEY, property_id TEXT NOT NULL REFERENCES properties(id) ON DELETE CASCADE,
+        lender TEXT, loan_type TEXT NOT NULL DEFAULT 'FIXED', original_balance_cents BIGINT,
+        current_balance_cents BIGINT NOT NULL, interest_rate_bps INTEGER, monthly_payment_cents BIGINT,
+        principal_payment_cents BIGINT, interest_payment_cents BIGINT, next_due_at DATE,
+        maturity_date DATE, rate_reset_at DATE, created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+      )`,
+      `CREATE TABLE IF NOT EXISTS property_transactions (
+        id TEXT PRIMARY KEY, property_id TEXT NOT NULL REFERENCES properties(id) ON DELETE CASCADE,
+        transaction_id TEXT REFERENCES transactions(id) ON DELETE SET NULL, occurred_at DATE NOT NULL,
+        direction TEXT NOT NULL CHECK(direction IN ('INCOME','EXPENSE')), category TEXT NOT NULL,
+        amount_cents BIGINT NOT NULL, capital_improvement BOOLEAN NOT NULL DEFAULT FALSE,
+        description TEXT, vendor TEXT, notes TEXT, created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+      )`,
+      `CREATE TABLE IF NOT EXISTS property_occupancies (
+        id TEXT PRIMARY KEY, property_id TEXT NOT NULL REFERENCES properties(id) ON DELETE CASCADE,
+        occupancy_type TEXT NOT NULL CHECK(occupancy_type IN ('TENANT','GUEST','OWNER','VACANT')),
+        display_name TEXT, start_at DATE NOT NULL, end_at DATE, rent_cents BIGINT,
+        deposit_cents BIGINT, status TEXT NOT NULL DEFAULT 'ACTIVE', metadata_json JSONB NOT NULL DEFAULT '{}'::jsonb
+      )`,
+      `CREATE TABLE IF NOT EXISTS property_projects (
+        id TEXT PRIMARY KEY, property_id TEXT NOT NULL REFERENCES properties(id) ON DELETE CASCADE,
+        title TEXT NOT NULL, project_type TEXT NOT NULL DEFAULT 'MAINTENANCE', vendor TEXT,
+        estimated_cost_cents BIGINT, actual_cost_cents BIGINT, status TEXT NOT NULL DEFAULT 'PLANNED',
+        due_at DATE, warranty_expires_at DATE, notes TEXT, created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+      )`,
+      `CREATE TABLE IF NOT EXISTS property_budgets (
+        id TEXT PRIMARY KEY, property_id TEXT NOT NULL REFERENCES properties(id) ON DELETE CASCADE,
+        year INTEGER NOT NULL, category TEXT NOT NULL, budget_cents BIGINT NOT NULL,
+        UNIQUE(property_id,year,category)
+      )`,
+      `CREATE TABLE IF NOT EXISTS property_snapshots (
+        id TEXT PRIMARY KEY, property_id TEXT NOT NULL REFERENCES properties(id) ON DELETE CASCADE,
+        captured_at DATE NOT NULL, estimated_value_cents BIGINT NOT NULL, debt_cents BIGINT NOT NULL DEFAULT 0,
+        income_cents BIGINT NOT NULL DEFAULT 0, expense_cents BIGINT NOT NULL DEFAULT 0,
+        noi_cents BIGINT NOT NULL DEFAULT 0, occupancy_bps INTEGER, source TEXT NOT NULL,
+        UNIQUE(property_id,captured_at)
+      )`,
+      `CREATE TABLE IF NOT EXISTS property_opportunities (
+        id TEXT PRIMARY KEY, household_id TEXT NOT NULL REFERENCES households(id) ON DELETE CASCADE,
+        name TEXT NOT NULL, address TEXT, strategy TEXT NOT NULL, asking_price_cents BIGINT,
+        target_price_cents BIGINT, required_cap_rate_bps INTEGER, required_cash_flow_cents BIGINT,
+        assumptions_json JSONB NOT NULL DEFAULT '{}'::jsonb, notes TEXT, status TEXT NOT NULL DEFAULT 'WATCH',
+        created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP, updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+      )`,
+      `CREATE INDEX IF NOT EXISTS idx_property_transactions_property_date ON property_transactions(property_id,occurred_at DESC)`,
+      `CREATE INDEX IF NOT EXISTS idx_property_loans_property ON property_loans(property_id)`,
+      `CREATE INDEX IF NOT EXISTS idx_property_projects_property_status ON property_projects(property_id,status,due_at)`,
+      `CREATE INDEX IF NOT EXISTS idx_property_snapshots_property_date ON property_snapshots(property_id,captured_at DESC)`,
+      `CREATE INDEX IF NOT EXISTS idx_property_opportunities_household_status ON property_opportunities(household_id,status,updated_at DESC)`,
+    ],
+  },
 ] as const;
