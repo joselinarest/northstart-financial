@@ -2,6 +2,7 @@
 import {Component,type ErrorInfo,type ReactNode} from "react";
 import RealEstateWorkspace from "./real-estate-workspace";
 import {AppPanel,SectionHeader} from "./ui/app-primitives";
+import {RealEstateAuthProvider} from "./real-estate-auth-context";
 
 class PropertyWorkspaceBoundary extends Component<{children:ReactNode},{failed:boolean,message:string}>{
  state={failed:false,message:""};
@@ -10,7 +11,7 @@ class PropertyWorkspaceBoundary extends Component<{children:ReactNode},{failed:b
  render(){return this.state.failed?<section className="property-module-error" role="alert"><span>PROPERTY DATA RECOVERY</span><h3>The property workspace could not finish loading</h3><p>Your saved property records were not changed. Refresh this module after the current deployment or database migration completes.</p><small>{this.state.message}</small><button type="button" onClick={()=>this.setState({failed:false,message:""})}>Retry property workspace</button></section>:this.props.children}
 }
 
-export default function RealEstateCommandCenter(){return <section className="real-estate-command-center">
+export default function RealEstateCommandCenter({accessToken}:{accessToken:string}){return <section className="real-estate-command-center">
  <AppPanel className="property-command-head"><SectionHeader eyebrow="HOUSEHOLD REAL ESTATE" title="Property portfolio command center" description="Track where you live, rental operations, property-linked cash flow, debt, reserves, projects, and potential purchases in one place." action={<div className="property-command-actions"><a href="#owned-properties">Manage properties</a><a href="#property-opportunities">Analyze a purchase</a></div>}/></AppPanel>
  <div className="property-workflow-grid" aria-label="Real estate workflows">
   <article><i>01</i><div><b>Owned & occupied</b><p>Home value, mortgage, equity, insurance, maintenance, affordability, and sell/hold timing.</p></div></article>
@@ -18,5 +19,5 @@ export default function RealEstateCommandCenter(){return <section className="rea
   <article><i>03</i><div><b>Payment accounts</b><p>Connect central Household accounts to each property without duplicating transactions.</p></div></article>
   <article><i>04</i><div><b>Buy / sell decisions</b><p>Model financing, downside, returns, household safety, due diligence, and maximum offer.</p></div></article>
  </div>
- <div id="owned-properties"><PropertyWorkspaceBoundary><RealEstateWorkspace/></PropertyWorkspaceBoundary></div>
+ <div id="owned-properties"><PropertyWorkspaceBoundary><RealEstateAuthProvider accessToken={accessToken}><RealEstateWorkspace/></RealEstateAuthProvider></PropertyWorkspaceBoundary></div>
  </section>}

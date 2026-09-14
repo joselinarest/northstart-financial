@@ -7,7 +7,7 @@ import {runMigrations} from "@/lib/migrations";
 const { Pool } = pg;
 type QueryResult = { rows: Array<Record<string, unknown>>; rowCount: number | null };
 const globalDatabase = globalThis as typeof globalThis & { northstarPool?: InstanceType<typeof Pool>; northstarSchemaReady?: Promise<void>; northstarSchemaVersion?: number; northstarRdsCa?: string; northstarRdsCaReady?: Promise<string> };
-const schemaVersion=14;
+const schemaVersion=15;
 const awsRdsCaUrl="https://truststore.pki.rds.amazonaws.com/global/global-bundle.pem";
 
 async function loadAwsRdsCa(){
@@ -79,10 +79,12 @@ export class PostgresDatabase {
 export async function database() {
   await loadRuntimeSecrets();
   await loadAwsRdsCa();
-  const local=/(?:localhost|127\.0\.0\.1)/.test(process.env.DATABASE_URL||"");
   // Schema work belongs in deployment/migration jobs. Running it from every
   // serverless cold start consumes scarce RDS slots and serializes requests.
-  const shouldMigrate=local||process.env.AUTO_MIGRATE_DATABASE==="true";
+  // Development can legitimately connect to an AWS-hosted database, so the
+  // application environment—not the database hostname—determines whether the
+  // local dev server should apply pending migrations automatically.
+  const shouldMigrate=process.env.NODE_ENV!=="production"||process.env.AUTO_MIGRATE_DATABASE==="true";
   if(shouldMigrate&&(!globalDatabase.northstarSchemaReady||globalDatabase.northstarSchemaVersion!==schemaVersion))globalDatabase.northstarSchemaReady=(async()=>{const client=await pool().connect();try{await client.query("SELECT pg_advisory_lock(hashtext($1))",["northstar_schema_init"]);for(const statement of schemaStatements)await client.query(postgresSql(statement));await runMigrations(client);globalDatabase.northstarSchemaVersion=schemaVersion}finally{await client.query("SELECT pg_advisory_unlock(hashtext($1))",["northstar_schema_init"]).catch(()=>undefined);client.release()}})().catch(error=>{globalDatabase.northstarSchemaReady=undefined;throw error});
   if(globalDatabase.northstarSchemaReady)await globalDatabase.northstarSchemaReady;
   return new PostgresDatabase();

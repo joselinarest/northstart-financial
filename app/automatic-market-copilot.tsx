@@ -1,53 +1,1408 @@
 "use client";
-import {useEffect,useRef,useState} from "react";
+import { useEffect, useRef, useState } from "react";
 
-type Candidate={symbol:string;name?:string;price:number;dayChange:number;score:number;setup:string;action:string;stableBuy?:boolean;rawBuy?:boolean;decisionStatus?:string;decisionChangedAt?:string;tier?:string;companyStage?:string;portfolioRole?:string;trend:string;ema20:number;sma50:number;sma100?:number|null;sma200?:number|null;rsi:number;relVol:number;support:number;resistance:number;invalidation:number;riskPct:number;asOf:string;dataFreshness?:"FRESH"|"DELAYED"|"STALE";dataAgeSeconds?:number;forecast?:string;missingData?:boolean;analysisCoverage?:string;fairValue?:number|null;fairValueLow?:number|null;fairValueHigh?:number|null;fairValueSource?:string;fairValueAsOf?:string|null;fundamentals?:{revenueGrowth3Y:number|null;revenueGrowth5Y:number|null;epsGrowth3Y:number|null;epsGrowth5Y:number|null;pe:number|null;forwardPE:number|null;peg:number|null;grossMargin:number|null;operatingMargin:number|null;marketCap:number|null};news?:Array<{headline?:string;source?:string}>};
-type Strategy="swing"|"long-term";
-
-const securityNames:Record<string,string>={
- AAPL:"Apple Inc.",ABNB:"Airbnb, Inc.",AMD:"Advanced Micro Devices, Inc.",AMZN:"Amazon.com, Inc.",AVGO:"Broadcom Inc.",BND:"Vanguard Total Bond Market ETF",BWXT:"BWX Technologies, Inc.",CAT:"Caterpillar Inc.",CAVA:"CAVA Group, Inc.",CCJ:"Cameco Corporation",CEG:"Constellation Energy Corporation",COST:"Costco Wholesale Corporation",CRM:"Salesforce, Inc.",CRWD:"CrowdStrike Holdings, Inc.",CVX:"Chevron Corporation",DDOG:"Datadog, Inc.",DIA:"SPDR Dow Jones Industrial Average ETF Trust",DUOL:"Duolingo, Inc.",GOOGL:"Alphabet Inc.",HD:"The Home Depot, Inc.",IWM:"iShares Russell 2000 ETF",JPM:"JPMorgan Chase & Co.",LEU:"Centrus Energy Corp.",LLY:"Eli Lilly and Company",MA:"Mastercard Incorporated",MELI:"MercadoLibre, Inc.",META:"Meta Platforms, Inc.",MSFT:"Microsoft Corporation",NEE:"NextEra Energy, Inc.",NET:"Cloudflare, Inc.",NFLX:"Netflix, Inc.",NLR:"VanEck Uranium and Nuclear ETF",NVDA:"NVIDIA Corporation",OKLO:"Oklo Inc.",ORCL:"Oracle Corporation",PLTR:"Palantir Technologies Inc.",QQQ:"Invesco QQQ Trust",SCHD:"Schwab U.S. Dividend Equity ETF",SHOP:"Shopify Inc.",SMR:"NuScale Power Corporation",SOFI:"SoFi Technologies, Inc.",SPY:"SPDR S&P 500 ETF Trust",UBER:"Uber Technologies, Inc.",UNH:"UnitedHealth Group Incorporated",URA:"Global X Uranium ETF",V:"Visa Inc.",VST:"Vistra Corp.",VTI:"Vanguard Total Stock Market ETF",VOO:"Vanguard S&P 500 ETF",VXUS:"Vanguard Total International Stock ETF",WMT:"Walmart Inc.",XOM:"Exxon Mobil Corporation"
+type Candidate = {
+  symbol: string;
+  name?: string;
+  price: number;
+  dayChange: number;
+  score: number;
+  setup: string;
+  action: string;
+  stableBuy?: boolean;
+  rawBuy?: boolean;
+  decisionStatus?: string;
+  decisionChangedAt?: string;
+  tier?: string;
+  companyStage?: string;
+  portfolioRole?: string;
+  trend: string;
+  ema20: number;
+  sma50: number;
+  sma100?: number | null;
+  sma200?: number | null;
+  rsi: number;
+  relVol: number;
+  support: number;
+  resistance: number;
+  invalidation: number;
+  riskPct: number;
+  asOf: string;
+  dataFreshness?: "FRESH" | "DELAYED" | "STALE";
+  dataAgeSeconds?: number;
+  forecast?: string;
+  missingData?: boolean;
+  analysisCoverage?: string;
+  fairValue?: number | null;
+  fairValueLow?: number | null;
+  fairValueHigh?: number | null;
+  fairValueSource?: string;
+  fairValueAsOf?: string | null;
+  fundamentals?: {
+    revenueGrowth3Y: number | null;
+    revenueGrowth5Y: number | null;
+    epsGrowth3Y: number | null;
+    epsGrowth5Y: number | null;
+    pe: number | null;
+    forwardPE: number | null;
+    peg: number | null;
+    grossMargin: number | null;
+    operatingMargin: number | null;
+    marketCap: number | null;
+  };
+  news?: Array<{ headline?: string; source?: string }>;
 };
-const actionLabel=(action:string)=>action==="Prepare conditional buy"?"BUY ON CONFIRMATION":action==="Add / buy more plan"?"ACCUMULATE":action==="Buy research"?"BUY CANDIDATE — COMPLETE PRICE CHECK":action==="Reduce / sell plan"?"REDUCE / SELL REVIEW":action==="No action — monitor"?"HOLD — NO PURCHASE":action==="Avoid — not owned"?"DO NOT BUY — valuation too high":action==="Avoid — bearish, not owned"?"DO NOT BUY — bearish setup":action.toUpperCase();
+type Strategy = "swing" | "long-term";
 
-export default function AutomaticMarketCopilot({onSelect,onPrepare,accessToken="",initialStrategy="swing",ownedSymbols=[],holdings=[],accountName="No investment account selected",accountPurpose="General investing",selectedAccountType="Investment account",marketPhase="closed",refreshMinutes=1}:{onSelect:(symbol:string)=>void;onPrepare?:(symbol:string,action:string)=>void;accessToken?:string;initialStrategy?:Strategy;ownedSymbols?:string[];holdings?:Array<Record<string,any>>;accountName?:string;accountPurpose?:string;selectedAccountType?:string;marketPhase?:string;refreshMinutes?:number}){
- const [data,setData]=useState<{provider?:string;feed?:string;asOf?:string;universeSize?:number;freshCount?:number;actionableMarketData?:boolean;method?:string;candidates?:Candidate[];error?:string}>({});
- const [loading,setLoading]=useState(true),[refresh,setRefresh]=useState(0),strategy:Strategy=initialStrategy;
- const [accountSize,setAccountSize]=useState(25000),[riskPercent,setRiskPercent]=useState(.5),[holdingPeriod,setHoldingPeriod]=useState("2–10 trading days"),[monthly,setMonthly]=useState(500),[accountType,setAccountType]=useState("Roth IRA");
- const [plannedActions,setPlannedActions]=useState<Record<string,string>>({}),[prepareStatus,setPrepareStatus]=useState("");
- const lastAlertKey=useRef("");
- const stabilizeCandidates=(candidates:Candidate[])=>{type Memory={stableBuy:boolean;pendingBuy:boolean;pendingCount:number;changedAt:string};let memory:Record<string,Memory>={};try{memory=JSON.parse(localStorage.getItem(`northstar-decision-memory-${strategy}`)||"{}")}catch{}const now=new Date().toISOString(),next={...memory},stabilized=candidates.map(item=>{const reference=item.fairValue||item.sma200||item.sma100||item.sma50,valuationPass=Boolean(reference)&&item.price<=Number(reference)*1.15,freshEnough=strategy==="long-term"||item.dataFreshness==="FRESH",rawBuy=strategy==="long-term"?item.trend!=="Bearish"&&item.score>=75&&valuationPass&&!item.missingData:item.trend==="Bullish"&&item.score>=60&&item.relVol>=.75&&freshEnough,hardFailure=item.trend==="Bearish"||item.price<=item.invalidation||!freshEnough,previous=next[item.symbol];if(!previous){next[item.symbol]={stableBuy:rawBuy,pendingBuy:rawBuy,pendingCount:0,changedAt:now}}else if(hardFailure&&previous.stableBuy){next[item.symbol]={stableBuy:false,pendingBuy:false,pendingCount:0,changedAt:now}}else if(rawBuy===previous.stableBuy){next[item.symbol]={...previous,pendingBuy:rawBuy,pendingCount:0}}else{const count=previous.pendingBuy===rawBuy?previous.pendingCount+1:1,required=rawBuy?1:2;next[item.symbol]=count>=required?{stableBuy:rawBuy,pendingBuy:rawBuy,pendingCount:0,changedAt:now}:{...previous,pendingBuy:rawBuy,pendingCount:count}}const state=next[item.symbol],decisionStatus=!freshEnough?"Time-sensitive action disabled until fresh market data arrives":hardFailure?"Material invalidation detected":state.pendingCount>0?`${state.pendingCount} confirmation pending toward ${state.pendingBuy?"BUY":"WAIT"}`:`Current conditional decision confirmed`;return{...item,rawBuy,stableBuy:state.stableBuy,decisionStatus,decisionChangedAt:state.changedAt}});localStorage.setItem(`northstar-decision-memory-${strategy}`,JSON.stringify(next));return stabilized};
- const prepareAction=async(symbol:string,action:string,suggestedAction:string,reason:string)=>{const householdId=localStorage.getItem("northstar-household-id");setPrepareStatus(`Saving ${symbol}…`);try{const response=await fetch("/api/watchlist",{method:"POST",headers:{"Content-Type":"application/json",...(accessToken?{Authorization:`Bearer ${accessToken}`}:{}) ,...(householdId?{"X-Household-ID":householdId}:{})},body:JSON.stringify({symbol,purpose:action,notes:`Northstar suggestion: ${suggestedAction}. ${reason} · ${strategy} · ${holdingPeriod}`})}),body=await response.json();if(!response.ok)throw new Error(body.error||"Unable to prepare action");sessionStorage.setItem("northstar-prepared-action",JSON.stringify({symbol,action,suggestedAction,reason,strategy,holdingPeriod,createdAt:new Date().toISOString()}));setPrepareStatus(`✓ ${symbol} added as “${action}”${action!==suggestedAction?` (Northstar suggested “${suggestedAction}”)`:""}`);onPrepare?.(symbol,action)}catch(error){setPrepareStatus(error instanceof Error?error.message:"Unable to prepare action")}};
- useEffect(()=>{if(marketPhase!=="open"&&refresh===0){setLoading(false);return}let active=true;setLoading(true);fetch(`/api/market/candidates?strategy=${strategy}&analysisVersion=4&refresh=${Date.now()}`,{cache:"no-store",headers:{"Cache-Control":"no-cache"}}).then(async response=>({ok:response.ok,body:await response.json()})).then(({ok,body})=>{if(active)setData(ok?{...body,candidates:stabilizeCandidates(body.candidates||[])}:{error:body.error||"Market scan unavailable"})}).catch(()=>{if(active)setData({error:"Market scan unavailable"})}).finally(()=>{if(active)setLoading(false)});return()=>{active=false}},[refresh,strategy,marketPhase]);
- useEffect(()=>{const update=()=>setRefresh(value=>value+1);window.addEventListener("northstar:realtime",update);return()=>window.removeEventListener("northstar:realtime",update)},[]);
- useEffect(()=>{if(marketPhase!=="open")return;const timer=window.setInterval(()=>{if(document.visibilityState==="visible")setRefresh(value=>value+1)},Math.max(1,refreshMinutes)*60000);return()=>window.clearInterval(timer)},[marketPhase,refreshMinutes]);
- const accountTotal=holdings.reduce((sum,holding)=>sum+Number(holding.market_value_cents||0),0)/100,holdingContext=(symbol:string)=>{const holding=holdings.find(item=>String(item.ticker||"").toUpperCase()===symbol.toUpperCase()),value=Number(holding?.market_value_cents||0)/100;return{holding,value,weight:accountTotal?value/accountTotal*100:0}};
- const swingClock=new Date(),etParts=new Intl.DateTimeFormat("en-US",{timeZone:"America/New_York",hour:"2-digit",minute:"2-digit",hour12:false}).formatToParts(swingClock),etMinutes=Number(etParts.find(part=>part.type==="hour")?.value||0)*60+Number(etParts.find(part=>part.type==="minute")?.value||0),sessionStage=marketPhase!=="open"?"Premarket / next-session preparation":etMinutes<585?"Opening range · wait for the first 15 minutes":etMinutes<720?"Morning setups":etMinutes<840?"Midday · require stronger liquidity":etMinutes<960?"Power hour · review overnight risk":"Close / after-hours review",dailyRiskBudget=accountSize*.02,perTradeRisk=accountSize*riskPercent/100,openPositions=holdings.filter(item=>Number(item.quantity||0)>0).length,remainingRisk=Math.max(0,dailyRiskBudget-openPositions*perTradeRisk),swingReady=(data.candidates||[]).filter(item=>item.dataFreshness==="FRESH"&&item.trend==="Bullish"&&item.score>=60&&item.relVol>=.75).sort((a,b)=>b.score-a.score).slice(0,3),noTradeReason=!data.candidates?.length?"The live scanner has not produced a qualified setup.":data.actionableMarketData===false?"Current market data is not fresh enough for a time-sensitive entry.":remainingRisk<perTradeRisk?"The remaining daily risk budget is too small for another full-risk setup.":"";
- const actionAlerts=(data.candidates||[]).filter(item=>{const context=holdingContext(item.symbol),isFund=["VTI","VOO","SCHD","VXUS","BND","QQQ","IWM","URA","NLR"].includes(item.symbol),limit=isFund?25:10,owned=Boolean(context.holding)||ownedSymbols.some(symbol=>symbol.toUpperCase()===item.symbol.toUpperCase()),atLimit=owned&&context.weight>=limit,buyReady=!atLimit&&item.stableBuy===true;return (owned&&(item.trend==="Bearish"||context.weight>limit))||buyReady}).slice(0,3);
- useEffect(()=>{if(!actionAlerts.length||!("Notification" in window)||Notification.permission!=="granted"||localStorage.getItem("northstar-push-enabled")==="false")return;const key=actionAlerts.map(item=>`${item.symbol}:${item.trend}:${item.score}`).join("|");if(key===lastAlertKey.current)return;lastAlertKey.current=key;const first=actionAlerts[0],context=holdingContext(first.symbol),isFund=["VTI","VOO","SCHD","VXUS","BND","QQQ","IWM","URA","NLR"].includes(first.symbol),limit=isFund?25:10,owned=Boolean(context.holding)||ownedSymbols.some(symbol=>symbol.toUpperCase()===first.symbol.toUpperCase()),action=owned&&(first.trend==="Bearish"||context.weight>limit)?"Do not buy more — open the sell/trim review":owned?"Review buying more — account size check passed":"New candidate — open account-specific research";new Notification(`Northstar decision review · ${first.symbol}`,{body:`${action}. ${accountName}; screening score ${first.score}/100. Northstar never places an order.`,tag:`northstar-${first.symbol}`})},[data.asOf,strategy,accountName,holdings]);
- return <section className="auto-copilot">
-  <header><div><span>✦ {marketPhase==="open"?"MARKET OPEN · LIVE-SYNCED ACTION LIST":"NEXT MARKET OPEN · RANKED PREPARATION LIST"}</span><h2>{strategy==="swing"?marketPhase==="open"?"Live opportunities ranked for action now":"Stocks to prepare for the next market open":"Ranked investment opportunities for the selected account"}</h2><p>One engine scans current provider data, checks each candidate against the selected account, and proposes buy, buy more, monitor, avoid, or trim review. Every result includes its trigger and invalidation; forecasts remain probabilistic.</p></div><button disabled={loading} onClick={()=>setRefresh(x=>x+1)}>{loading?"Analyzing…":"Run fresh analysis ↻"}</button></header>
-  <div className="copilot-account-context"><b>Suggestions for: {accountName}</b><span>{accountPurpose} · {selectedAccountType} · {holdings.length} holding{holdings.length===1?"":"s"} · ${accountTotal.toLocaleString(undefined,{maximumFractionDigits:0})} analyzed</span><small>Changing the investment account changes ownership, concentration limits, recommendations, and saved trade preparation.</small></div>
-  {strategy==="swing"&&<section className="swing-command-summary"><header><div><span>TODAY'S SWING DASHBOARD · {accountName.toUpperCase()}</span><h3>{noTradeReason?"NO TRADE NOW":"TOP SETUPS REQUIRE CONFIRMATION"}</h3><p>{noTradeReason||`${swingReady.length} setup${swingReady.length===1?"":"s"} currently pass the stored evidence gate. Recheck the live quote before any manual decision.`}</p></div><strong>{sessionStage}<small>{new Intl.DateTimeFormat("en-US",{hour:"numeric",minute:"2-digit",timeZoneName:"short"}).format(swingClock)} local</small></strong></header><div className="swing-risk-strip"><span><small>DAILY RISK BUDGET</small><b>${dailyRiskBudget.toFixed(0)} · 2.00%</b></span><span><small>RISK / IDEA</small><b>${perTradeRisk.toFixed(0)} · {riskPercent.toFixed(2)}%</b></span><span><small>OPEN POSITIONS</small><b>{openPositions}</b></span><span><small>EST. REMAINING RISK</small><b>${remainingRisk.toFixed(0)}</b></span><span><small>SETUP EXPIRATION</small><b>Today's close</b></span></div>{swingReady.length?<ol>{swingReady.map(item=>{const riskPerShare=Math.max(.01,item.price-item.invalidation),shares=Math.max(0,Math.floor(Math.min(perTradeRisk,remainingRisk)/riskPerShare)),target1=item.price+riskPerShare*2,target2=item.price+riskPerShare*3;return <li key={item.symbol}><b>{item.symbol} · {shares>0?`PREPARE ${shares} SHARES`:"NO NEW POSITION"}</b><span>Entry only after a 5m close above ${item.resistance.toFixed(2)} with RVOL ≥ 1.5</span><dl><div><dt>Preferred entry</dt><dd>${item.resistance.toFixed(2)}–${(item.resistance+riskPerShare*.15).toFixed(2)}</dd></div><div><dt>Stop</dt><dd>${item.invalidation.toFixed(2)}</dd></div><div><dt>Target 1 / 2</dt><dd>${target1.toFixed(2)} / ${target2.toFixed(2)}</dd></div><div><dt>Risk</dt><dd>${(shares*riskPerShare).toFixed(0)} · {riskPercent.toFixed(2)}%</dd></div></dl><small>Valid for this session only · {item.score}% evidence score · wait if spread, QQQ direction, volume, or catalyst check fails.</small></li>})}</ol>:<div className="swing-no-trade"><b>NO-TRADE DISCIPLINE</b><span>{noTradeReason} Continue monitoring; Northstar will reassess on the next one-minute refresh.</span></div>}<footer><b>Next action:</b> {marketPhase==="open"?sessionStage:"Prepare the watchlist now; revalidate gaps, spread, volume, VWAP, index direction, and news after the market opens."}</footer></section>}
-  <ol className="smart-opportunity-criteria" aria-label="Smart opportunity ranking criteria"><li><b>Account fit</b><span>Ownership, purpose and concentration</span></li><li><b>Market structure</b><span>Trend, moving averages and momentum</span></li><li><b>Participation</b><span>Volume, liquidity and confirmation</span></li><li><b>Business value</b><span>Fundamentals, valuation and dividends</span></li><li><b>Action plan</b><span>Entry, invalidation and reward/risk</span></li></ol>
-  {strategy==="swing"&&<div className="market-day-playbook"><b>CONDITIONAL MARKET-DAY MAP · NOT A PROMISED PREDICTION</b><span><strong>Pre-market</strong> Re-rank gaps, news, liquidity, index and sector direction.</span><span><strong>Opening 30 minutes</strong> Wait for spread, volume and the opening range; reject candidates that lose invalidation.</span><span><strong>Midday</strong> Act only on a confirmed hold/retest with sufficient volume and at least 2:1 modeled reward/risk.</span><span><strong>Final hour</strong> Avoid chasing; reassess trend, target proximity, overnight catalyst risk and position size.</span></div>}
-  {data.error?<div className="auto-error"><b>Live shortlist unavailable</b><span>{data.error}</span></div>:<><div className="auto-method"><b><i className="live-market-dot" />{data.provider||"Provider"} {data.feed?.toUpperCase()} · {data.universeSize||0} securities screened and ranked</b><span>{data.method}</span><time>{data.asOf?`Updated ${new Date(data.asOf).toLocaleString()} · auto-refresh 60s`:"Calculating…"}</time></div>{strategy==="swing"&&data.actionableMarketData===false&&<div className="auto-error" role="status"><b>Time-sensitive actions paused</b><span>The latest candidate bars are not fresh enough for an immediate swing entry. Rankings remain visible for research; Northstar will not label them ready until current market data arrives.</span></div>}
-  {!!actionAlerts.length&&<section className="market-action-alert" role="alert"><header><b>🔥 {strategy==="long-term"?"HOT RETIREMENT PROPOSALS":"HOT SWING DECISIONS"} · ACTION REVIEW NOW</b><span>All actions below are calculated for {accountName} ({accountPurpose}). Northstar never places an order.</span></header>{actionAlerts.map(item=>{const context=holdingContext(item.symbol),isFund=["VTI","VOO","SCHD","VXUS","BND","QQQ","IWM","URA","NLR"].includes(item.symbol),limit=isFund?25:10,owned=Boolean(context.holding)||ownedSymbols.some(symbol=>symbol.toUpperCase()===item.symbol.toUpperCase()),atLimit=owned&&context.weight>=limit,overLimit=owned&&context.weight>limit,decisionReference=item.fairValue||item.sma200||item.sma100||item.sma50,referenceKind=item.fairValue?"Fundamental fair-value model":item.sma200?"200-day market reference":item.sma100?"100-day market reference":"50-day market reference",valuationPass=item.price<=decisionReference*1.1,readyToBuy=!atLimit&&item.stableBuy===true,action=overLimit?"DO NOT BUY MORE · TRIM REVIEW":owned&&item.trend==="Bearish"?"DO NOT BUY MORE · RISK REVIEW":readyToBuy?(strategy==="long-term"?(owned?"YES — RETIREMENT BUY-MORE PROPOSAL":"YES — RETIREMENT ACCUMULATION PROPOSAL"):(owned?"YES — PREPARE SWING ADD":"YES — PREPARE A SWING BUY")):"NO ACTION · CRITERIA NOT MET";return <article className={readyToBuy?"hot-buy":"hot-risk"} key={item.symbol}><div><i aria-label={readyToBuy?"Buy criteria passed":"Risk review required"}>{readyToBuy?"👍":"⚠"}</i><strong>{action} · {item.symbol}</strong><span>{item.name||securityNames[item.symbol]||"Security"}</span></div><dl><div><dt>Selected account weight</dt><dd>{owned?`${context.weight.toFixed(1)}% / ${limit}% guide`:"Not owned"}</dd></div><div><dt>Current price</dt><dd>${item.price.toFixed(2)}</dd></div><div><dt>{strategy==="long-term"?"Accumulation reference":"Required buy trigger"}</dt><dd>{strategy==="long-term"?`At/below $${decisionReference.toFixed(2)}`:`$${item.resistance.toFixed(2)} + model confirmation`}</dd></div><div><dt>{referenceKind}</dt><dd>${decisionReference.toFixed(2)}</dd></div></dl><p><b>Action now:</b> {overLimit?`Do not buy more. This position exceeds the ${limit}% size guide for ${accountName}; open Portfolio for the consistent partial-trim calculation.`:readyToBuy?(strategy==="long-term"?`The account-size check passed. Review a staged contribution for ${accountName}; this is a multi-year proposal, not a swing entry.`:`The account-size and market checks passed. Prepare the swing plan with invalidation near $${item.invalidation.toFixed(2)}.`):`Do not add now. Northstar’s account-size or market-evidence criteria did not pass.`}</p><button type="button" onClick={()=>onSelect(item.symbol)}>Open complete {strategy==="long-term"?"retirement":"swing"} analysis for {item.symbol} →</button></article>})}</section>}
-  <div className="proposal-settings"><div><span>{strategy==="swing"?"READ-ONLY TRADE PREPARATION MODEL":"LONG-TERM CONTRIBUTION MODEL"}</span><b>{strategy==="swing"?"Compare buy, sell, or wait using confirmation, risk, reward, and time":"Build a diversified core before emerging-growth satellites"}</b></div>{strategy==="swing"?<><label>Planning capital $<input type="number" min="1000" step="1000" value={accountSize} onChange={e=>setAccountSize(Math.max(0,+e.target.value))}/><small>Used only to calculate maximum position size</small></label><label>Maximum risk / idea<select value={riskPercent} onChange={e=>setRiskPercent(+e.target.value)}><option value="0.25">0.25%</option><option value="0.5">0.50%</option><option value="0.75">0.75%</option><option value="1">1.00%</option></select></label><label>Planned holding period<select value={holdingPeriod} onChange={e=>setHoldingPeriod(e.target.value)}><option>1–3 trading days</option><option>2–10 trading days</option><option>2–6 weeks</option><option>Until invalidation or target</option></select></label><strong>${(accountSize*riskPercent/100).toFixed(0)} maximum planned loss · {holdingPeriod}</strong></>:<><label>Monthly contribution $<input type="number" min="0" step="50" value={monthly} onChange={e=>setMonthly(Math.max(0,+e.target.value))}/></label><label>Account type<select value={accountType} onChange={e=>setAccountType(e.target.value)}><option>401(k)</option><option>Roth IRA</option><option>Traditional IRA</option><option>Taxable brokerage</option></select></label><strong>${monthly.toFixed(0)} monthly · {accountType}</strong></>}</div>
-  <div className="auto-grid">
-   {(data.candidates||[]).slice(0,6).map((item,index)=>{
-    const riskPerShare=Math.max(.01,item.price-item.invalidation),maxPlannedLoss=accountSize*riskPercent/100,shares=Math.floor(maxPlannedLoss/riskPerShare),modeledLoss=shares*riskPerShare,target=item.price+2*riskPerShare,isFund=["VTI","VOO","SCHD","VXUS","BND","QQQ","IWM","URA","NLR"].includes(item.symbol),owned=holdingContext(item.symbol),isOwned=Boolean(owned.holding)||ownedSymbols.some(symbol=>symbol.toUpperCase()===item.symbol.toUpperCase()),positionLimit=isFund?25:10,sizeAtLimit=isOwned&&owned.weight>=positionLimit,sizeOverLimit=isOwned&&owned.weight>positionLimit,displayName=item.name&&item.name!==item.symbol?item.name:securityNames[item.symbol]||"Company or fund name unavailable",valuationGap=item.fairValue?((item.price-item.fairValue)/item.fairValue)*100:null,decisionReference=item.fairValue||item.sma200||item.sma100||item.sma50,longTermBuyReady=item.stableBuy===true,suggestedAction=sizeOverLimit?"Reduce / sell plan":sizeAtLimit?"No action — monitor":strategy==="long-term"?(valuationGap!==null&&valuationGap>25?(isOwned?"Reduce / sell plan":"Avoid — not owned"):longTermBuyReady?(isOwned?"Add / buy more plan":"Buy research"):"No action — monitor"):item.trend==="Bearish"?(isOwned?"Reduce / sell plan":"Avoid — bearish, not owned"):item.stableBuy===true?"Prepare conditional buy":"No action — monitor",suggestionReason=sizeOverLimit?`${item.symbol} is ${owned.weight.toFixed(1)}% of ${accountName}, above the ${positionLimit}% ${isFund?"fund":"individual-stock"} size guide. Do not buy more; review a partial reduction using the Portfolio analysis trigger.`:sizeAtLimit?`${item.symbol} is ${owned.weight.toFixed(1)}% of ${accountName}, at the ${positionLimit}% size guide. Hold/monitor; buying more is blocked unless the saved allocation plan changes.`:valuationGap!==null&&valuationGap>25?`Model midpoint is ${Math.abs(valuationGap).toFixed(1)}% below price. ${isOwned?"Review reducing only after taxes, concentration and thesis are checked.":"You do not own this security, so no sell action is proposed."}`:strategy==="long-term"&&(suggestedAction==="Buy research"||suggestedAction==="Add / buy more plan")?`Model favors ${isOwned?"adding to this holding":"researching this candidate for accumulation"}: evidence ${item.score}/100, ${item.trend.toLowerCase()} structure, price within 10% of the ${item.fairValue?"fair-value":"long-term market"} reference, and current weight ${owned.weight.toFixed(1)}% below the ${positionLimit}% guide.`:strategy==="swing"&&suggestedAction==="Prepare conditional buy"?`Bullish continuation is favored at ${item.score}/100 evidence confidence. Entry trigger: hold or close above $${item.resistance.toFixed(2)} with volume; invalidation $${item.invalidation.toFixed(2)}; modeled target $${target.toFixed(2)}.`:item.trend==="Bearish"?`${isOwned?"Owned position: downside risk supports a reduce/sell review.":"Unowned security: bearish evidence means avoid or watch, not sell."} A reclaim above $${item.resistance.toFixed(2)} changes the reading.`:`No action now: evidence is ${item.score}/100 or one of the required checks has not passed. Monitor $${item.resistance.toFixed(2)}.`,availableActions=[suggestedAction,...(strategy==="swing"?[...(sizeAtLimit?[]:["Prepare conditional buy"]),...(isOwned&&!sizeAtLimit?["Add / buy more plan"]:[]),...(isOwned?["Reduce / sell plan"]:[]),"No action — monitor","Call setup review","Put setup review"]:[...(isOwned&&!sizeAtLimit?["Add / buy more plan"]:!isOwned?["Buy research"]:[]),...(isOwned?["Reduce / sell plan"]:[]),"No action — monitor"])].filter((action,index,actions)=>actions.indexOf(action)===index),selectedAction=availableActions.includes(plannedActions[item.symbol])?plannedActions[item.symbol]:suggestedAction,verification=[{label:"Selected account ownership",pass:isOwned||!suggestedAction.includes("sell")},{label:`Position size below ${positionLimit}%`,pass:!sizeAtLimit},{label:"Trend structure",pass:item.trend==="Bullish"},{label:"Volume confirms",pass:item.relVol>=1},{label:`Stop loss ≤ $${maxPlannedLoss.toFixed(0)} limit`,pass:shares>0&&modeledLoss<=maxPlannedLoss},{label:"Reward/risk ≥ 2:1",pass:target>item.price&&riskPerShare>0},{label:item.missingData?`Fundamental provider incomplete · ${item.analysisCoverage||"lower confidence"}`:`Required decision data received · ${item.analysisCoverage||"fund-specific checks"}`,pass:!item.missingData}];
-    return <article id={`candidate-${item.symbol}`} key={item.symbol}>
-     <div className="auto-rank"><i>{index+1}</i><span><b className="security-title"><strong>{item.symbol}</strong><em>{displayName}</em></b><small>${item.price.toFixed(2)} · {item.dayChange>=0?"+":""}{item.dayChange.toFixed(2)}%</small></span><strong>{item.score}<small>/100</small></strong></div>
-     <em className={["Prepare conditional buy","Add / buy more plan","Buy research"].includes(suggestedAction)?"research":suggestedAction==="No action — monitor"?"watch":"avoid"}>{actionLabel(suggestedAction)}</em><h3>{item.setup}</h3>
-     <div className={`decision-stability ${item.rawBuy===item.stableBuy?"stable":"confirming"}`}><b>{item.rawBuy===item.stableBuy?"✓ STABLE RECOMMENDATION":"⏳ CHANGE NOT YET CONFIRMED"}</b><span>{item.decisionStatus} · last material decision {item.decisionChangedAt?new Date(item.decisionChangedAt).toLocaleString():"now"}</span></div>
-     <dl><div><dt>Trend</dt><dd>{item.trend}</dd></div><div><dt>EMA 20 / SMA 50</dt><dd>${item.ema20.toFixed(2)} / ${item.sma50.toFixed(2)}</dd></div><div><dt>SMA 100 / SMA 200</dt><dd>{item.sma100!==null&&item.sma100!==undefined?`$${item.sma100.toFixed(2)}`:"Insufficient history"} / {item.sma200!==null&&item.sma200!==undefined?`$${item.sma200.toFixed(2)}`:"Insufficient history"}</dd></div><div><dt>RSI / relative volume</dt><dd>{item.rsi.toFixed(1)} / {item.relVol.toFixed(2)}×</dd></div><div><dt>Support / resistance</dt><dd>${item.support.toFixed(2)} / ${item.resistance.toFixed(2)}</dd></div></dl>
-     {strategy==="swing"?<section className="trade-proposal"><span>READ-ONLY EXECUTION PREPARATION · TARGET 2:1 REWARD/RISK</span><div><b>Entry status<small>{suggestedAction==="Prepare conditional buy"?`Northstar criteria passed at $${item.price.toFixed(2)}`:`Not passed · trigger $${item.resistance.toFixed(2)}`}</small></b><b>Stop / invalidation<small>${item.invalidation.toFixed(2)}</small></b><b>Target model<small>${target.toFixed(2)}</small></b><b>Maximum size<small>{shares} shares</small></b></div><p>Northstar refreshes the evidence automatically. Risk/share ${riskPerShare.toFixed(2)} · maximum modeled loss ${modeledLoss.toFixed(0)} of your ${maxPlannedLoss.toFixed(0)} limit · modeled reward ${(shares*(target-item.price)).toFixed(0)} · reward/risk 2.00. Overnight gaps and slippage may exceed the planned loss.</p></section>:<section className="trade-proposal long"><span>{item.companyStage||(isFund?"DIVERSIFIED FUND":"CLASSIFICATION PENDING")}</span><div><b>Portfolio role<small>{item.portfolioRole||(isFund?"Core or diversifier":"Satellite pending validation")}</small></b><b>Monthly plan<small>${monthly.toFixed(0)} available</small></b><b>Horizon<small>5–10+ years</small></b><b>Account<small>{accountType}</small></b></div>{!isFund&&<aside className="candidate-fair-value"><b>Fair-price reference</b>{item.fairValue?<><strong>${item.fairValue.toFixed(2)}</strong><span>{item.fairValueLow&&item.fairValueHigh?`Analyst range $${item.fairValueLow.toFixed(2)}–$${item.fairValueHigh.toFixed(2)}`:"Consensus range unavailable"}</span><em className={item.price<=item.fairValue?"below":"above"}>{Math.abs((item.price-item.fairValue)/item.fairValue*100).toFixed(1)}% {item.price<=item.fairValue?"below":"above"} reference</em></>:<><strong>Not available</strong><span>Do not invent a fair price when valuation coverage is missing.</span></>}</aside>}<p>{isFund?"Compare expense ratio, diversification, overlap and plan availability.":"Analyst consensus is a reference—not intrinsic value or a prediction. Validate cash flow, growth, debt, dilution, moat and filings."}</p></section>}
-     <div className="decision-verification"><b>DECISION VERIFICATION</b><div>{verification.map(check=><span className={check.pass?"pass":"fail"} key={check.label}>{check.pass?"✓":"×"} {check.label}</span>)}</div><small>{isOwned?"Position verified in a connected portfolio.":"Not held in the connected portfolio; sell/reduce is unavailable."}</small></div>
-     <div className="suggested-action"><b>One account-specific decision: {actionLabel(suggestedAction)}</b><span>{suggestionReason}</span></div><div className="prepare-action"><label>Decision for {accountName}<strong>{actionLabel(suggestedAction)}</strong></label><button type="button" disabled={suggestedAction.startsWith("Avoid")||suggestedAction==="No action — monitor"} onClick={()=>prepareAction(item.symbol,suggestedAction,suggestedAction,suggestionReason)}>{suggestedAction.startsWith("Avoid")||suggestedAction==="No action — monitor"?"No action to save":"+ Add this decision to Today&apos;s Plan"}</button></div>
-     <button type="button" className="open-chart" onClick={()=>onSelect(item.symbol)}>Analyze {item.symbol} on complete chart →</button>
-    </article>
-   })}
-  </div>{prepareStatus&&<div className="prepare-status" role="status">{prepareStatus}</div>}</>}
-  <footer><b>Separation rule:</b> Never treat retirement assets as swing-trading capital. Future compounder status is uncertain and must be validated with fundamentals, valuation, filings, diversification and suitability. Northstar never places an order.</footer>
- </section>
+const securityNames: Record<string, string> = {
+  AAPL: "Apple Inc.",
+  ABNB: "Airbnb, Inc.",
+  AMD: "Advanced Micro Devices, Inc.",
+  AMZN: "Amazon.com, Inc.",
+  AVGO: "Broadcom Inc.",
+  BND: "Vanguard Total Bond Market ETF",
+  BWXT: "BWX Technologies, Inc.",
+  CAT: "Caterpillar Inc.",
+  CAVA: "CAVA Group, Inc.",
+  CCJ: "Cameco Corporation",
+  CEG: "Constellation Energy Corporation",
+  COST: "Costco Wholesale Corporation",
+  CRM: "Salesforce, Inc.",
+  CRWD: "CrowdStrike Holdings, Inc.",
+  CVX: "Chevron Corporation",
+  DDOG: "Datadog, Inc.",
+  DIA: "SPDR Dow Jones Industrial Average ETF Trust",
+  DUOL: "Duolingo, Inc.",
+  GOOGL: "Alphabet Inc.",
+  HD: "The Home Depot, Inc.",
+  IWM: "iShares Russell 2000 ETF",
+  JPM: "JPMorgan Chase & Co.",
+  LEU: "Centrus Energy Corp.",
+  LLY: "Eli Lilly and Company",
+  MA: "Mastercard Incorporated",
+  MELI: "MercadoLibre, Inc.",
+  META: "Meta Platforms, Inc.",
+  MSFT: "Microsoft Corporation",
+  NEE: "NextEra Energy, Inc.",
+  NET: "Cloudflare, Inc.",
+  NFLX: "Netflix, Inc.",
+  NLR: "VanEck Uranium and Nuclear ETF",
+  NVDA: "NVIDIA Corporation",
+  OKLO: "Oklo Inc.",
+  ORCL: "Oracle Corporation",
+  PLTR: "Palantir Technologies Inc.",
+  QQQ: "Invesco QQQ Trust",
+  SCHD: "Schwab U.S. Dividend Equity ETF",
+  SHOP: "Shopify Inc.",
+  SMR: "NuScale Power Corporation",
+  SOFI: "SoFi Technologies, Inc.",
+  SPY: "SPDR S&P 500 ETF Trust",
+  UBER: "Uber Technologies, Inc.",
+  UNH: "UnitedHealth Group Incorporated",
+  URA: "Global X Uranium ETF",
+  V: "Visa Inc.",
+  VST: "Vistra Corp.",
+  VTI: "Vanguard Total Stock Market ETF",
+  VOO: "Vanguard S&P 500 ETF",
+  VXUS: "Vanguard Total International Stock ETF",
+  WMT: "Walmart Inc.",
+  XOM: "Exxon Mobil Corporation",
+};
+const actionLabel = (action: string) =>
+  action === "Prepare conditional buy"
+    ? "BUY ON CONFIRMATION"
+    : action === "Add / buy more plan"
+      ? "BUY MORE SHARES REVIEW — ALREADY OWNED"
+      : action === "Buy research"
+        ? "RESEARCH ONLY — NEW, NOT OWNED"
+        : action === "Reduce / sell plan"
+          ? "REDUCE / SELL REVIEW"
+          : action === "No action — monitor"
+            ? "HOLD — NO PURCHASE"
+            : action === "Avoid — not owned"
+              ? "DO NOT BUY — valuation too high"
+              : action === "Avoid — bearish, not owned"
+                ? "DO NOT BUY — bearish setup"
+                : action.toUpperCase();
+
+export default function AutomaticMarketCopilot({
+  onSelect,
+  onPrepare,
+  accessToken = "",
+  initialStrategy = "swing",
+  ownedSymbols = [],
+  holdings = [],
+  accountName = "No investment account selected",
+  accountPurpose = "General investing",
+  selectedAccountType = "Investment account",
+  marketPhase = "closed",
+  refreshMinutes = 1,
+}: {
+  onSelect: (symbol: string) => void;
+  onPrepare?: (symbol: string, action: string) => void;
+  accessToken?: string;
+  initialStrategy?: Strategy;
+  ownedSymbols?: string[];
+  holdings?: Array<Record<string, any>>;
+  accountName?: string;
+  accountPurpose?: string;
+  selectedAccountType?: string;
+  marketPhase?: string;
+  refreshMinutes?: number;
+}) {
+  const [data, setData] = useState<{
+    provider?: string;
+    feed?: string;
+    asOf?: string;
+    universeSize?: number;
+    freshCount?: number;
+    actionableMarketData?: boolean;
+    method?: string;
+    candidates?: Candidate[];
+    error?: string;
+  }>({});
+  const [loading, setLoading] = useState(true),
+    [refresh, setRefresh] = useState(0),
+    strategy: Strategy = initialStrategy;
+  const [accountSize, setAccountSize] = useState(25000),
+    [riskPercent, setRiskPercent] = useState(0.5),
+    [holdingPeriod, setHoldingPeriod] = useState("2–10 trading days"),
+    [monthly, setMonthly] = useState(500);
+  const [plannedActions, setPlannedActions] = useState<Record<string, string>>(
+      {},
+    ),
+    [prepareStatus, setPrepareStatus] = useState("");
+  const lastAlertKey = useRef("");
+  const stabilizeCandidates = (candidates: Candidate[]) => {
+    type Memory = {
+      stableBuy: boolean;
+      pendingBuy: boolean;
+      pendingCount: number;
+      changedAt: string;
+    };
+    let memory: Record<string, Memory> = {};
+    try {
+      memory = JSON.parse(
+        localStorage.getItem(`northstar-decision-memory-${strategy}`) || "{}",
+      );
+    } catch {}
+    const now = new Date().toISOString(),
+      next = { ...memory },
+      stabilized = candidates.map((item) => {
+        const reference =
+            item.fairValue || item.sma200 || item.sma100 || item.sma50,
+          valuationPass =
+            Boolean(reference) && item.price <= Number(reference) * 1.15,
+          freshEnough =
+            strategy === "long-term" || item.dataFreshness === "FRESH",
+          rawBuy =
+            strategy === "long-term"
+              ? item.trend !== "Bearish" &&
+                item.score >= 75 &&
+                valuationPass &&
+                !item.missingData
+              : item.trend === "Bullish" &&
+                item.score >= 60 &&
+                item.relVol >= 0.75 &&
+                freshEnough,
+          hardFailure =
+            item.trend === "Bearish" ||
+            item.price <= item.invalidation ||
+            !freshEnough,
+          previous = next[item.symbol];
+        if (!previous) {
+          next[item.symbol] = {
+            stableBuy: rawBuy,
+            pendingBuy: rawBuy,
+            pendingCount: 0,
+            changedAt: now,
+          };
+        } else if (hardFailure && previous.stableBuy) {
+          next[item.symbol] = {
+            stableBuy: false,
+            pendingBuy: false,
+            pendingCount: 0,
+            changedAt: now,
+          };
+        } else if (rawBuy === previous.stableBuy) {
+          next[item.symbol] = {
+            ...previous,
+            pendingBuy: rawBuy,
+            pendingCount: 0,
+          };
+        } else {
+          const count =
+              previous.pendingBuy === rawBuy ? previous.pendingCount + 1 : 1,
+            required = rawBuy ? 1 : 2;
+          next[item.symbol] =
+            count >= required
+              ? {
+                  stableBuy: rawBuy,
+                  pendingBuy: rawBuy,
+                  pendingCount: 0,
+                  changedAt: now,
+                }
+              : { ...previous, pendingBuy: rawBuy, pendingCount: count };
+        }
+        const state = next[item.symbol],
+          decisionStatus = !freshEnough
+            ? "Time-sensitive action disabled until fresh market data arrives"
+            : hardFailure
+              ? "Material invalidation detected"
+              : state.pendingCount > 0
+                ? `${state.pendingCount} confirmation pending toward ${state.pendingBuy ? "BUY" : "WAIT"}`
+                : `Current conditional decision confirmed`;
+        return {
+          ...item,
+          rawBuy,
+          stableBuy: state.stableBuy,
+          decisionStatus,
+          decisionChangedAt: state.changedAt,
+        };
+      });
+    localStorage.setItem(
+      `northstar-decision-memory-${strategy}`,
+      JSON.stringify(next),
+    );
+    return stabilized;
+  };
+  const prepareAction = async (
+    symbol: string,
+    action: string,
+    suggestedAction: string,
+    reason: string,
+  ) => {
+    const householdId = localStorage.getItem("northstar-household-id");
+    setPrepareStatus(`Saving ${symbol}…`);
+    try {
+      const response = await fetch("/api/watchlist", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+            ...(householdId ? { "X-Household-ID": householdId } : {}),
+          },
+          body: JSON.stringify({
+            symbol,
+            purpose: action,
+            notes: `Northstar suggestion: ${suggestedAction}. ${reason} · ${strategy} · ${holdingPeriod}`,
+          }),
+        }),
+        body = await response.json();
+      if (!response.ok)
+        throw new Error(body.error || "Unable to prepare action");
+      sessionStorage.setItem(
+        "northstar-prepared-action",
+        JSON.stringify({
+          symbol,
+          action,
+          suggestedAction,
+          reason,
+          strategy,
+          holdingPeriod,
+          createdAt: new Date().toISOString(),
+        }),
+      );
+      setPrepareStatus(
+        `✓ ${symbol} added as “${action}”${action !== suggestedAction ? ` (Northstar suggested “${suggestedAction}”)` : ""}`,
+      );
+      onPrepare?.(symbol, action);
+    } catch (error) {
+      setPrepareStatus(
+        error instanceof Error ? error.message : "Unable to prepare action",
+      );
+    }
+  };
+  useEffect(() => {
+    if (marketPhase !== "open" && refresh === 0) {
+      setLoading(false);
+      return;
+    }
+    let active = true;
+    setLoading(true);
+    fetch(
+      `/api/market/candidates?strategy=${strategy}&analysisVersion=4&refresh=${Date.now()}`,
+      { cache: "no-store", headers: { "Cache-Control": "no-cache" } },
+    )
+      .then(async (response) => ({
+        ok: response.ok,
+        body: await response.json(),
+      }))
+      .then(({ ok, body }) => {
+        if (active)
+          setData(
+            ok
+              ? {
+                  ...body,
+                  candidates: stabilizeCandidates(body.candidates || []),
+                }
+              : { error: body.error || "Market scan unavailable" },
+          );
+      })
+      .catch(() => {
+        if (active) setData({ error: "Market scan unavailable" });
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [refresh, strategy, marketPhase]);
+  useEffect(() => {
+    const update = () => setRefresh((value) => value + 1);
+    window.addEventListener("northstar:realtime", update);
+    return () => window.removeEventListener("northstar:realtime", update);
+  }, []);
+  useEffect(() => {
+    if (marketPhase !== "open") return;
+    const timer = window.setInterval(
+      () => {
+        if (document.visibilityState === "visible")
+          setRefresh((value) => value + 1);
+      },
+      Math.max(1, refreshMinutes) * 60000,
+    );
+    return () => window.clearInterval(timer);
+  }, [marketPhase, refreshMinutes]);
+  const accountTotal =
+      holdings.reduce(
+        (sum, holding) => sum + Number(holding.market_value_cents || 0),
+        0,
+      ) / 100,
+    holdingContext = (symbol: string) => {
+      const holding = holdings.find(
+          (item) =>
+            String(item.ticker || "").toUpperCase() === symbol.toUpperCase(),
+        ),
+        value = Number(holding?.market_value_cents || 0) / 100;
+      return {
+        holding,
+        value,
+        weight: accountTotal ? (value / accountTotal) * 100 : 0,
+      };
+    };
+  const diversifiedCoreSymbols = new Set([
+      "VTI",
+      "VOO",
+      "SPY",
+      "IVV",
+      "ITOT",
+      "VXUS",
+      "BND",
+      "AGG",
+      "SCHD",
+    ]),
+    diversifiedCoreValue = holdings.reduce((sum, holding) => {
+      const symbol = String(holding.ticker || "").toUpperCase(),
+        name = String(holding.name || "").toUpperCase(),
+        isCore =
+          diversifiedCoreSymbols.has(symbol) ||
+          /TOTAL MARKET|S&P 500|BROAD MARKET|BOND INDEX|DIVIDEND (?:GROWTH|EQUITY)/.test(
+            name,
+          );
+      return sum + (isCore ? Number(holding.market_value_cents || 0) / 100 : 0);
+    }, 0),
+    diversifiedCoreWeight = accountTotal
+      ? (diversifiedCoreValue / accountTotal) * 100
+      : 0;
+  const swingClock = new Date(),
+    etParts = new Intl.DateTimeFormat("en-US", {
+      timeZone: "America/New_York",
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+    }).formatToParts(swingClock),
+    etMinutes =
+      Number(etParts.find((part) => part.type === "hour")?.value || 0) * 60 +
+      Number(etParts.find((part) => part.type === "minute")?.value || 0),
+    sessionStage =
+      marketPhase !== "open"
+        ? "Premarket / next-session preparation"
+        : etMinutes < 585
+          ? "Opening range · wait for the first 15 minutes"
+          : etMinutes < 720
+            ? "Morning setups"
+            : etMinutes < 840
+              ? "Midday · require stronger liquidity"
+              : etMinutes < 960
+                ? "Power hour · review overnight risk"
+                : "Close / after-hours review",
+    dailyRiskBudget = accountSize * 0.02,
+    perTradeRisk = (accountSize * riskPercent) / 100,
+    openPositions = holdings.filter(
+      (item) => Number(item.quantity || 0) > 0,
+    ).length,
+    remainingRisk = Math.max(0, dailyRiskBudget - openPositions * perTradeRisk),
+    swingReady = (data.candidates || [])
+      .filter(
+        (item) =>
+          item.dataFreshness === "FRESH" &&
+          item.trend === "Bullish" &&
+          item.score >= 60 &&
+          item.relVol >= 0.75,
+      )
+      .sort((a, b) => b.score - a.score)
+      .slice(0, 3),
+    noTradeReason = !data.candidates?.length
+      ? "The live scanner has not produced a qualified setup."
+      : data.actionableMarketData === false
+        ? "Current market data is not fresh enough for a time-sensitive entry."
+        : remainingRisk < perTradeRisk
+          ? "The remaining daily risk budget is too small for another full-risk setup."
+          : "";
+  const actionAlerts = (data.candidates || [])
+    .filter((item) => {
+      const context = holdingContext(item.symbol),
+        isFund = [
+          "VTI",
+          "VOO",
+          "SCHD",
+          "VXUS",
+          "BND",
+          "QQQ",
+          "IWM",
+          "URA",
+          "NLR",
+        ].includes(item.symbol),
+        limit = isFund ? 25 : 10,
+        owned =
+          Boolean(context.holding) ||
+          ownedSymbols.some(
+            (symbol) => symbol.toUpperCase() === item.symbol.toUpperCase(),
+          ),
+        atLimit = owned && context.weight >= limit,
+        buyReady = !atLimit && item.stableBuy === true;
+      return (
+        (owned && (item.trend === "Bearish" || context.weight > limit)) ||
+        (buyReady && (strategy !== "long-term" || owned))
+      );
+    })
+    .slice(0, 3);
+  useEffect(() => {
+    if (
+      !actionAlerts.length ||
+      !("Notification" in window) ||
+      Notification.permission !== "granted" ||
+      localStorage.getItem("northstar-push-enabled") === "false"
+    )
+      return;
+    const key = actionAlerts
+      .map((item) => `${item.symbol}:${item.trend}:${item.score}`)
+      .join("|");
+    if (key === lastAlertKey.current) return;
+    lastAlertKey.current = key;
+    const first = actionAlerts[0],
+      context = holdingContext(first.symbol),
+      isFund = [
+        "VTI",
+        "VOO",
+        "SCHD",
+        "VXUS",
+        "BND",
+        "QQQ",
+        "IWM",
+        "URA",
+        "NLR",
+      ].includes(first.symbol),
+      limit = isFund ? 25 : 10,
+      owned =
+        Boolean(context.holding) ||
+        ownedSymbols.some(
+          (symbol) => symbol.toUpperCase() === first.symbol.toUpperCase(),
+        ),
+      action =
+        owned && (first.trend === "Bearish" || context.weight > limit)
+          ? "Do not buy more — open the sell/trim review"
+          : owned
+            ? "Review buying more — account size check passed"
+            : "New candidate — open account-specific research";
+    new Notification(`Northstar decision review · ${first.symbol}`, {
+      body: `${action}. ${accountName}; screening score ${first.score}/100. Northstar never places an order.`,
+      tag: `northstar-${first.symbol}`,
+    });
+  }, [data.asOf, strategy, accountName, holdings]);
+  return (
+    <section className="auto-copilot">
+      <header>
+        <div>
+          <span>
+            ✦{" "}
+            {marketPhase === "open"
+              ? "MARKET OPEN · LIVE-SYNCED ACTION LIST"
+              : "NEXT MARKET OPEN · RANKED PREPARATION LIST"}
+          </span>
+          <h2>
+            {strategy === "swing"
+              ? marketPhase === "open"
+                ? "Live opportunities ranked for action now"
+                : "Stocks to prepare for the next market open"
+              : "Ranked investment opportunities for the selected account"}
+          </h2>
+          <p>
+            One engine scans current provider data, checks each candidate
+            against the selected account, and proposes buy, buy more, monitor,
+            avoid, or trim review. Every result includes its trigger and
+            invalidation; forecasts remain probabilistic.
+          </p>
+        </div>
+        <button disabled={loading} onClick={() => setRefresh((x) => x + 1)}>
+          {loading ? "Analyzing…" : "Run fresh analysis ↻"}
+        </button>
+      </header>
+      <div className="copilot-account-context">
+        <b>Suggestions for: {accountName}</b>
+        <span>
+          {accountPurpose} · {selectedAccountType} · {holdings.length} holding
+          {holdings.length === 1 ? "" : "s"} · $
+          {accountTotal.toLocaleString(undefined, { maximumFractionDigits: 0 })}{" "}
+          analyzed
+        </span>
+        <small>
+          Changing the investment account changes ownership, concentration
+          limits, recommendations, and saved trade preparation.
+        </small>
+      </div>
+      {strategy === "swing" && (
+        <section className="swing-command-summary">
+          <header>
+            <div>
+              <span>TODAY'S SWING DASHBOARD · {accountName.toUpperCase()}</span>
+              <h3>
+                {noTradeReason
+                  ? "NO TRADE NOW"
+                  : "TOP SETUPS REQUIRE CONFIRMATION"}
+              </h3>
+              <p>
+                {noTradeReason ||
+                  `${swingReady.length} setup${swingReady.length === 1 ? "" : "s"} currently pass the stored evidence gate. Recheck the live quote before any manual decision.`}
+              </p>
+            </div>
+            <strong>
+              {sessionStage}
+              <small>
+                {new Intl.DateTimeFormat("en-US", {
+                  hour: "numeric",
+                  minute: "2-digit",
+                  timeZoneName: "short",
+                }).format(swingClock)}{" "}
+                local
+              </small>
+            </strong>
+          </header>
+          <div className="swing-risk-strip">
+            <span>
+              <small>DAILY RISK BUDGET</small>
+              <b>${dailyRiskBudget.toFixed(0)} · 2.00%</b>
+            </span>
+            <span>
+              <small>RISK / IDEA</small>
+              <b>
+                ${perTradeRisk.toFixed(0)} · {riskPercent.toFixed(2)}%
+              </b>
+            </span>
+            <span>
+              <small>OPEN POSITIONS</small>
+              <b>{openPositions}</b>
+            </span>
+            <span>
+              <small>EST. REMAINING RISK</small>
+              <b>${remainingRisk.toFixed(0)}</b>
+            </span>
+            <span>
+              <small>SETUP EXPIRATION</small>
+              <b>Today's close</b>
+            </span>
+          </div>
+          {swingReady.length ? (
+            <ol>
+              {swingReady.map((item) => {
+                const riskPerShare = Math.max(
+                    0.01,
+                    item.price - item.invalidation,
+                  ),
+                  shares = Math.max(
+                    0,
+                    Math.floor(
+                      Math.min(perTradeRisk, remainingRisk) / riskPerShare,
+                    ),
+                  ),
+                  target1 = item.price + riskPerShare * 2,
+                  target2 = item.price + riskPerShare * 3;
+                return (
+                  <li key={item.symbol}>
+                    <b>
+                      {item.symbol} ·{" "}
+                      {shares > 0
+                        ? `PREPARE ${shares} SHARES`
+                        : "NO NEW POSITION"}
+                    </b>
+                    <span>
+                      Entry only after a 5m close above $
+                      {item.resistance.toFixed(2)} with RVOL ≥ 1.5
+                    </span>
+                    <dl>
+                      <div>
+                        <dt>Preferred entry</dt>
+                        <dd>
+                          ${item.resistance.toFixed(2)}–$
+                          {(item.resistance + riskPerShare * 0.15).toFixed(2)}
+                        </dd>
+                      </div>
+                      <div>
+                        <dt>Stop</dt>
+                        <dd>${item.invalidation.toFixed(2)}</dd>
+                      </div>
+                      <div>
+                        <dt>Target 1 / 2</dt>
+                        <dd>
+                          ${target1.toFixed(2)} / ${target2.toFixed(2)}
+                        </dd>
+                      </div>
+                      <div>
+                        <dt>Risk</dt>
+                        <dd>
+                          ${(shares * riskPerShare).toFixed(0)} ·{" "}
+                          {riskPercent.toFixed(2)}%
+                        </dd>
+                      </div>
+                    </dl>
+                    <small>
+                      Valid for this session only · {item.score}% evidence score
+                      · wait if spread, QQQ direction, volume, or catalyst check
+                      fails.
+                    </small>
+                  </li>
+                );
+              })}
+            </ol>
+          ) : (
+            <div className="swing-no-trade">
+              <b>NO-TRADE DISCIPLINE</b>
+              <span>
+                {noTradeReason} Continue monitoring; Northstar will reassess on
+                the next one-minute refresh.
+              </span>
+            </div>
+          )}
+          <footer>
+            <b>Next action:</b>{" "}
+            {marketPhase === "open"
+              ? sessionStage
+              : "Prepare the watchlist now; revalidate gaps, spread, volume, VWAP, index direction, and news after the market opens."}
+          </footer>
+        </section>
+      )}
+      <ol
+        className="smart-opportunity-criteria"
+        aria-label="Smart opportunity ranking criteria"
+      >
+        <li>
+          <b>Account fit</b>
+          <span>Ownership, purpose and concentration</span>
+        </li>
+        <li>
+          <b>Market structure</b>
+          <span>Trend, moving averages and momentum</span>
+        </li>
+        <li>
+          <b>Participation</b>
+          <span>Volume, liquidity and confirmation</span>
+        </li>
+        <li>
+          <b>Business value</b>
+          <span>Fundamentals, valuation and dividends</span>
+        </li>
+        <li>
+          <b>Action plan</b>
+          <span>Entry, invalidation and reward/risk</span>
+        </li>
+      </ol>
+      {strategy === "swing" && (
+        <div className="market-day-playbook">
+          <b>CONDITIONAL MARKET-DAY MAP · NOT A PROMISED PREDICTION</b>
+          <span>
+            <strong>Pre-market</strong> Re-rank gaps, news, liquidity, index and
+            sector direction.
+          </span>
+          <span>
+            <strong>Opening 30 minutes</strong> Wait for spread, volume and the
+            opening range; reject candidates that lose invalidation.
+          </span>
+          <span>
+            <strong>Midday</strong> Act only on a confirmed hold/retest with
+            sufficient volume and at least 2:1 modeled reward/risk.
+          </span>
+          <span>
+            <strong>Final hour</strong> Avoid chasing; reassess trend, target
+            proximity, overnight catalyst risk and position size.
+          </span>
+        </div>
+      )}
+      {data.error ? (
+        <div className="auto-error">
+          <b>Live shortlist unavailable</b>
+          <span>{data.error}</span>
+        </div>
+      ) : (
+        <>
+          <div className="auto-method">
+            <b>
+              <i className="live-market-dot" />
+              {data.provider || "Provider"} {data.feed?.toUpperCase()} ·{" "}
+              {data.universeSize || 0} securities screened and ranked
+            </b>
+            <span>{data.method}</span>
+            <time>
+              {data.asOf
+                ? `Updated ${new Date(data.asOf).toLocaleString()} · auto-refresh 60s`
+                : "Calculating…"}
+            </time>
+          </div>
+          {strategy === "swing" && data.actionableMarketData === false && (
+            <div className="auto-error" role="status">
+              <b>Time-sensitive actions paused</b>
+              <span>
+                The latest candidate bars are not fresh enough for an immediate
+                swing entry. Rankings remain visible for research; Northstar
+                will not label them ready until current market data arrives.
+              </span>
+            </div>
+          )}
+          {!!actionAlerts.length && (
+            <section className="market-action-alert" role="alert">
+              <header>
+                <b>
+                  🔥{" "}
+                  {strategy === "long-term"
+                    ? "OWNED RETIREMENT HOLDING REVIEWS"
+                    : "HOT SWING DECISIONS"}{" "}
+                  · ACTION REVIEW NOW
+                </b>
+                <span>
+                  All actions below are calculated for {accountName} (
+                  {accountPurpose}). Northstar never places an order.
+                </span>
+              </header>
+              {actionAlerts.map((item) => {
+                const context = holdingContext(item.symbol),
+                  isFund = [
+                    "VTI",
+                    "VOO",
+                    "SCHD",
+                    "VXUS",
+                    "BND",
+                    "QQQ",
+                    "IWM",
+                    "URA",
+                    "NLR",
+                  ].includes(item.symbol),
+                  limit = isFund ? 25 : 10,
+                  owned =
+                    Boolean(context.holding) ||
+                    ownedSymbols.some(
+                      (symbol) =>
+                        symbol.toUpperCase() === item.symbol.toUpperCase(),
+                    ),
+                  atLimit = owned && context.weight >= limit,
+                  overLimit = owned && context.weight > limit,
+                  decisionReference =
+                    item.fairValue || item.sma200 || item.sma100 || item.sma50,
+                  referenceKind = item.fairValue
+                    ? "Fundamental fair-value model"
+                    : item.sma200
+                      ? "200-day market reference"
+                      : item.sma100
+                        ? "100-day market reference"
+                        : "50-day market reference",
+                  valuationPass = item.price <= decisionReference * 1.1,
+                  readyToBuy = !atLimit && item.stableBuy === true,
+                  action = overLimit
+                    ? "DO NOT BUY MORE · TRIM REVIEW"
+                    : owned && item.trend === "Bearish"
+                      ? "DO NOT BUY MORE · RISK REVIEW"
+                      : readyToBuy
+                        ? strategy === "long-term"
+                          ? owned
+                            ? "BUY MORE SHARES REVIEW — ALREADY OWNED"
+                            : "RESEARCH ONLY — NEW, NOT OWNED"
+                          : owned
+                            ? "YES — PREPARE SWING ADD"
+                            : "YES — PREPARE A SWING BUY"
+                        : "NO ACTION · CRITERIA NOT MET";
+                return (
+                  <article
+                    className={readyToBuy ? "hot-buy" : "hot-risk"}
+                    key={item.symbol}
+                  >
+                    <div>
+                      <i
+                        aria-label={
+                          readyToBuy
+                            ? "Buy criteria passed"
+                            : "Risk review required"
+                        }
+                      >
+                        {readyToBuy ? "👍" : "⚠"}
+                      </i>
+                      <strong>
+                        {action} · {item.symbol}
+                      </strong>
+                      <span>
+                        {item.name || securityNames[item.symbol] || "Security"}
+                      </span>
+                    </div>
+                    <dl>
+                      <div>
+                        <dt>Selected account weight</dt>
+                        <dd>
+                          {owned
+                            ? `${context.weight.toFixed(1)}% / ${limit}% guide`
+                            : "Not owned"}
+                        </dd>
+                      </div>
+                      <div>
+                        <dt>Current price</dt>
+                        <dd>${item.price.toFixed(2)}</dd>
+                      </div>
+                      <div>
+                        <dt>
+                          {strategy === "long-term"
+                            ? "Accumulation reference"
+                            : "Required buy trigger"}
+                        </dt>
+                        <dd>
+                          {strategy === "long-term"
+                            ? `At/below $${decisionReference.toFixed(2)}`
+                            : `$${item.resistance.toFixed(2)} + model confirmation`}
+                        </dd>
+                      </div>
+                      <div>
+                        <dt>{referenceKind}</dt>
+                        <dd>${decisionReference.toFixed(2)}</dd>
+                      </div>
+                    </dl>
+                    <p>
+                      <b>Action now:</b>{" "}
+                      {overLimit
+                        ? `Do not buy more. This position exceeds the ${limit}% size guide for ${accountName}; open Portfolio for the consistent partial-trim calculation.`
+                        : readyToBuy
+                          ? strategy === "long-term"
+                            ? `The account-size check passed. Review a staged contribution for ${accountName}; this is a multi-year proposal, not a swing entry.`
+                            : `The account-size and market checks passed. Prepare the swing plan with invalidation near $${item.invalidation.toFixed(2)}.`
+                          : `Do not add now. Northstar’s account-size or market-evidence criteria did not pass.`}
+                    </p>
+                    <button type="button" onClick={() => onSelect(item.symbol)}>
+                      Open complete{" "}
+                      {strategy === "long-term" ? "retirement" : "swing"}{" "}
+                      analysis for {item.symbol} →
+                    </button>
+                  </article>
+                );
+              })}
+            </section>
+          )}
+          <div className="proposal-settings">
+            <div>
+              <span>
+                {strategy === "swing"
+                  ? "READ-ONLY TRADE PREPARATION MODEL"
+                  : "LONG-TERM CONTRIBUTION MODEL"}
+              </span>
+              <b>
+                {strategy === "swing"
+                  ? "Compare buy, sell, or wait using confirmation, risk, reward, and time"
+                  : "Build a diversified core before emerging-growth satellites"}
+              </b>
+            </div>
+            {strategy === "swing" ? (
+              <>
+                <label>
+                  Planning capital $
+                  <input
+                    type="number"
+                    min="1000"
+                    step="1000"
+                    value={accountSize}
+                    onChange={(e) =>
+                      setAccountSize(Math.max(0, +e.target.value))
+                    }
+                  />
+                  <small>Used only to calculate maximum position size</small>
+                </label>
+                <label>
+                  Maximum risk / idea
+                  <select
+                    value={riskPercent}
+                    onChange={(e) => setRiskPercent(+e.target.value)}
+                  >
+                    <option value="0.25">0.25%</option>
+                    <option value="0.5">0.50%</option>
+                    <option value="0.75">0.75%</option>
+                    <option value="1">1.00%</option>
+                  </select>
+                </label>
+                <label>
+                  Planned holding period
+                  <select
+                    value={holdingPeriod}
+                    onChange={(e) => setHoldingPeriod(e.target.value)}
+                  >
+                    <option>1–3 trading days</option>
+                    <option>2–10 trading days</option>
+                    <option>2–6 weeks</option>
+                    <option>Until invalidation or target</option>
+                  </select>
+                </label>
+                <strong>
+                  ${((accountSize * riskPercent) / 100).toFixed(0)} maximum
+                  planned loss · {holdingPeriod}
+                </strong>
+              </>
+            ) : (
+              <>
+                <label>
+                  Monthly contribution $
+                  <input
+                    type="number"
+                    min="0"
+                    step="50"
+                    value={monthly}
+                    onChange={(e) => setMonthly(Math.max(0, +e.target.value))}
+                  />
+                </label>
+                <label>
+                  Selected account type
+                  <input value={selectedAccountType} readOnly />
+                </label>
+                <strong>
+                  ${monthly.toFixed(0)} monthly · {selectedAccountType}
+                </strong>
+              </>
+            )}
+          </div>
+          <div className="auto-grid">
+            {(data.candidates || []).slice(0, 6).map((item, index) => {
+              const riskPerShare = Math.max(
+                  0.01,
+                  item.price - item.invalidation,
+                ),
+                maxPlannedLoss = (accountSize * riskPercent) / 100,
+                shares = Math.floor(maxPlannedLoss / riskPerShare),
+                modeledLoss = shares * riskPerShare,
+                target = item.price + 2 * riskPerShare,
+                isFund = [
+                  "VTI",
+                  "VOO",
+                  "SCHD",
+                  "VXUS",
+                  "BND",
+                  "QQQ",
+                  "IWM",
+                  "URA",
+                  "NLR",
+                ].includes(item.symbol),
+                owned = holdingContext(item.symbol),
+                isOwned =
+                  Boolean(owned.holding) ||
+                  ownedSymbols.some(
+                    (symbol) =>
+                      symbol.toUpperCase() === item.symbol.toUpperCase(),
+                  ),
+                ownedShares = Number(owned.holding?.quantity || 0),
+                positionLimit = isFund ? 25 : 10,
+                sizeAtLimit = isOwned && owned.weight >= positionLimit,
+                sizeOverLimit = isOwned && owned.weight > positionLimit,
+                newCandidatePortfolioFit =
+                  isFund || diversifiedCoreWeight >= 70,
+                displayName =
+                  item.name && item.name !== item.symbol
+                    ? item.name
+                    : securityNames[item.symbol] ||
+                      "Company or fund name unavailable",
+                valuationGap = item.fairValue
+                  ? ((item.price - item.fairValue) / item.fairValue) * 100
+                  : null,
+                decisionReference =
+                  item.fairValue || item.sma200 || item.sma100 || item.sma50,
+                longTermBuyReady =
+                  item.stableBuy === true &&
+                  (isOwned || newCandidatePortfolioFit),
+                suggestedAction = sizeOverLimit
+                  ? "Reduce / sell plan"
+                  : sizeAtLimit
+                    ? "No action — monitor"
+                    : strategy === "long-term"
+                      ? valuationGap !== null && valuationGap > 25
+                        ? isOwned
+                          ? "Reduce / sell plan"
+                          : "Avoid — not owned"
+                        : longTermBuyReady
+                          ? isOwned
+                            ? "Add / buy more plan"
+                            : "Buy research"
+                          : "No action — monitor"
+                      : item.trend === "Bearish"
+                        ? isOwned
+                          ? "Reduce / sell plan"
+                          : "Avoid — bearish, not owned"
+                        : item.stableBuy === true
+                          ? "Prepare conditional buy"
+                          : "No action — monitor",
+                suggestionReason = sizeOverLimit
+                  ? `${item.symbol} is ${owned.weight.toFixed(1)}% of ${accountName}, above the ${positionLimit}% ${isFund ? "fund" : "individual-stock"} size guide. Do not buy more; review a partial reduction using the Portfolio analysis trigger.`
+                  : sizeAtLimit
+                    ? `${item.symbol} is ${owned.weight.toFixed(1)}% of ${accountName}, at the ${positionLimit}% size guide. Hold/monitor; buying more is blocked unless the saved allocation plan changes.`
+                    : valuationGap !== null && valuationGap > 25
+                      ? `Model midpoint is ${Math.abs(valuationGap).toFixed(1)}% below price. ${isOwned ? "Review reducing only after taxes, concentration and thesis are checked." : "You do not own this security, so no sell action is proposed."}`
+                      : suggestedAction === "Buy research"
+                        ? `${item.symbol} is not owned by ${accountName}. It is a research candidate only—not an accumulation recommendation. The Roth currently has ${diversifiedCoreWeight.toFixed(1)}% in identified diversified core holdings; verify its saved allocation gap, overlap, contribution cash, taxes, and full fundamentals before considering a new position.`
+                        : strategy === "long-term" &&
+                            suggestedAction === "Add / buy more plan"
+                          ? `${accountName} already owns ${ownedShares.toLocaleString(undefined,{maximumFractionDigits:4})} ${item.symbol} share${ownedShares===1?"":"s"}. This is a buy-more review—not a new-position suggestion. Evidence is ${item.score}/100, structure is ${item.trend.toLowerCase()}, and the current ${owned.weight.toFixed(1)}% account weight remains below the ${positionLimit}% guide. Verify the saved allocation gap and contribution cash before adding shares.`
+                        : strategy === "swing" &&
+                            suggestedAction === "Prepare conditional buy"
+                          ? `Bullish continuation is favored at ${item.score}/100 evidence confidence. Entry trigger: hold or close above $${item.resistance.toFixed(2)} with volume; invalidation $${item.invalidation.toFixed(2)}; modeled target $${target.toFixed(2)}.`
+                          : item.trend === "Bearish"
+                            ? `${isOwned ? "Owned position: downside risk supports a reduce/sell review." : "Unowned security: bearish evidence means avoid or watch, not sell."} A reclaim above $${item.resistance.toFixed(2)} changes the reading.`
+                            : `No action now: evidence is ${item.score}/100 or one of the required checks has not passed. Monitor $${item.resistance.toFixed(2)}.`,
+                availableActions = [
+                  suggestedAction,
+                  ...(strategy === "swing"
+                    ? [
+                        ...(sizeAtLimit ? [] : ["Prepare conditional buy"]),
+                        ...(isOwned && !sizeAtLimit
+                          ? ["Add / buy more plan"]
+                          : []),
+                        ...(isOwned ? ["Reduce / sell plan"] : []),
+                        "No action — monitor",
+                        "Call setup review",
+                        "Put setup review",
+                      ]
+                    : [
+                        ...(isOwned && !sizeAtLimit
+                          ? ["Add / buy more plan"]
+                          : !isOwned
+                            ? ["Buy research"]
+                            : []),
+                        ...(isOwned ? ["Reduce / sell plan"] : []),
+                        "No action — monitor",
+                      ]),
+                ].filter(
+                  (action, index, actions) => actions.indexOf(action) === index,
+                ),
+                selectedAction = availableActions.includes(
+                  plannedActions[item.symbol],
+                )
+                  ? plannedActions[item.symbol]
+                  : suggestedAction,
+                verification = [
+                  {
+                    label: isOwned
+                      ? "Owned by selected account"
+                      : "Not owned · research only",
+                    pass: isOwned,
+                  },
+                  {
+                    label: `Diversified core foundation · ${diversifiedCoreWeight.toFixed(1)}% identified`,
+                    pass: isOwned || isFund || diversifiedCoreWeight >= 70,
+                  },
+                  {
+                    label: `Position size below ${positionLimit}%`,
+                    pass: !sizeAtLimit,
+                  },
+                  { label: "Trend structure", pass: item.trend === "Bullish" },
+                  { label: "Volume confirms", pass: item.relVol >= 1 },
+                  {
+                    label: `Stop loss ≤ $${maxPlannedLoss.toFixed(0)} limit`,
+                    pass: shares > 0 && modeledLoss <= maxPlannedLoss,
+                  },
+                  {
+                    label: "Reward/risk ≥ 2:1",
+                    pass: target > item.price && riskPerShare > 0,
+                  },
+                  {
+                    label: item.missingData
+                      ? `Fundamental provider incomplete · ${item.analysisCoverage || "lower confidence"}`
+                      : `Required decision data received · ${item.analysisCoverage || "fund-specific checks"}`,
+                    pass: !item.missingData,
+                  },
+                ];
+              return (
+                <article id={`candidate-${item.symbol}`} key={item.symbol}>
+                  <div className="auto-rank">
+                    <i>{index + 1}</i>
+                    <span>
+                      <b className="security-title">
+                        <strong>{item.symbol}</strong>
+                        <em>{displayName}</em>
+                      </b>
+                      <small>
+                        ${item.price.toFixed(2)} ·{" "}
+                        {item.dayChange >= 0 ? "+" : ""}
+                        {item.dayChange.toFixed(2)}%
+                      </small>
+                    </span>
+                    <strong>
+                      {item.score}
+                      <small>/100</small>
+                    </strong>
+                  </div>
+                  <em
+                    className={
+                      [
+                        "Prepare conditional buy",
+                        "Add / buy more plan",
+                        "Buy research",
+                      ].includes(suggestedAction)
+                        ? "research"
+                        : suggestedAction === "No action — monitor"
+                          ? "watch"
+                          : "avoid"
+                    }
+                  >
+                    {actionLabel(suggestedAction)}
+                  </em>
+                  <h3>{item.setup}</h3>
+                  <div
+                    className={`decision-stability ${item.rawBuy === item.stableBuy ? "stable" : "confirming"}`}
+                  >
+                    <b>
+                      {item.rawBuy === item.stableBuy
+                        ? "✓ STABLE RECOMMENDATION"
+                        : "⏳ CHANGE NOT YET CONFIRMED"}
+                    </b>
+                    <span>
+                      {item.decisionStatus} · last material decision{" "}
+                      {item.decisionChangedAt
+                        ? new Date(item.decisionChangedAt).toLocaleString()
+                        : "now"}
+                    </span>
+                  </div>
+                  <dl>
+                    <div>
+                      <dt>Trend</dt>
+                      <dd>{item.trend}</dd>
+                    </div>
+                    <div>
+                      <dt>EMA 20 / SMA 50</dt>
+                      <dd>
+                        ${item.ema20.toFixed(2)} / ${item.sma50.toFixed(2)}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt>SMA 100 / SMA 200</dt>
+                      <dd>
+                        {item.sma100 !== null && item.sma100 !== undefined
+                          ? `$${item.sma100.toFixed(2)}`
+                          : "Insufficient history"}{" "}
+                        /{" "}
+                        {item.sma200 !== null && item.sma200 !== undefined
+                          ? `$${item.sma200.toFixed(2)}`
+                          : "Insufficient history"}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt>RSI / relative volume</dt>
+                      <dd>
+                        {item.rsi.toFixed(1)} / {item.relVol.toFixed(2)}×
+                      </dd>
+                    </div>
+                    <div>
+                      <dt>Support / resistance</dt>
+                      <dd>
+                        ${item.support.toFixed(2)} / $
+                        {item.resistance.toFixed(2)}
+                      </dd>
+                    </div>
+                  </dl>
+                  {strategy === "swing" ? (
+                    <section className="trade-proposal">
+                      <span>
+                        READ-ONLY EXECUTION PREPARATION · TARGET 2:1 REWARD/RISK
+                      </span>
+                      <div>
+                        <b>
+                          Entry status
+                          <small>
+                            {suggestedAction === "Prepare conditional buy"
+                              ? `Northstar criteria passed at $${item.price.toFixed(2)}`
+                              : `Not passed · trigger $${item.resistance.toFixed(2)}`}
+                          </small>
+                        </b>
+                        <b>
+                          Stop / invalidation
+                          <small>${item.invalidation.toFixed(2)}</small>
+                        </b>
+                        <b>
+                          Target model<small>${target.toFixed(2)}</small>
+                        </b>
+                        <b>
+                          Maximum size<small>{shares} shares</small>
+                        </b>
+                      </div>
+                      <p>
+                        Northstar refreshes the evidence automatically.
+                        Risk/share ${riskPerShare.toFixed(2)} · maximum modeled
+                        loss ${modeledLoss.toFixed(0)} of your $
+                        {maxPlannedLoss.toFixed(0)} limit · modeled reward $
+                        {(shares * (target - item.price)).toFixed(0)} ·
+                        reward/risk 2.00. Overnight gaps and slippage may exceed
+                        the planned loss.
+                      </p>
+                    </section>
+                  ) : (
+                    <section className="trade-proposal long">
+                      <span>
+                        {item.companyStage ||
+                          (isFund
+                            ? "DIVERSIFIED FUND"
+                            : "CLASSIFICATION PENDING")}
+                      </span>
+                      <div>
+                        <b>
+                          Portfolio role
+                          <small>
+                            {item.portfolioRole ||
+                              (isFund
+                                ? "Core or diversifier"
+                                : "Satellite pending validation")}
+                          </small>
+                        </b>
+                        <b>
+                          Monthly plan
+                          <small>${monthly.toFixed(0)} available</small>
+                        </b>
+                        <b>
+                          Horizon<small>5–10+ years</small>
+                        </b>
+                        <b>
+                          Account<small>{selectedAccountType}</small>
+                        </b>
+                      </div>
+                      {!isFund && (
+                        <aside className="candidate-fair-value">
+                          <b>Fair-price reference</b>
+                          {item.fairValue ? (
+                            <>
+                              <strong>${item.fairValue.toFixed(2)}</strong>
+                              <span>
+                                {item.fairValueLow && item.fairValueHigh
+                                  ? `Analyst range $${item.fairValueLow.toFixed(2)}–$${item.fairValueHigh.toFixed(2)}`
+                                  : "Consensus range unavailable"}
+                              </span>
+                              <em
+                                className={
+                                  item.price <= item.fairValue
+                                    ? "below"
+                                    : "above"
+                                }
+                              >
+                                {Math.abs(
+                                  ((item.price - item.fairValue) /
+                                    item.fairValue) *
+                                    100,
+                                ).toFixed(1)}
+                                %{" "}
+                                {item.price <= item.fairValue
+                                  ? "below"
+                                  : "above"}{" "}
+                                reference
+                              </em>
+                            </>
+                          ) : (
+                            <>
+                              <strong>Not available</strong>
+                              <span>
+                                Do not invent a fair price when valuation
+                                coverage is missing.
+                              </span>
+                            </>
+                          )}
+                        </aside>
+                      )}
+                      <p>
+                        {isFund
+                          ? "Compare expense ratio, diversification, overlap and plan availability."
+                          : "Analyst consensus is a reference—not intrinsic value or a prediction. Validate cash flow, growth, debt, dilution, moat and filings."}
+                      </p>
+                    </section>
+                  )}
+                  <div className="decision-verification">
+                    <b>DECISION VERIFICATION</b>
+                    <div>
+                      {verification.map((check) => (
+                        <span
+                          className={check.pass ? "pass" : "fail"}
+                          key={check.label}
+                        >
+                          {check.pass ? "✓" : "×"} {check.label}
+                        </span>
+                      ))}
+                    </div>
+                    <small>
+                      {isOwned
+                        ? "Position verified in a connected portfolio."
+                        : "Not held in the connected portfolio; sell/reduce is unavailable."}
+                    </small>
+                  </div>
+                  <div className="suggested-action">
+                    <b>
+                      One account-specific decision:{" "}
+                      {actionLabel(suggestedAction)}
+                    </b>
+                    <span>{suggestionReason}</span>
+                  </div>
+                  <div className="prepare-action">
+                    <label>
+                      Decision for {accountName}
+                      <strong>{actionLabel(suggestedAction)}</strong>
+                    </label>
+                    <button
+                      type="button"
+                      disabled={
+                        suggestedAction.startsWith("Avoid") ||
+                        suggestedAction === "No action — monitor"
+                      }
+                      onClick={() =>
+                        prepareAction(
+                          item.symbol,
+                          suggestedAction,
+                          suggestedAction,
+                          suggestionReason,
+                        )
+                      }
+                    >
+                      {suggestedAction.startsWith("Avoid") ||
+                      suggestedAction === "No action — monitor"
+                        ? "No action to save"
+                        : "+ Add this decision to Today&apos;s Plan"}
+                    </button>
+                  </div>
+                  <button
+                    type="button"
+                    className="open-chart"
+                    onClick={() => onSelect(item.symbol)}
+                  >
+                    Analyze {item.symbol} on complete chart →
+                  </button>
+                </article>
+              );
+            })}
+          </div>
+          {prepareStatus && (
+            <div className="prepare-status" role="status">
+              {prepareStatus}
+            </div>
+          )}
+        </>
+      )}
+      <footer>
+        <b>Separation rule:</b> Never treat retirement assets as swing-trading
+        capital. Future compounder status is uncertain and must be validated
+        with fundamentals, valuation, filings, diversification and suitability.
+        Northstar never places an order.
+      </footer>
+    </section>
+  );
 }
