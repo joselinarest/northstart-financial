@@ -28,16 +28,15 @@ async function plaid(
       ...extra,
     }),
   });
-  if (!response.ok) throw new Error(`Plaid ${path} failed: ${response.status}`);
-  return response.json() as Promise<Record<string, any>>;
-}
-async function optionalPlaid(path: string, accessToken: string) {
-  try {
-    return await plaid(path, accessToken);
-  } catch {
-    return null;
+  const payload=await response.json().catch(()=>({})) as Record<string,any>;
+  if (!response.ok) {
+    const error=new Error(String(payload.error_message||payload.error_code||`Plaid ${path} failed: ${response.status}`)) as Error&{code?:string;type?:string;requestId?:string};
+    error.code=String(payload.error_code||"PLAID_API_ERROR");error.type=String(payload.error_type||"API_ERROR");error.requestId=payload.request_id?String(payload.request_id):undefined;throw error;
   }
+  return payload;
 }
+const plaidError=(error:unknown)=>({code:String((error as any)?.code||"PLAID_API_ERROR"),message:error instanceof Error?error.message:"Plaid request failed"});
+const investmentRecoveryCodes=new Set(["NO_INVESTMENT_ACCOUNTS","ADDITIONAL_CONSENT_REQUIRED","ACCESS_NOT_GRANTED","PRODUCTS_NOT_SUPPORTED","INSTITUTION_DOWN","PRODUCT_NOT_READY"]);
 const cents = (value: unknown) => Math.round(Number(value || 0) * 100);
 
 export async function POST(request: Request) {
@@ -103,7 +102,7 @@ export async function POST(request: Request) {
       )
       .run();
     const token = await decryptSecret(connection.encrypted_access_token),
-      itemData = await optionalPlaid("/item/get", token),
+      itemData = await plaid("/item/get", token),
       accountData = await plaid("/accounts/get", token),
       accountWrites: DbStatement[] = [];
     if (itemData?.item?.item_id && !connection.provider_item_id)
@@ -113,6 +112,8 @@ export async function POST(request: Request) {
         )
         .bind(itemData.item.item_id, body.connectionId, householdId)
         .run();
+    await db.prepare("UPDATE connections SET provider_item_id=COALESCE(provider_item_id,?),plaid_products_json=?::jsonb,plaid_consented_products_json=?::jsonb,plaid_billed_products_json=?::jsonb,plaid_consent_expiration_at=? WHERE id=? AND household_id=?")
+      .bind(itemData?.item?.item_id||null,JSON.stringify(itemData?.item?.products||[]),JSON.stringify(itemData?.item?.consented_products||[]),JSON.stringify(itemData?.item?.billed_products||[]),itemData?.item?.consent_expiration_time||null,body.connectionId,householdId).run();
     const accountById = new Map<string, any>();
     for (const account of accountData.accounts || []) {
       accountById.set(account.account_id, account);
@@ -422,7 +423,8 @@ export async function POST(request: Request) {
       cursor = data.next_cursor;
       hasMore = Boolean(data.has_more);
     }
-    const investments = await optionalPlaid("/investments/holdings/get", token);
+    let investments:Record<string,any>|null=null,investmentError:{code:string;message:string}|null=null;
+    try{investments=await plaid("/investments/holdings/get",token)}catch(error){investmentError=plaidError(error)}
     let holdingCount = 0;
     if (investments) {
       const writes: DbStatement[] = [];
@@ -459,10 +461,24 @@ export async function POST(request: Request) {
         );
       }
       if (writes.length) await db.batch(writes);
+      await db.prepare("UPDATE connections SET last_holdings_sync_at=CURRENT_TIMESTAMP,investment_access_status='ENABLED',latest_plaid_error_message=NULL WHERE id=? AND household_id=?").bind(body.connectionId,householdId).run();
     }
+    let investmentTransactionCount=0;
+    if(investments){
+      const now=new Date(),start=new Date(now);start.setUTCFullYear(start.getUTCFullYear()-2);const iso=(date:Date)=>date.toISOString().slice(0,10);let offset=0,total=1;
+      try{
+        while(offset<total){const page=await plaid("/investments/transactions/get",token,{start_date:iso(start),end_date:iso(now),options:{count:500,offset}});total=Number(page.total_investment_transactions||0);const writes:DbStatement[]=[];
+          for(const security of page.securities||[])writes.push(db.prepare("INSERT INTO securities(id,ticker,name,type,currency) VALUES(?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET ticker=excluded.ticker,name=excluded.name,type=excluded.type,currency=excluded.currency").bind(`plaid_sec_${security.security_id}`,security.ticker_symbol||null,security.name||"Unknown security",security.type||null,security.iso_currency_code||"USD"));
+          for(const transaction of page.investment_transactions||[]){const rawType=String(transaction.type||"").toLowerCase(),subtype=String(transaction.subtype||"").toLowerCase();const type=rawType==="buy"?"BUY":rawType==="sell"?"SELL":rawType==="fee"?"FEE":/dividend/.test(subtype)?"DIVIDEND":/interest/.test(subtype)?"INTEREST":rawType==="transfer"?"TRANSFER":rawType==="cash"&&Number(transaction.amount)<0?"WITHDRAWAL":"DEPOSIT";writes.push(db.prepare(`INSERT INTO investment_transactions(id,household_id,account_id,security_id,transaction_type,trade_at,settle_at,quantity,price_cents,amount_cents,fee_cents,currency,source,external_id,notes,created_by_user_id)
+            VALUES(?,?,?,?,?,?,?,?,?,?,?,?, 'PLAID',?,?,?) ON CONFLICT(account_id,source,external_id) DO UPDATE SET security_id=excluded.security_id,transaction_type=excluded.transaction_type,trade_at=excluded.trade_at,settle_at=excluded.settle_at,quantity=excluded.quantity,price_cents=excluded.price_cents,amount_cents=excluded.amount_cents,fee_cents=excluded.fee_cents,currency=excluded.currency,notes=excluded.notes`).bind(`plaid_inv_tx_${transaction.investment_transaction_id}`,householdId,`plaid_${transaction.account_id}`,transaction.security_id?`plaid_sec_${transaction.security_id}`:null,type,transaction.date,transaction.date,transaction.quantity==null?null:Number(transaction.quantity),transaction.price==null?null:cents(transaction.price),cents(transaction.amount),cents(transaction.fees),transaction.iso_currency_code||"USD",transaction.investment_transaction_id,[transaction.name,transaction.subtype].filter(Boolean).join(" · ")||null,connectionOwner));investmentTransactionCount++}
+          if(writes.length)await db.batch(writes);offset+=(page.investment_transactions||[]).length;if(!(page.investment_transactions||[]).length)break}
+        await db.prepare("UPDATE connections SET last_investment_transactions_sync_at=CURRENT_TIMESTAMP,investment_access_status='ENABLED',latest_plaid_error_message=NULL WHERE id=? AND household_id=?").bind(body.connectionId,householdId).run();
+      }catch(error){investmentError=plaidError(error)}
+    }
+    if(investmentError){const status=investmentError.code==="PRODUCT_NOT_READY"?"PENDING":investmentRecoveryCodes.has(investmentError.code)?"RECONNECT_REQUIRED":"ERROR";await db.prepare("UPDATE connections SET investment_access_status=?,error_code=?,latest_plaid_error_message=? WHERE id=? AND household_id=?").bind(status,investmentError.code,investmentError.message.slice(0,300),body.connectionId,householdId).run()}
     await db
       .prepare(
-        "UPDATE connections SET cursor=?,last_synced_at=CURRENT_TIMESTAMP,error_code=NULL WHERE id=? AND household_id=?",
+        "UPDATE connections SET cursor=?,last_synced_at=CURRENT_TIMESTAMP,error_code=CASE WHEN investment_access_status IN ('RECONNECT_REQUIRED','PENDING','ERROR') THEN error_code ELSE NULL END WHERE id=? AND household_id=?",
       )
       .bind(cursor, body.connectionId, householdId)
       .run();
@@ -479,6 +495,8 @@ export async function POST(request: Request) {
       status: "synced",
       accounts: (accountData.accounts || []).length,
       holdings: holdingCount,
+      investmentTransactions:investmentTransactionCount,
+      investmentAccess:investmentError?{status:investmentError.code==="PRODUCT_NOT_READY"?"PENDING":"RECONNECT_REQUIRED",...investmentError}:{status:"ENABLED"},
       added,
       modified,
       removed,

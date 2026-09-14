@@ -31,7 +31,7 @@ export async function POST(request: Request) {
       .bind(id("plaid_hook"), itemId, type, code, hash, JSON.stringify(payload))
       .run();
     if (
-      type === "TRANSACTIONS" &&
+      ["TRANSACTIONS","INVESTMENTS"].includes(type) &&
       [
         "SYNC_UPDATES_AVAILABLE",
         "DEFAULT_UPDATE",
@@ -60,6 +60,10 @@ export async function POST(request: Request) {
             }),
           )
           .run();
+    }
+    if(type==="ITEM"&&["ERROR","PENDING_EXPIRATION","PENDING_DISCONNECT","USER_PERMISSION_REVOKED"].includes(code)){
+      const plaidCode=String(payload.error?.error_code||code),message=String(payload.error?.error_message||"Plaid Item requires attention").slice(0,300);
+      await db.prepare("UPDATE connections SET error_code=?,latest_plaid_error_message=?,investment_access_status=CASE WHEN ? IN ('ADDITIONAL_CONSENT_REQUIRED','ACCESS_NOT_GRANTED','ITEM_LOGIN_REQUIRED') THEN 'RECONNECT_REQUIRED' ELSE investment_access_status END WHERE provider='plaid' AND provider_item_id=?").bind(plaidCode,message,plaidCode,itemId).run();
     }
     await loadRuntimeSecrets();
     const base = process.env.APP_URL;

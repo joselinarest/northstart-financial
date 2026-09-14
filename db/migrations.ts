@@ -543,4 +543,19 @@ export const migrations: readonly Migration[] = [
       `CREATE INDEX IF NOT EXISTS idx_push_subscriptions_user_active ON push_subscriptions(household_id,user_id,active,updated_at DESC)`,
     ],
   },
+  {
+    id: "0021_plaid_investment_access",
+    description: "Plaid Investments consent, synchronization diagnostics, and product-specific status",
+    statements: [
+      `ALTER TABLE connections ADD COLUMN IF NOT EXISTS plaid_products_json JSONB NOT NULL DEFAULT '[]'::jsonb`,
+      `ALTER TABLE connections ADD COLUMN IF NOT EXISTS plaid_consented_products_json JSONB NOT NULL DEFAULT '[]'::jsonb`,
+      `ALTER TABLE connections ADD COLUMN IF NOT EXISTS plaid_billed_products_json JSONB NOT NULL DEFAULT '[]'::jsonb`,
+      `ALTER TABLE connections ADD COLUMN IF NOT EXISTS plaid_consent_expiration_at TIMESTAMPTZ`,
+      `ALTER TABLE connections ADD COLUMN IF NOT EXISTS investment_access_status TEXT NOT NULL DEFAULT 'UNKNOWN'`,
+      `ALTER TABLE connections ADD COLUMN IF NOT EXISTS last_holdings_sync_at TIMESTAMPTZ`,
+      `ALTER TABLE connections ADD COLUMN IF NOT EXISTS last_investment_transactions_sync_at TIMESTAMPTZ`,
+      `ALTER TABLE connections ADD COLUMN IF NOT EXISTS latest_plaid_error_message TEXT`,
+      `CREATE INDEX IF NOT EXISTS idx_investment_transactions_external ON investment_transactions(account_id,source,external_id)`,
+    ],
+  },
 ] as const;
