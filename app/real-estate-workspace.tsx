@@ -58,6 +58,7 @@ type PropertyInsight = {
   protectedReserveCents: number;
   liquidCashCents: number;
   debtCents: number;
+  debtAvailable: boolean;
   status: "HEALTHY" | "WATCH" | "WARNING" | "CRITICAL";
   reason: string;
 };
@@ -69,6 +70,9 @@ type PropertyForm = {
   estimatedValue: number;
   monthlyRent: number;
   monthlyExpenses: number;
+  acquisitionDate: string;
+  mortgageBalance: number;
+  monthlyMortgagePayment: number;
 };
 export default function RealEstateWorkspace() {
   const [tab, setTab] = useState<Tab>("My Properties"),
@@ -84,6 +88,9 @@ export default function RealEstateWorkspace() {
       estimatedValue: 0,
       monthlyRent: 0,
       monthlyExpenses: 0,
+      acquisitionDate: "",
+      mortgageBalance: 0,
+      monthlyMortgagePayment: 0,
     }),
     [editingId, setEditingId] = useState(""),
     [editForm, setEditForm] = useState<PropertyForm | null>(null),
@@ -157,6 +164,9 @@ export default function RealEstateWorkspace() {
             estimatedValueCents: Math.round(form.estimatedValue * 100),
             monthlyRentCents: Math.round(form.monthlyRent * 100),
             monthlyExpensesCents: Math.round(form.monthlyExpenses * 100),
+            acquisitionDate: form.acquisitionDate || null,
+            mortgageBalanceCents: Math.round(form.mortgageBalance * 100),
+            monthlyMortgagePaymentCents: Math.round(form.monthlyMortgagePayment * 100),
           }),
         }),
         data = await r.json();
@@ -180,6 +190,9 @@ export default function RealEstateWorkspace() {
       estimatedValue: Number(property.estimated_value_cents || 0) / 100,
       monthlyRent: Number(property.monthly_rent_cents || 0) / 100,
       monthlyExpenses: Number(property.monthly_expenses_cents || 0) / 100,
+      acquisitionDate: String(property.acquisition_date || "").slice(0,10),
+      mortgageBalance: Number(insights[property.id]?.debtCents || 0) / 100,
+      monthlyMortgagePayment: Number(insights[property.id]?.monthlyPaymentCents || 0) / 100,
     });
   };
   const updateProperty = async () => {
@@ -200,6 +213,9 @@ export default function RealEstateWorkspace() {
             estimatedValueCents: Math.round(editForm.estimatedValue * 100),
             monthlyRentCents: Math.round(editForm.monthlyRent * 100),
             monthlyExpensesCents: Math.round(editForm.monthlyExpenses * 100),
+            acquisitionDate: editForm.acquisitionDate || null,
+            mortgageBalanceCents: Math.round(editForm.mortgageBalance * 100),
+            monthlyMortgagePaymentCents: Math.round(editForm.monthlyMortgagePayment * 100),
           }),
         }),
         result = await response.json();
@@ -232,7 +248,7 @@ export default function RealEstateWorkspace() {
             expenses = Number(x.monthly_expenses_cents || 0) / 100,
             purpose = String(x.property_type || "OTHER").toUpperCase(),
             debt = Number(insights[x.id]?.debtCents || 0) / 100,
-            equity = Math.max(0, value - debt),
+            equity = value - debt,
             equityChange = value - purchase,
             netRent = rent - expenses,
             grossYield = value ? ((rent * 12) / value) * 100 : 0;
@@ -431,6 +447,9 @@ export default function RealEstateWorkspace() {
                         }
                       />
                     </label>
+                    <label>Purchase date<input type="date" value={editForm.acquisitionDate} onChange={(event)=>setEditForm({...editForm,acquisitionDate:event.target.value})}/></label>
+                    <label>Mortgage / loan payoff balance<CurrencyInput value={editForm.mortgageBalance} onChange={(mortgageBalance)=>setEditForm({...editForm,mortgageBalance})}/></label>
+                    <label>Monthly mortgage / loan payment<CurrencyInput value={editForm.monthlyMortgagePayment} onChange={(monthlyMortgagePayment)=>setEditForm({...editForm,monthlyMortgagePayment})}/></label>
                     <label>
                       Monthly rent
                       <CurrencyInput
@@ -478,12 +497,12 @@ export default function RealEstateWorkspace() {
                   </article>
                   <article>
                     <small>Mortgage / loan balance</small>
-                    <b>{usd(x.debt)}</b>
+                    <b>{insights[x.id]?.debtAvailable ? usd(x.debt) : "Needs loan balance"}</b>
                   </article>
                   <article>
                     <small>Estimated equity</small>
                     <b className={x.equity > 0 ? "positive" : ""}>
-                      {x.value > 0 ? usd(x.equity) : "Unavailable"}
+                      {x.value > 0 && insights[x.id]?.debtAvailable ? usd(x.equity) : "Unavailable"}
                     </b>
                   </article>
                   <article>
@@ -515,7 +534,7 @@ export default function RealEstateWorkspace() {
                   const insight = insights[x.id];
                   return <section className={`property-financial-insight ${insight.status.toLowerCase()}`}>
                     <header><div><span>AUTOMATIC VALUE + HOUSEHOLD PAYMENT CHECK</span><h3>{insight.status} · Current finances {insight.status === "HEALTHY" ? "support" : "require review of"} this property</h3></div><strong>{insight.estimatedValueCents > 0 ? usd(insight.estimatedValueCents / 100) : "Value unavailable"}<small>modeled current value</small></strong></header>
-                    <div><article><small>Estimated value range</small><b>{insight.estimatedValueCents > 0 ? `${usd(insight.estimatedValueLowCents / 100)}–${usd(insight.estimatedValueHighCents / 100)}` : "Add purchase price or verified value"}</b><em>{insight.valuationSource} · {insight.valuationConfidence.toLowerCase()} confidence{insight.estimatedValueCents > 0 ? ` · ${insight.annualModelPct.toFixed(1)}% annual model` : ""}</em></article><article><small>Estimated equity</small><b>{insight.estimatedValueCents > 0 ? usd(Math.max(0, insight.estimatedValueCents - insight.debtCents) / 100) : "Unavailable"}</b><em>Modeled current value minus linked mortgage and property-loan balances</em></article><article><small>Current property debt</small><b>{usd(insight.debtCents / 100)}</b><em>Sum of linked property-loan balances</em></article><article><small>Monthly mortgage / loan payment</small><b>{usd(insight.monthlyPaymentCents / 100)}</b><em>Recorded loan schedule or observed linked mortgage payments</em></article><article><small>Net monthly property cost</small><b>{usd(insight.netHousingCostCents / 100)}</b><em>Payment + operating costs − recorded rent</em></article><article><small>Payment-to-income</small><b>{insight.paymentToIncomePct === null ? "Income history required" : `${insight.paymentToIncomePct.toFixed(1)}%`}</b><em>Uses the latest three months of household transactions</em></article><article><small>Projected household free cash</small><b>{usd(insight.projectedFreeCashCents / 100)}</b><em>After observed household outflow</em></article><article><small>Protected reserve / liquid cash</small><b>{usd(insight.protectedReserveCents / 100)} / {usd(insight.liquidCashCents / 100)}</b><em>Three-month spending reserve compared with connected cash</em></article></div>
+                    <div><article><small>Estimated value range</small><b>{insight.estimatedValueCents > 0 ? `${usd(insight.estimatedValueLowCents / 100)}–${usd(insight.estimatedValueHighCents / 100)}` : "Add purchase price or verified value"}</b><em>{insight.valuationSource} · {insight.valuationConfidence.toLowerCase()} confidence{insight.annualModelPct > 0 ? ` · ${insight.annualModelPct.toFixed(1)}% annual planning model` : ""}</em></article><article><small>Estimated equity</small><b>{insight.estimatedValueCents > 0&&insight.debtAvailable ? usd((insight.estimatedValueCents - insight.debtCents) / 100) : "Needs value and loan payoff"}</b><em>Current value minus linked or recorded mortgage payoff balance; negative equity is preserved</em></article><article><small>Current property debt</small><b>{insight.debtAvailable?usd(insight.debtCents / 100):"Loan balance not connected"}</b><em>Linked mortgage account balance takes priority over manually recorded debt</em></article><article><small>Monthly mortgage / loan payment</small><b>{insight.monthlyPaymentCents>0?usd(insight.monthlyPaymentCents / 100):"Payment not identified"}</b><em>Recorded loan schedule or observed linked mortgage payments</em></article><article><small>Net monthly property cost</small><b>{usd(insight.netHousingCostCents / 100)}</b><em>Payment + operating costs − recorded rent</em></article><article><small>Payment-to-income</small><b>{insight.paymentToIncomePct === null ? "Income history required" : `${insight.paymentToIncomePct.toFixed(1)}%`}</b><em>Uses the latest three months of household transactions</em></article><article><small>Projected household free cash</small><b>{usd(insight.projectedFreeCashCents / 100)}</b><em>After observed household outflow</em></article><article><small>Protected reserve / liquid cash</small><b>{usd(insight.protectedReserveCents / 100)} / {usd(insight.liquidCashCents / 100)}</b><em>Three-month spending reserve compared with connected cash</em></article></div>
                     <p><b>Why:</b> {insight.reason}</p><footer>The value is a planning model—not an appraisal or licensed AVM. Connect a property valuation provider or save a verified appraisal/snapshot to improve confidence. Payment analysis updates from synchronized household accounts and property-linked mortgage accounts.</footer>
                   </section>;
                 })()}
@@ -598,6 +617,9 @@ export default function RealEstateWorkspace() {
                   }
                 />
               </label>
+              <label>Purchase date<input type="date" value={form.acquisitionDate} onChange={(event)=>setForm({...form,acquisitionDate:event.target.value})}/></label>
+              <label>Mortgage / loan payoff balance<CurrencyInput value={form.mortgageBalance} onChange={(mortgageBalance)=>setForm({...form,mortgageBalance})}/></label>
+              <label>Monthly mortgage / loan payment<CurrencyInput value={form.monthlyMortgagePayment} onChange={(monthlyMortgagePayment)=>setForm({...form,monthlyMortgagePayment})}/></label>
               <label>
                 Monthly rent
                 <CurrencyInput

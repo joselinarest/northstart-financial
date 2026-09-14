@@ -29,7 +29,7 @@ export async function POST(r: Request) {
       );
     const eid = id("entity"),
       pid = id("property");
-    await db.batch([
+    const writes=[
       db
         .prepare(
           "INSERT INTO entities(id,household_id,type,name,legal_name) VALUES(?,?,?,?,?)",
@@ -37,7 +37,7 @@ export async function POST(r: Request) {
         .bind(eid, householdId, "property", b.name, b.legalName || null),
       db
         .prepare(
-          "INSERT INTO properties(id,entity_id,address,property_type,purchase_price_cents,estimated_value_cents,monthly_rent_cents,monthly_expenses_cents) VALUES(?,?,?,?,?,?,?,?)",
+          "INSERT INTO properties(id,entity_id,address,property_type,purchase_price_cents,estimated_value_cents,monthly_rent_cents,monthly_expenses_cents,acquisition_date) VALUES(?,?,?,?,?,?,?,?,?)",
         )
         .bind(
           pid,
@@ -48,8 +48,11 @@ export async function POST(r: Request) {
           b.estimatedValueCents || null,
           b.monthlyRentCents || 0,
           b.monthlyExpensesCents || 0,
+          b.acquisitionDate || null,
         ),
-    ]);
+    ];
+    if(Number(b.mortgageBalanceCents||0)>0||Number(b.monthlyMortgagePaymentCents||0)>0)writes.push(db.prepare("INSERT INTO property_loans(id,property_id,lender,loan_type,current_balance_cents,monthly_payment_cents) VALUES(?,?,?,'FIXED',?,?)").bind(`property_loan_${pid}`,pid,"Recorded mortgage / loan",Number(b.mortgageBalanceCents||0),Number(b.monthlyMortgagePaymentCents||0)));
+    await db.batch(writes);
     return Response.json({ id: pid, entityId: eid }, { status: 201 });
   } catch (e) {
     if (e instanceof Response) return e;
@@ -81,7 +84,7 @@ export async function PATCH(r: Request) {
         .bind(String(b.name).trim(), owned.entity_id, householdId),
       db
         .prepare(
-          "UPDATE properties SET address=?,property_type=?,purchase_price_cents=?,estimated_value_cents=?,monthly_rent_cents=?,monthly_expenses_cents=?,updated_at=CURRENT_TIMESTAMP WHERE id=?",
+          "UPDATE properties SET address=?,property_type=?,purchase_price_cents=?,estimated_value_cents=?,monthly_rent_cents=?,monthly_expenses_cents=?,acquisition_date=?,updated_at=CURRENT_TIMESTAMP WHERE id=?",
         )
         .bind(
           String(b.address || "").trim() || null,
@@ -90,8 +93,10 @@ export async function PATCH(r: Request) {
           Number(b.estimatedValueCents || 0),
           Number(b.monthlyRentCents || 0),
           Number(b.monthlyExpensesCents || 0),
+          b.acquisitionDate || null,
           propertyId,
         ),
+      db.prepare("INSERT INTO property_loans(id,property_id,lender,loan_type,current_balance_cents,monthly_payment_cents) VALUES(?,?,?,'FIXED',?,?) ON CONFLICT(id) DO UPDATE SET current_balance_cents=excluded.current_balance_cents,monthly_payment_cents=excluded.monthly_payment_cents,updated_at=CURRENT_TIMESTAMP").bind(`property_loan_${propertyId}`,propertyId,"Recorded mortgage / loan",Number(b.mortgageBalanceCents||0),Number(b.monthlyMortgagePaymentCents||0)),
     ]);
     return Response.json({ ok: true, id: propertyId });
   } catch (e) {
