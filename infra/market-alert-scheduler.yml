@@ -1,0 +1,66 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: Northstar server-driven market and notification worker schedule
+Parameters:
+  NorthstarAppUrl:
+    Type: String
+    Description: Production origin, for example https://app.example.com
+  CronSecret:
+    Type: String
+    NoEcho: true
+    Description: Must equal the production CRON_SECRET
+Resources:
+  WorkerRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal: { Service: lambda.amazonaws.com }
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+  WorkerFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      Runtime: nodejs22.x
+      Handler: index.handler
+      Role: !GetAtt WorkerRole.Arn
+      Timeout: 60
+      MemorySize: 128
+      Environment:
+        Variables:
+          APP_URL: !Ref NorthstarAppUrl
+          CRON_SECRET: !Ref CronSecret
+      Code:
+        ZipFile: |
+          exports.handler = async () => {
+            const response = await fetch(`${process.env.APP_URL.replace(/\/$/, "")}/api/notifications/process`, {
+              method: "POST",
+              headers: { authorization: `Bearer ${process.env.CRON_SECRET}` }
+            });
+            if (!response.ok) throw new Error(`Northstar worker returned ${response.status}`);
+            return response.json();
+          };
+  WorkerSchedule:
+    Type: AWS::Events::Rule
+    Properties:
+      Description: Evaluate Northstar market conditions and process notification jobs every minute
+      ScheduleExpression: rate(1 minute)
+      State: ENABLED
+      Targets:
+        - Arn: !GetAtt WorkerFunction.Arn
+          Id: NorthstarWorker
+          RetryPolicy:
+            MaximumEventAgeInSeconds: 300
+            MaximumRetryAttempts: 2
+  SchedulePermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !Ref WorkerFunction
+      Principal: events.amazonaws.com
+      SourceArn: !GetAtt WorkerSchedule.Arn
+Outputs:
+  WorkerFunctionName:
+    Value: !Ref WorkerFunction

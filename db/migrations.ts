@@ -449,4 +449,84 @@ export const migrations: readonly Migration[] = [
       `CREATE INDEX IF NOT EXISTS idx_property_rules_household_active ON property_transaction_rules(household_id,active,priority)`,
     ],
   },
+  {
+    id: "0016_realtime_notification_jobs",
+    description: "Verified Plaid webhook inbox, durable sync jobs, delivery lifecycle, and notification dismissal",
+    statements: [
+      `ALTER TABLE connections ADD COLUMN IF NOT EXISTS provider_item_id TEXT`,
+      `ALTER TABLE alerts ADD COLUMN IF NOT EXISTS dismissed_at TIMESTAMPTZ`,
+      `ALTER TABLE alert_deliveries ADD COLUMN IF NOT EXISTS available_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP`,
+      `CREATE TABLE IF NOT EXISTS background_jobs (
+        id TEXT PRIMARY KEY, household_id TEXT REFERENCES households(id) ON DELETE CASCADE,
+        job_type TEXT NOT NULL CHECK(job_type IN ('PLAID_SYNC','NOTIFICATION_DELIVERY')),
+        idempotency_key TEXT NOT NULL UNIQUE, payload_json JSONB NOT NULL DEFAULT '{}'::jsonb,
+        status TEXT NOT NULL DEFAULT 'QUEUED' CHECK(status IN ('QUEUED','RUNNING','SUCCEEDED','FAILED','DEAD')),
+        attempts INTEGER NOT NULL DEFAULT 0, available_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        locked_at TIMESTAMPTZ, completed_at TIMESTAMPTZ, error_code TEXT,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP, updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+      )`,
+      `CREATE TABLE IF NOT EXISTS plaid_webhook_events (
+        id TEXT PRIMARY KEY, item_id TEXT, webhook_type TEXT NOT NULL, webhook_code TEXT NOT NULL,
+        request_hash TEXT NOT NULL UNIQUE, verified BOOLEAN NOT NULL, payload_json JSONB NOT NULL,
+        received_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+      )`,
+      `CREATE INDEX IF NOT EXISTS idx_background_jobs_due ON background_jobs(status,available_at,created_at)`,
+      `CREATE INDEX IF NOT EXISTS idx_connections_provider_item ON connections(provider,provider_item_id)`,
+    ],
+  },
+  {
+    id: "0017_pwa_push_devices",
+    description: "Identify and safely manage multiple PWA push devices",
+    statements: [
+      `ALTER TABLE push_subscriptions ADD COLUMN IF NOT EXISTS device_name TEXT`,
+      `ALTER TABLE push_subscriptions ADD COLUMN IF NOT EXISTS platform TEXT`,
+      `ALTER TABLE push_subscriptions ADD COLUMN IF NOT EXISTS user_agent_hint TEXT`,
+      `CREATE INDEX IF NOT EXISTS idx_push_subscriptions_user_active ON push_subscriptions(household_id,user_id,active,updated_at DESC)`,
+    ],
+  },
+  {
+    id: "0018_market_intelligence_alert_engine",
+    description: "Server-driven market alert preferences, evidence ledger, deduplication, and worker jobs",
+    statements: [
+      `ALTER TABLE background_jobs DROP CONSTRAINT IF EXISTS background_jobs_job_type_check`,
+      `ALTER TABLE background_jobs ADD CONSTRAINT background_jobs_job_type_check CHECK(job_type IN ('PLAID_SYNC','NOTIFICATION_DELIVERY','MARKET_INTELLIGENCE'))`,
+      `CREATE TABLE IF NOT EXISTS market_alert_preferences (
+        household_id TEXT NOT NULL REFERENCES households(id) ON DELETE CASCADE,
+        user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        enabled BOOLEAN NOT NULL DEFAULT TRUE, channels_json JSONB NOT NULL DEFAULT '{"inApp":true,"push":false,"email":false}'::jsonb,
+        severities_json JSONB NOT NULL DEFAULT '{"ACTION_NOW":true,"IMPORTANT":true,"WATCH":true,"INFORMATIONAL":false}'::jsonb,
+        classes_json JSONB NOT NULL DEFAULT '{}'::jsonb, quiet_exceptions_json JSONB NOT NULL DEFAULT '{"ACTION_NOW":true}'::jsonb,
+        digest_low_value_news BOOLEAN NOT NULL DEFAULT TRUE, max_immediate_per_hour INTEGER NOT NULL DEFAULT 8,
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP, PRIMARY KEY(household_id,user_id)
+      )`,
+      `CREATE TABLE IF NOT EXISTS symbol_alert_preferences (
+        household_id TEXT NOT NULL REFERENCES households(id) ON DELETE CASCADE,
+        user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE, symbol TEXT NOT NULL,
+        enabled BOOLEAN NOT NULL DEFAULT TRUE, timeframe TEXT NOT NULL DEFAULT '5–7 Year',
+        price_above NUMERIC(20,6), price_below NUMERIC(20,6), support_level NUMERIC(20,6), resistance_level NUMERIC(20,6),
+        move_percent NUMERIC(8,3) NOT NULL DEFAULT 4, volume_ratio NUMERIC(8,3) NOT NULL DEFAULT 1.8,
+        minimum_confidence INTEGER NOT NULL DEFAULT 70 CHECK(minimum_confidence BETWEEN 0 AND 100),
+        cooldown_minutes INTEGER NOT NULL DEFAULT 240, classes_json JSONB NOT NULL DEFAULT '{}', channels_json JSONB NOT NULL DEFAULT '{}',
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP, PRIMARY KEY(household_id,user_id,symbol)
+      )`,
+      `CREATE TABLE IF NOT EXISTS market_intelligence_events (
+        id TEXT PRIMARY KEY, household_id TEXT NOT NULL REFERENCES households(id) ON DELETE CASCADE,
+        symbol TEXT, company_name TEXT, event_class TEXT NOT NULL, severity TEXT NOT NULL,
+        fingerprint TEXT NOT NULL UNIQUE, title TEXT NOT NULL, explanation TEXT NOT NULL,
+        evidence_json JSONB NOT NULL, confidence INTEGER NOT NULL CHECK(confidence BETWEEN 0 AND 100),
+        source_as_of TIMESTAMPTZ NOT NULL, created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+      )`,
+      `CREATE INDEX IF NOT EXISTS idx_market_events_household_time ON market_intelligence_events(household_id,created_at DESC)`,
+      `CREATE INDEX IF NOT EXISTS idx_market_events_symbol_class ON market_intelligence_events(household_id,symbol,event_class,created_at DESC)`,
+      `CREATE INDEX IF NOT EXISTS idx_symbol_alert_preferences_symbol ON symbol_alert_preferences(household_id,symbol,enabled)`,
+    ],
+  },
+  {
+    id: "0019_transaction_alert_classes",
+    description: "First-class transaction alert classes for configurable server-driven delivery",
+    statements: [
+      `ALTER TABLE transaction_notification_events DROP CONSTRAINT IF EXISTS transaction_notification_events_event_type_check`,
+      `ALTER TABLE transaction_notification_events ADD CONSTRAINT transaction_notification_events_event_type_check CHECK(event_type IN ('IMPORTED','UPDATED','PENDING_POSTED','RECURRING_IDENTIFIED','DEPOSIT','WITHDRAWAL','CARD_PURCHASE','LARGE_TRANSACTION','NEW_MERCHANT','SUBSCRIPTION_INCREASE','ATM_WITHDRAWAL','FOREIGN_TRANSACTION','FEE','DUPLICATE_CHARGE','SUSPICIOUS','REMOVED'))`,
+    ],
+  },
 ] as const;

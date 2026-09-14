@@ -28,6 +28,8 @@ import HouseholdMoneyCenter from "@/app/household-money-center";
 import DebtLiabilityCenter from "@/app/debt-liability-center";
 import { useConfirm } from "@/app/confirmation-modal";
 import TransactionNotificationCenter from "@/app/transaction-notification-center";
+import {PwaSettingsPanel} from "@/app/pwa-manager";
+import MarketAlertCenter from "@/app/market-alert-center";
 import BillTransactionHistory from "@/app/bill-transaction-history";
 import LongTermPortfolioPlan from "@/app/long-term-portfolio-plan";
 
@@ -199,6 +201,7 @@ export function NorthstarWorkspace({ initialTab = "Dashboard", initialInvestment
   const [authNotice, setAuthNotice] = useState("");
   const [tab, setTab] = useState(initialTab);
   const [routeLoading,setRouteLoading]=useState(false);
+  const [marketUnread,setMarketUnread]=useState(0);
   const [researchDetailOpen,setResearchDetailOpen]=useState(focusInvestmentAnalysis);
   const [pick, setPick] = useState({ticker:"",name:"",score:0,setup:"Select a provider-backed action to prepare.",price:0,trend:"Neutral",support:"—",resistance:"—",volume:"—",catalyst:"Check current news and event risk"});
   const [capital, setCapital] = useState(25000);
@@ -295,6 +298,7 @@ export function NorthstarWorkspace({ initialTab = "Dashboard", initialInvestment
   const [selectedBillName,setSelectedBillName]=useState(initialBillName);
   const [accountTransactions,setAccountTransactions]=useState<Array<Record<string,any>>>([]);
   const [accountTransactionsStatus,setAccountTransactionsStatus]=useState("");
+  const [targetTransactionId,setTargetTransactionId]=useState("");
   const [plaidNotice, setPlaidNotice] = useState("Connect a read-only institution to begin syncing balances and transactions.");
   const [plaidBusy, setPlaidBusy] = useState(false);
   const [manualAccount,setManualAccount]=useState({alias:"",accountType:"Roth IRA",purpose:"Long-term"});
@@ -448,6 +452,8 @@ export function NorthstarWorkspace({ initialTab = "Dashboard", initialInvestment
     return()=>{window.removeEventListener("popstate",restoreRoute);document.removeEventListener("click",interceptWorkspaceLink)};
   },[]);
   useEffect(()=>{if(tab==="Account Transactions"&&selectedFinanceAccountId&&signedIn&&workspaceAccess==="granted")openAccountTransactions(selectedFinanceAccountId)},[tab,selectedFinanceAccountId,signedIn,workspaceAccess,accessToken]);
+  useEffect(()=>{if(tab==="Account Transactions")setTargetTransactionId(new URLSearchParams(window.location.search).get("transactionId")||"")},[tab]);
+  useEffect(()=>{if(!targetTransactionId)return;setAccountTransactions(current=>{const match=current.find(row=>String(row.id)===targetTransactionId);return !match||String(current[0]?.id)===targetTransactionId?current:[match,...current.filter(row=>String(row.id)!==targetTransactionId)]})},[targetTransactionId,accountTransactions.length]);
   useEffect(()=>{if(tab!=="Account Transactions")return;const timer=window.setTimeout(()=>{const chart=document.querySelector<HTMLElement>(".transaction-chart"),header=chart?.querySelector("header");if(!chart||!header||header.querySelector(".chart-fullscreen-toggle"))return;const button=document.createElement("button");button.type="button";button.className="chart-fullscreen-toggle";button.textContent="⛶ Maximize";button.title="Maximize chart for touch, landscape, or desktop review";const update=()=>{button.textContent=document.fullscreenElement?"× Restore":"⛶ Maximize"};button.onclick=async()=>{try{if(document.fullscreenElement)await document.exitFullscreen();else await chart.requestFullscreen()}catch{chart.classList.toggle("expanded-chart");button.textContent=chart.classList.contains("expanded-chart")?"× Restore":"⛶ Maximize"}};document.addEventListener("fullscreenchange",update);header.appendChild(button);(button as any)._cleanup=()=>document.removeEventListener("fullscreenchange",update)},0);return()=>{window.clearTimeout(timer);const button=document.querySelector<HTMLButtonElement>(".chart-fullscreen-toggle");(button as any)?._cleanup?.();button?.remove()}},[tab,accountTransactions.length]);
   const updateInvestmentAccount=async(accountId:string,nickname:string,investmentPurpose:string)=>{setPlaidNotice("Saving investment account profile…");try{const response=await fetch("/api/connections/plaid",{method:"PATCH",headers:financeHeaders(),body:JSON.stringify({accountId,nickname,investmentPurpose})}),data=await apiPayload(response);if(!response.ok)throw new Error(data.error||"Unable to save account profile");await loadConnectedFinance(true);setPlaidNotice("✓ Nickname and investment purpose saved and verified from the database.");return true}catch(error){setPlaidNotice(error instanceof Error?error.message:"Unable to save account profile");return false}};
   const createManualInvestmentAccount=async()=>{setManualAccountBusy(true);setPlaidNotice("Creating manual investment account…");try{const response=await fetch("/api/connections/plaid",{method:"POST",headers:financeHeaders(),body:JSON.stringify({...manualAccount,source:"manual"})}),data=await apiPayload(response);if(!response.ok)throw new Error(`${data.error||"Unable to create manual investment account"}${data.code?` (${data.code})`:""}`);setManualAccount(value=>({...value,alias:""}));await loadConnectedFinance(true);setPlaidNotice("✓ Manual investment account created. Add and maintain its holdings manually; it is not synchronized by Plaid.")}catch(error){setPlaidNotice(error instanceof Error?error.message:"Unable to create manual investment account")}finally{setManualAccountBusy(false)}};
@@ -489,22 +495,12 @@ export function NorthstarWorkspace({ initialTab = "Dashboard", initialInvestment
     const localHost = ["localhost", "127.0.0.1"].includes(window.location.hostname);
     setIsLocal(localHost);
     if (localHost && sessionStorage.getItem("northstar-local-preview") === "true") setSignedIn(true);
-    if (!("serviceWorker" in navigator)) return;
-    if (localHost) {
-      navigator.serviceWorker.getRegistrations().then((registrations) =>
-        Promise.all(registrations.map((registration) => registration.unregister())),
-      );
-      if ("caches" in window) {
-        caches.keys().then((keys) => Promise.all(keys.map((key) => caches.delete(key))));
-      }
-      return;
-    }
-    navigator.serviceWorker.register("/sw.js").catch(() => undefined);
   }, []);
+  useEffect(()=>{const update=(event:Event)=>setMarketUnread(Number((event as CustomEvent<number>).detail||0));window.addEventListener("northstar:market-unread",update);return()=>window.removeEventListener("northstar:market-unread",update)},[]);
   useEffect(() => {
     const session=getCognitoSession();
-    if(session){setAccessToken(session.idToken);setAccountEmail(session.email||"");setSignedIn(true)}
-    setAuthReady(true);
+    if(session){setAccessToken(session.idToken);setAccountEmail(session.email||"");setSignedIn(true);setAuthReady(true);return}
+    fetch("/api/auth/session",{cache:"no-store"}).then(async response=>response.ok?response.json():null).then(data=>{if(data?.authenticated){setAccountEmail(data.email||"");setSignedIn(true)}}).finally(()=>setAuthReady(true));
   }, []);
   useEffect(() => {
     if (!signedIn) return;
@@ -544,6 +540,8 @@ export function NorthstarWorkspace({ initialTab = "Dashboard", initialInvestment
   const sendOtp = async () => socialLogin();
   const verifyOtp = async () => socialLogin();
   const enableNotifications = async () => {
+    const ios=/iPad|iPhone|iPod/.test(navigator.userAgent),standalone=window.matchMedia("(display-mode: standalone)").matches||Boolean((navigator as Navigator&{standalone?:boolean}).standalone);
+    if(ios&&!standalone){setNotifyStatus("Install Northstar from Safari before enabling iPhone Web Push");window.dispatchEvent(new Event("northstar:pwa-install"));return}
     if (!("Notification" in window)) {
       setNotifyStatus("Not supported on this device");
       return;
@@ -552,7 +550,7 @@ export function NorthstarWorkspace({ initialTab = "Dashboard", initialInvestment
     if(result==="granted"){
       try{
         const registration=await navigator.serviceWorker.ready,response=await fetch("/api/notifications/push-subscription",{headers:financeHeaders()}),configuration=await response.json();
-        if(response.ok&&configuration.publicKey){const normalized=String(configuration.publicKey).replace(/-/g,"+").replace(/_/g,"/"),padded=normalized+"=".repeat((4-normalized.length%4)%4),applicationServerKey=Uint8Array.from(atob(padded),value=>value.charCodeAt(0)),subscription=await registration.pushManager.subscribe({userVisibleOnly:true,applicationServerKey});await fetch("/api/notifications/push-subscription",{method:"POST",headers:financeHeaders(),body:JSON.stringify(subscription.toJSON())})}
+        if(response.ok&&configuration.publicKey){const normalized=String(configuration.publicKey).replace(/-/g,"+").replace(/_/g,"/"),padded=normalized+"=".repeat((4-normalized.length%4)%4),applicationServerKey=Uint8Array.from(atob(padded),value=>value.charCodeAt(0)),existing=await registration.pushManager.getSubscription(),subscription=existing||await registration.pushManager.subscribe({userVisibleOnly:true,applicationServerKey});await fetch("/api/notifications/push-subscription",{method:"POST",headers:financeHeaders(),body:JSON.stringify({subscription:subscription.toJSON(),deviceName:/iPhone|iPad/.test(navigator.userAgent)?"iPhone / iPad Home Screen":"Northstar on this browser",platform:navigator.platform||"Web",userAgentHint:navigator.userAgent.match(/(iPhone OS|Android|Windows NT|Mac OS X)[^;)]+/)?.[0]||"Web Push"})})}
         localStorage.setItem("northstar-push-enabled","true");setPushEnabled(true);setNotifyStatus(configuration.configured?"Northstar alerts ON · secure push registered":"Device permission granted · push provider setup required");return;
       }catch(error){setNotifyStatus(error instanceof Error?error.message:"Push registration failed");return}
     }
@@ -819,7 +817,7 @@ export function NorthstarWorkspace({ initialTab = "Dashboard", initialInvestment
         <div className="head-actions">
           <HeaderMarketSearch currentSymbol={chartSymbol} onSelect={symbol=>{sessionStorage.setItem("northstar-chart-symbol",symbol);setChartSymbol(symbol);setMarketLookup(symbol);navigate("Professional Charts")}}/>
           <div className="profile-menu" ref={profileMenuRef}>
-            <button className="avatar profile-menu-trigger" type="button" aria-label="Open user menu" aria-haspopup="dialog" aria-expanded={profileMenuOpen} onClick={()=>setProfileMenuOpen(value=>!value)}>{displayInitials}</button>
+            <button className="avatar profile-menu-trigger" type="button" aria-label={`Open user menu${marketUnread?` · ${marketUnread} unread market alerts`:""}`} aria-haspopup="dialog" aria-expanded={profileMenuOpen} onClick={()=>setProfileMenuOpen(value=>!value)}>{displayInitials}{marketUnread>0&&<sup>{marketUnread>99?"99+":marketUnread}</sup>}</button>
             {profileMenuOpen&&<section className="profile-menu-popover" role="dialog" aria-label="User menu"><header><span className="avatar">{displayInitials}</span><div><b>{accountEmail||"Northstar user"}</b><small>{familyRole.replaceAll("_"," ")} · {realtimeStatus}</small></div></header><nav>
               {!studentOnly&&["owner","co_owner"].includes(familyRole)&&<button type="button" onClick={()=>{setProfileMenuOpen(false);sessionStorage.setItem("northstar-open-invite","true");navigate("Household")}}><i>♧</i><span><b>Invite family</b><small>Manage household access</small></span></button>}
               <button type="button" onClick={()=>{setProfileMenuOpen(false);navigate("Help")}}><i>?</i><span><b>Help &amp; Guide</b><small>Open tutorials and support</small></span></button>
@@ -1162,6 +1160,7 @@ export function NorthstarWorkspace({ initialTab = "Dashboard", initialInvestment
                 <button className="primary" onClick={()=>notify("Watch creation requires the authenticated connected-data form.")}>＋ Create watch</button>
               </div>
             </div>
+            <MarketAlertCenter accessToken={accessToken}/>
             <div className="plaid-notice" role="status">{macroStatus}</div>
             {macroSeries.length>0&&<div className="connection-summary">{macroSeries.slice(0,6).map(item=><div key={item.id}><small>{item.label}</small><b>{item.value===null?"—":`${item.value.toFixed(2)}${item.unit?` ${item.unit}`:""}`}</b><span>{item.date||"No observation date"}{item.change!==null?` · ${item.change>=0?"+":""}${item.change.toFixed(2)} previous`:""}</span></div>)}</div>}
             <div className="intel-filters">
@@ -2101,7 +2100,7 @@ export function NorthstarWorkspace({ initialTab = "Dashboard", initialInvestment
                   Only IMPORTANT and ACT NOW TO REVIEW events interrupt you.
                   INFO and WATCH stay in the daily digest.
                 </p>
-                <div className="notification-actions"><button className={`primary notify ${notifyClass}`} disabled={notifyClass==="unsupported"} onClick={()=>{if(Notification.permission==="granted"){localStorage.setItem("northstar-push-enabled","true");setPushEnabled(true);setNotifyStatus("Northstar alerts ON · browser permission granted")}else enableNotifications()}}>{pushEnabled?"✓ Northstar alerts enabled":"Enable Northstar alerts"}</button><button className="notification-off" disabled={!pushEnabled} onClick={()=>{localStorage.setItem("northstar-push-enabled","false");setPushEnabled(false);setNotifyStatus("Northstar alerts OFF · browser permission remains granted")}}>Turn off alerts</button></div>
+                <div className="notification-actions"><button className={`primary notify ${notifyClass}`} disabled={notifyClass==="unsupported"} onClick={()=>enableNotifications()}>{pushEnabled?"✓ Refresh device registration":"Enable Northstar alerts"}</button><button className="notification-off" disabled={!pushEnabled} onClick={async()=>{const registration=await navigator.serviceWorker?.ready,subscription=await registration?.pushManager.getSubscription();await subscription?.unsubscribe();await fetch("/api/notifications/push-subscription",{method:"DELETE",headers:financeHeaders()});localStorage.setItem("northstar-push-enabled","false");setPushEnabled(false);setNotifyStatus("Northstar alerts OFF · this device was removed")}}>Turn off alerts</button></div>
                 <span className={`notify-status ${notifyClass}`} role="status"><i />{notifyStatus}</span>
                 <small className="setup-note">
                   To revoke browser permission completely, open the site controls beside the address bar → Notifications → Block. Web Push delivery also requires HTTPS, a push-signing key, and a server subscription endpoint.
@@ -2118,6 +2117,8 @@ export function NorthstarWorkspace({ initialTab = "Dashboard", initialInvestment
               </div>
             </div>
             <TransactionNotificationCenter accessToken={accessToken}/>
+            <MarketAlertCenter accessToken={accessToken} settings/>
+            <PwaSettingsPanel accessToken={accessToken}/>
             <div className="discipline-rules">
               <span>✓ No alerts during sleep hours</span>
               <span>✓ Maximum 3 urgent alerts/day</span>

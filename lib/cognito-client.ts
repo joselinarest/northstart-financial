@@ -4,6 +4,7 @@ const SESSION_KEY = "northstar-cognito-session";
 const STATE_KEY = "northstar-cognito-state";
 const VERIFIER_KEY = "northstar-cognito-verifier";
 const NEXT_KEY = "northstar-cognito-next";
+const FLOW_KEY = "northstar-cognito-pwa-flow";
 
 export type CognitoSession = {
   idToken: string;
@@ -43,6 +44,7 @@ export async function startCognitoLogin() {
   sessionStorage.setItem(STATE_KEY, state);
   const requestedPath=`${location.pathname}${location.search}${location.hash}`;
   sessionStorage.setItem(NEXT_KEY,requestedPath.startsWith("/")&&!requestedPath.startsWith("//")?requestedPath:"/workspace/dashboard");
+  localStorage.setItem(FLOW_KEY,JSON.stringify({verifier,state,next:requestedPath,expiresAt:Date.now()+10*60*1000}));
   const params = new URLSearchParams({client_id:clientId,response_type:"code",scope:"openid email profile",redirect_uri:`${location.origin}/auth/callback`,state,code_challenge:challenge,code_challenge_method:"S256"});
   params.set("identity_provider", "Google");
   params.set("prompt","select_account");
@@ -50,7 +52,9 @@ export async function startCognitoLogin() {
 }
 
 export async function completeCognitoLogin(code:string, state:string):Promise<{session:CognitoSession;next:string}> {
-  const { domain, clientId } = config(), expectedState = sessionStorage.getItem(STATE_KEY), verifier = sessionStorage.getItem(VERIFIER_KEY);
+  let fallback:{verifier?:string;state?:string;next?:string;expiresAt?:number}={};try{fallback=JSON.parse(localStorage.getItem(FLOW_KEY)||"{}")}catch{}
+  if((fallback.expiresAt||0)<Date.now())fallback={};
+  const { domain, clientId } = config(), expectedState = sessionStorage.getItem(STATE_KEY)||fallback.state||null, verifier = sessionStorage.getItem(VERIFIER_KEY)||fallback.verifier||null;
   if (!domain || !clientId) throw new Error("AWS Cognito environment variables are not configured.");
   if (!state || state !== expectedState || !verifier) throw new Error("The sign-in response could not be verified. Please start again.");
   const body = new URLSearchParams({grant_type:"authorization_code",client_id:clientId,code,redirect_uri:`${location.origin}/auth/callback`,code_verifier:verifier});
@@ -59,9 +63,12 @@ export async function completeCognitoLogin(code:string, state:string):Promise<{s
   if (!response.ok || !tokens.id_token || !tokens.access_token) throw new Error(tokens.error_description || tokens.error || "Cognito could not complete sign-in.");
   const claims = decodeClaims(tokens.id_token);
   const session:CognitoSession = {idToken:tokens.id_token,accessToken:tokens.access_token,refreshToken:tokens.refresh_token,expiresAt:(claims.exp || Math.floor(Date.now()/1000)+(tokens.expires_in||3600))*1000,email:claims.email,name:claims.name};
+  const serverSession=await fetch("/api/auth/session",{method:"POST",headers:{Authorization:`Bearer ${tokens.id_token}`}});
+  if(!serverSession.ok)throw new Error("Northstar could not establish the secure app session.");
   sessionStorage.setItem(SESSION_KEY, JSON.stringify(session));
-  const requested = sessionStorage.getItem(NEXT_KEY) || "/workspace/dashboard";
+  const requested = sessionStorage.getItem(NEXT_KEY) || fallback.next || "/workspace/dashboard";
   [STATE_KEY,VERIFIER_KEY,NEXT_KEY].forEach(key=>sessionStorage.removeItem(key));
+  localStorage.removeItem(FLOW_KEY);
   return {session,next:requested.startsWith("/")&&!requested.startsWith("//")?requested:"/workspace/dashboard"};
 }
 
@@ -72,5 +79,6 @@ export function getCognitoSession():CognitoSession|null {
 export function signOutCognito() {
   const {domain,clientId}=config();
   sessionStorage.removeItem(SESSION_KEY);
+  fetch("/api/auth/session",{method:"DELETE",keepalive:true}).catch(()=>undefined);
   if(domain&&clientId){const params=new URLSearchParams({client_id:clientId,logout_uri:location.origin});location.assign(`${domain}/logout?${params}`)}else location.assign("/");
 }

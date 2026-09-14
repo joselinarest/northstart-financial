@@ -25,6 +25,7 @@ import './responsive-mobile.css';
 import './design-system.css';
 import HoldingDisclosureController from './holding-disclosure-controller';
 import { ConfirmProvider } from './confirmation-modal';
+import PwaManager from './pwa-manager';
 
 const geistSans = Geist({
   variable: '--font-geist-sans',
@@ -39,11 +40,13 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: 'Northstar — Professional Trading Copilot',
   description: 'A powerful, risk-first and explainable investing and trading assistant for every experience level.',
-  manifest: '/manifest.json',
-  icons: { icon: '/favicon.svg?v=3', shortcut: '/favicon.svg?v=3', apple: '/favicon.svg?v=3' },
-  themeColor: '#172a24',
+  manifest: '/manifest.webmanifest',
+  icons: { icon: [{url:'/icons/northstar-192.png',sizes:'192x192',type:'image/png'},{url:'/favicon.svg',type:'image/svg+xml'}], shortcut: '/favicon.svg', apple: [{url:'/icons/apple-touch-icon.png',sizes:'180x180',type:'image/png'}] },
   appleWebApp: { capable: true, statusBarStyle: 'black-translucent', title: 'Northstar' },
+  formatDetection:{telephone:false},
 };
+
+export const viewport={themeColor:'#0b3d30',width:'device-width',initialScale:1,viewportFit:'cover'};
 
 export default function RootLayout({
   children,
@@ -56,7 +59,7 @@ export default function RootLayout({
         suppressHydrationWarning
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
-        <ConfirmProvider><HoldingDisclosureController />{children}</ConfirmProvider>
+        <ConfirmProvider><PwaManager/><HoldingDisclosureController />{children}</ConfirmProvider>
       </body>
     </html>
   );
