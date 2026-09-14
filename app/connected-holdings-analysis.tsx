@@ -399,7 +399,11 @@ export default function ConnectedHoldingsAnalysis({
               h.cost_basis_cents == null
                 ? null
                 : Number(h.cost_basis_cents) / 100,
-            marks = history.filter((mark) => mark.symbol === symbol),
+            marks = history.filter(
+              (mark) =>
+                String(mark.account_id) === String(h.account_id) &&
+                mark.symbol === symbol,
+            ),
             latestMark = marks[0],
             dailyChange =
               latestMark?.day_change_cents == null
@@ -434,7 +438,7 @@ export default function ConnectedHoldingsAnalysis({
                     : {
                         tone: "risk",
                         title: "INDIVIDUAL STOCK · CONCENTRATION RISK",
-                        text: `One company represents ${weight.toFixed(1)}% of the portfolio, so company-specific losses could materially affect the plan.`,
+                        text: `One company represents ${weight.toFixed(1)}% of this account, so company-specific losses could materially affect the plan.`,
                       };
           return (
             <article className={x?.state || "pending"} key={symbol}>
@@ -443,7 +447,7 @@ export default function ConnectedHoldingsAnalysis({
                   <b>{symbol}</b>
                   <small>
                     {h.name} · {shares.toLocaleString()} shares ·{" "}
-                    {weight.toFixed(1)}% of portfolio
+                    {weight.toFixed(1)}% of this account
                   </small>
                   <small className="history-mark">
                     {marks.length} market day{marks.length === 1 ? "" : "s"}{" "}
