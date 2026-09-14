@@ -7,6 +7,8 @@ const webhook = await readFile(new URL("../app/api/connections/plaid/webhook/rou
 const migrations = await readFile(new URL("../db/migrations.ts", import.meta.url), "utf8");
 
 assert.match(link, /additional_consented_products:updateMode\?\["investments"\]/);
+assert.match(link, /user:\{client_user_id:userId\}/);
+assert.match(link, /update:updateMode\?\{account_selection_enabled:true\}/);
 assert.match(link, /products:updateMode\?undefined:products/);
 assert.match(sync, /\/investments\/holdings\/get/);
 assert.match(sync, /\/investments\/transactions\/get/);
