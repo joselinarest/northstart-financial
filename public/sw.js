@@ -1,13 +1,15 @@
 /* Northstar PWA worker. Private financial pages and API payloads are never cached. */
-const VERSION = "northstar-pwa-v4";
+const VERSION = "northstar-pwa-v5";
 const STATIC_CACHE = `${VERSION}-static`;
 const OFFLINE_URL = "/offline";
 const PRECACHE = [OFFLINE_URL,"/manifest.webmanifest","/favicon.svg","/icons/northstar-192.png","/icons/northstar-512.png","/icons/northstar-maskable-192.png","/icons/northstar-maskable-512.png","/icons/apple-touch-icon.png"];
+const LOCAL_DEVELOPMENT = ["localhost","127.0.0.1"].includes(self.location.hostname);
 
-self.addEventListener("install", event => event.waitUntil(caches.open(STATIC_CACHE).then(cache => cache.addAll(PRECACHE))));
+self.addEventListener("install", event => event.waitUntil(LOCAL_DEVELOPMENT?self.skipWaiting():caches.open(STATIC_CACHE).then(cache => cache.addAll(PRECACHE))));
 self.addEventListener("activate", event => event.waitUntil(caches.keys().then(keys => Promise.all(keys.filter(key => key !== STATIC_CACHE).map(key => caches.delete(key)))).then(() => self.clients.claim())));
 self.addEventListener("message", event => { if (event.data?.type === "SKIP_WAITING") self.skipWaiting(); });
 self.addEventListener("fetch", event => {
+  if(LOCAL_DEVELOPMENT)return;
   const request=event.request;
   if(request.method!=="GET")return;
   const url=new URL(request.url);
