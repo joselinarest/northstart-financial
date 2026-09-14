@@ -14,6 +14,7 @@
     "test:pwa": "node scripts/pwa-check.mjs",
     "test:market-alerts": "node scripts/market-alert-check.mjs",
     "test:transaction-alerts": "node scripts/transaction-alert-check.mjs"
+    ,"db:migrate": "node scripts/run-migrations.mjs"
   },
   "dependencies": {
     "@aws-sdk/client-secrets-manager": "^3.1125.0",

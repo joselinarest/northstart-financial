@@ -529,4 +529,18 @@ export const migrations: readonly Migration[] = [
       `ALTER TABLE transaction_notification_events ADD CONSTRAINT transaction_notification_events_event_type_check CHECK(event_type IN ('IMPORTED','UPDATED','PENDING_POSTED','RECURRING_IDENTIFIED','DEPOSIT','WITHDRAWAL','CARD_PURCHASE','LARGE_TRANSACTION','NEW_MERCHANT','SUBSCRIPTION_INCREASE','ATM_WITHDRAWAL','FOREIGN_TRANSACTION','FEE','DUPLICATE_CHARGE','SUSPICIOUS','REMOVED'))`,
     ],
   },
+  {
+    id: "0020_notification_schema_drift_repair",
+    description: "Repair notification columns for databases whose earlier migration ledger preceded the final schema",
+    statements: [
+      `ALTER TABLE connections ADD COLUMN IF NOT EXISTS provider_item_id TEXT`,
+      `ALTER TABLE alerts ADD COLUMN IF NOT EXISTS dismissed_at TIMESTAMPTZ`,
+      `ALTER TABLE alert_deliveries ADD COLUMN IF NOT EXISTS available_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP`,
+      `ALTER TABLE push_subscriptions ADD COLUMN IF NOT EXISTS device_name TEXT`,
+      `ALTER TABLE push_subscriptions ADD COLUMN IF NOT EXISTS platform TEXT`,
+      `ALTER TABLE push_subscriptions ADD COLUMN IF NOT EXISTS user_agent_hint TEXT`,
+      `CREATE INDEX IF NOT EXISTS idx_connections_provider_item ON connections(provider,provider_item_id)`,
+      `CREATE INDEX IF NOT EXISTS idx_push_subscriptions_user_active ON push_subscriptions(household_id,user_id,active,updated_at DESC)`,
+    ],
+  },
 ] as const;
