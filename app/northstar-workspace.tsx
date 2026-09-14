@@ -531,7 +531,7 @@ export function NorthstarWorkspace({ initialTab = "Dashboard", initialInvestment
   useEffect(()=>{localStorage.setItem("northstar-market-alert-settings",JSON.stringify({timezone,travelMode,decisionTime,intradayRefreshMinutes,refreshDefaultVersion:2,decisionAlarmEnabled,dailyLimit}))},[timezone,travelMode,decisionTime,intradayRefreshMinutes,decisionAlarmEnabled,dailyLimit]);
   useEffect(()=>{if(!decisionAlarmEnabled||!pushEnabled||!("Notification" in window)||Notification.permission!=="granted")return;const check=()=>{const parts=Object.fromEntries(new Intl.DateTimeFormat("en-US",{timeZone:"America/New_York",weekday:"short",hour12:false,hour:"2-digit",minute:"2-digit"}).formatToParts(new Date()).filter(part=>part.type!=="literal").map(part=>[part.type,part.value])),today=new Date().toISOString().slice(0,10),key=`northstar-decision-alarm-${today}`;if(!["Sat","Sun"].includes(String(parts.weekday))&&`${parts.hour}:${parts.minute}`===decisionTime&&localStorage.getItem(key)!=="sent"){new Notification("Northstar decision window",{body:"The live market plan has been refreshed. Review triggers, risk, and invalidation before taking any action."});localStorage.setItem(key,"sent")}};check();const timer=window.setInterval(check,30000);return()=>window.clearInterval(timer)},[decisionAlarmEnabled,pushEnabled,decisionTime]);
   useEffect(()=>{try{const saved=localStorage.getItem("northstar-decision-journal");if(saved)setJournalEntries(JSON.parse(saved));const reflection=sessionStorage.getItem("northstar-journal-reflection");if(tab==="Journal"&&reflection){setJournalForm(current=>({...current,thesis:reflection}));sessionStorage.removeItem("northstar-journal-reflection")}}catch{setJournalNotice("Saved journal entries could not be loaded.")}},[tab]);
-  useEffect(()=>{if(["Dashboard","Accounts","Account Transactions","Bill Transactions","Portfolio","Growth Finder","Market Intel","Prepare Trade","Professional Charts","Household","Bills & cards","Liabilities"].includes(tab)&&signedIn)loadConnectedFinance()},[tab,signedIn,accessToken]);
+  useEffect(()=>{if(["Dashboard","Accounts","Account Transactions","Bill Transactions","Portfolio","Growth Finder","Market Intel","Prepare Trade","Professional Charts","Household","Bills & cards","Liabilities"].includes(tab)&&signedIn&&workspaceAccess==="granted")loadConnectedFinance()},[tab,signedIn,workspaceAccess,accessToken]);
   useEffect(()=>{if(tab==="Household"&&sessionStorage.getItem("northstar-open-invite")==="true"){sessionStorage.removeItem("northstar-open-invite");setInviteOpen(true)}},[tab]);
   const socialLogin = async () => {
     setAuthNotice("");
@@ -627,6 +627,7 @@ export function NorthstarWorkspace({ initialTab = "Dashboard", initialInvestment
   const monthlyBills = bills.filter(b=>Date.parse(b.dueDate)<=Date.now()+31*86400000).reduce((s, b) => s + b.amount, 0);
   const openBillHistory=(pattern:RegExp,fallback:string)=>{const bill=bills.find(item=>pattern.test(`${item.name} ${item.category}`)),name=bill?.name||fallback,accountId=bill?.accountId||"";setSelectedBillName(name);setSelectedFinanceAccountId(accountId);navigatePath(`/workspace/bills/${encodeURIComponent(name)}${accountId?`?accountId=${encodeURIComponent(accountId)}`:""}`)};
   const cardMinimums = cards.reduce((s, c) => s + c.min, 0);
+  const financeBackedTabs=["Dashboard","Accounts","Account Transactions","Bill Transactions","Portfolio","Growth Finder","Market Intel","Prepare Trade","Professional Charts","Household","Bills & cards","Liabilities"],pageDataLoading=routeLoading||(financeBackedTabs.includes(tab)&&!financeDataReady)||(tab==="Account Transactions"&&accountTransactionsStatus.startsWith("Loading"));
   const monthlyIncome = monthlySpending.income;
   const freeCash = Math.max(0,monthlyIncome-monthlySpending.spending-monthlySpending.debtPayments);
   const debts:Array<{name:string;type:string;balance:number;apr:number;payment:number;urgency:string}>=[];
@@ -853,8 +854,8 @@ export function NorthstarWorkspace({ initialTab = "Dashboard", initialInvestment
             </button>
           </div>
         </aside>
-        <section className="content page-container" aria-busy={routeLoading}>
-          {routeLoading&&<div className="workspace-route-skeleton" role="status" aria-live="polite"><span className="sr-only">Loading page content</span><i className="route-skeleton-title"/><i className="route-skeleton-subtitle"/><div><i/><i/><i/></div><i className="route-skeleton-panel"/></div>}
+        <section className="content page-container" aria-busy={pageDataLoading}>
+          {pageDataLoading&&<div className="workspace-route-skeleton" role="status" aria-live="polite" aria-label="Loading Northstar data"><span className="sr-only">Loading complete page data</span><i className="route-skeleton-title"/><i className="route-skeleton-subtitle"/><div><i/><i/><i/><i/></div><i className="route-skeleton-panel"/><div className="route-skeleton-rows"><i/><i/><i/><i/></div></div>}
           {actionNotice && <div className="action-toast" role="status">{actionNotice}</div>}
           <nav className="workspace-breadcrumb" aria-label="Page navigation">
             <div className="history-controls" aria-label="Navigation history">
