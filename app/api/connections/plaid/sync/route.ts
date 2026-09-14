@@ -36,7 +36,9 @@ async function plaid(
   return payload;
 }
 const plaidError=(error:unknown)=>({code:String((error as any)?.code||"PLAID_API_ERROR"),message:error instanceof Error?error.message:"Plaid request failed"});
-const investmentRecoveryCodes=new Set(["NO_INVESTMENT_ACCOUNTS","ADDITIONAL_CONSENT_REQUIRED","ACCESS_NOT_GRANTED","PRODUCTS_NOT_SUPPORTED","INSTITUTION_DOWN","PRODUCT_NOT_READY"]);
+const investmentReconnectCodes=new Set(["ADDITIONAL_CONSENT_REQUIRED","ACCESS_NOT_GRANTED","ITEM_LOGIN_REQUIRED"]);
+const investmentUnsupportedCodes=new Set(["NO_INVESTMENT_ACCOUNTS","PRODUCTS_NOT_SUPPORTED"]);
+const investmentStatusFor=(code:string)=>code==="PRODUCT_NOT_READY"?"PENDING":investmentUnsupportedCodes.has(code)?"UNSUPPORTED":code==="INSTITUTION_DOWN"?"TEMPORARILY_UNAVAILABLE":investmentReconnectCodes.has(code)?"RECONNECT_REQUIRED":"ERROR";
 const cents = (value: unknown) => Math.round(Number(value || 0) * 100);
 
 export async function POST(request: Request) {
@@ -475,10 +477,10 @@ export async function POST(request: Request) {
         await db.prepare("UPDATE connections SET last_investment_transactions_sync_at=CURRENT_TIMESTAMP,investment_access_status='ENABLED',latest_plaid_error_message=NULL WHERE id=? AND household_id=?").bind(body.connectionId,householdId).run();
       }catch(error){investmentError=plaidError(error)}
     }
-    if(investmentError){const status=investmentError.code==="PRODUCT_NOT_READY"?"PENDING":investmentRecoveryCodes.has(investmentError.code)?"RECONNECT_REQUIRED":"ERROR";await db.prepare("UPDATE connections SET investment_access_status=?,error_code=?,latest_plaid_error_message=? WHERE id=? AND household_id=?").bind(status,investmentError.code,investmentError.message.slice(0,300),body.connectionId,householdId).run()}
+    if(investmentError){const status=investmentStatusFor(investmentError.code);await db.prepare("UPDATE connections SET investment_access_status=?,error_code=?,latest_plaid_error_message=? WHERE id=? AND household_id=?").bind(status,investmentError.code,investmentError.message.slice(0,300),body.connectionId,householdId).run()}
     await db
       .prepare(
-        "UPDATE connections SET cursor=?,last_synced_at=CURRENT_TIMESTAMP,error_code=CASE WHEN investment_access_status IN ('RECONNECT_REQUIRED','PENDING','ERROR') THEN error_code ELSE NULL END WHERE id=? AND household_id=?",
+        "UPDATE connections SET cursor=?,last_synced_at=CURRENT_TIMESTAMP,error_code=CASE WHEN investment_access_status IN ('RECONNECT_REQUIRED','PENDING','UNSUPPORTED','TEMPORARILY_UNAVAILABLE','ERROR') THEN error_code ELSE NULL END WHERE id=? AND household_id=?",
       )
       .bind(cursor, body.connectionId, householdId)
       .run();
@@ -496,7 +498,7 @@ export async function POST(request: Request) {
       accounts: (accountData.accounts || []).length,
       holdings: holdingCount,
       investmentTransactions:investmentTransactionCount,
-      investmentAccess:investmentError?{status:investmentError.code==="PRODUCT_NOT_READY"?"PENDING":"RECONNECT_REQUIRED",...investmentError}:{status:"ENABLED"},
+      investmentAccess:investmentError?{status:investmentStatusFor(investmentError.code),...investmentError}:{status:"ENABLED"},
       added,
       modified,
       removed,

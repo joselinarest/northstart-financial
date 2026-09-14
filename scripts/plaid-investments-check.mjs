@@ -12,6 +12,8 @@ assert.match(link, /update:updateMode\?\{account_selection_enabled:true\}/);
 assert.match(link, /products:updateMode\?undefined:products/);
 assert.match(sync, /\/investments\/holdings\/get/);
 assert.match(sync, /\/investments\/transactions\/get/);
+assert.match(sync, /investmentUnsupportedCodes=new Set\(\["NO_INVESTMENT_ACCOUNTS","PRODUCTS_NOT_SUPPORTED"\]\)/);
+assert.match(sync, /\?"UNSUPPORTED"/);
 assert.match(sync, /total_investment_transactions/);
 assert.match(sync, /NO_INVESTMENT_ACCOUNTS/);
 assert.match(sync, /ADDITIONAL_CONSENT_REQUIRED/);
