@@ -1,5 +1,5 @@
 "use client";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 type Holding = {
   ticker: string;
   name: string;
@@ -91,6 +91,7 @@ export default function LongTermPortfolioPlan({
       Math.max(10000, Math.round((accountValue || 100000) / 1000) * 1000),
     ),
     [showTemplate, setShowTemplate] = useState(false);
+  useEffect(()=>{setTemplateAmount(Math.max(10000,Math.round((accountValue||100000)/1000)*1000));setShowTemplate(false)},[accountName,accountValue]);
   const plan = useMemo(() => {
     const monthlySurplus = Math.max(0, monthlyIncome - monthlySpending),
       protectedReserve = Math.max(monthlySpending * 3, 1000),
@@ -146,7 +147,7 @@ export default function LongTermPortfolioPlan({
       const sale = 0;
       const total = account + fresh + sale,
         parts: string[] = [];
-      if (account) parts.push(`${usd(account)} existing Roth cash`);
+      if (account) parts.push(`${usd(account)} existing ${accountType} cash`);
       if (fresh) parts.push(`${usd(fresh)} proposed new contribution`);
       return {
         total,
