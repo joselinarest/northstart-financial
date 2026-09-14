@@ -238,7 +238,6 @@ export function NorthstarWorkspace({ initialTab = "Dashboard", initialInvestment
   const [decisionAlarmEnabled, setDecisionAlarmEnabled] = useState(false);
   const [notifyStatus, setNotifyStatus] = useState("Checking permission…");
   const [pushEnabled,setPushEnabled]=useState(false);
-  const [isLocal, setIsLocal] = useState(false);
   const [mobileMenuOpen,setMobileMenuOpen]=useState(false);
   const [profileMenuOpen,setProfileMenuOpen]=useState(false);
   const [notificationMenuOpen,setNotificationMenuOpen]=useState(false);
@@ -498,11 +497,6 @@ export function NorthstarWorkspace({ initialTab = "Dashboard", initialInvestment
     .join("")
     .slice(0, 2)
     .toUpperCase();
-  useEffect(() => {
-    const localHost = ["localhost", "127.0.0.1"].includes(window.location.hostname);
-    setIsLocal(localHost);
-    if (localHost && sessionStorage.getItem("northstar-local-preview") === "true") setSignedIn(true);
-  }, []);
   useEffect(()=>{const update=(event:Event)=>setMarketUnread(Number((event as CustomEvent<number>).detail||0));window.addEventListener("northstar:market-unread",update);return()=>window.removeEventListener("northstar:market-unread",update)},[]);
   useEffect(() => {
     const session=getCognitoSession();
@@ -700,8 +694,7 @@ export function NorthstarWorkspace({ initialTab = "Dashboard", initialInvestment
                 Continue to verification
               </button>
               <small>
-                Enter the account email first. Verification and the localhost
-                developer bypass are available on the next step.
+                Enter the account email first. Access requires successful AWS Cognito verification.
               </small>
               <div className="auth-legal"><a href="/privacy">Privacy Policy</a><span>Northstar uses read-only financial connections and never executes trades.</span></div>
             </div>
@@ -779,19 +772,6 @@ export function NorthstarWorkspace({ initialTab = "Dashboard", initialInvestment
               <button className="primary full-auth" disabled={code.length !== 6} onClick={verifyOtp}>
                 Verify and enter Northstar
               </button>
-              {isLocal && (
-                  <button
-                    className="dev-bypass"
-                    disabled={!accountEmail.includes("@")}
-                    onClick={() => {
-                      sessionStorage.setItem("northstar-local-preview", "true");
-                      setAuthNotice("Local UI preview only. Backend development authentication must also be explicitly enabled in .env.local.");
-                      setSignedIn(true);
-                    }}
-                  >
-                    Developer bypass · localhost only
-                  </button>
-                )}
               <div className="security-note">
                 <b>◈ No fake verification</b>
                 <span>
@@ -2010,7 +1990,7 @@ export function NorthstarWorkspace({ initialTab = "Dashboard", initialInvestment
             {inviteOpen&&<div className="invite-panel"><label>Invitation purpose<select value={invitationType} onChange={event=>setInvitationType(event.target.value as "join_household"|"create_household")}><option value="join_household">Join this household</option><option value="create_household">Create a separate household as owner</option></select></label><label>Email address<input type="email" value={inviteEmail} onChange={event=>setInviteEmail(event.target.value)} placeholder="person@example.com" /></label>{invitationType==="create_household"?<label>New household name<input value={invitedHouseholdName} onChange={event=>setInvitedHouseholdName(event.target.value)} placeholder="Example: Rivera Household" /></label>:<label>Access role<select value={inviteRole} onChange={event=>setInviteRole(event.target.value)}><option value="co_owner">Co-owner · full application access</option><option value="manager">Household manager · manage finances</option><option value="account_connector">Account connector · link own banks</option><option value="investment_manager">Investment manager · research and plans</option><option value="member">Household member · contribute records</option><option value="observer">Observer · view only</option><option value="accountant">Accountant · financial records</option><option value="student">Student / kid · Academy only</option></select></label>}<button className="primary" disabled={!inviteEmail.includes("@")||(invitationType==="create_household"&&!invitedHouseholdName.trim())||inviteNotice.includes("Creating")} onClick={inviteMember}>Send secure invitation</button><button onClick={()=>setInviteOpen(false)}>Cancel</button><small className="invite-explainer">Authentication alone never grants access. A join invitation adds the exact email to this household with the selected role. A new-household invitation creates a separate, isolated workspace owned by the recipient. No household can see another household unless that same user is explicitly invited to both.</small></div>}
             {inviteNotice&&<div className="invite-notice"><span>{inviteNotice}</span>{inviteNotice.toLowerCase().includes("sign in with the email")&&<button type="button" onClick={()=>{const token=new URLSearchParams(window.location.search).get("invite");if(token)sessionStorage.setItem("northstar-pending-invite",token);setSignedIn(false);setAccessToken("");signOutCognito()}}>Switch to invited account →</button>}</div>}
             <div className="members">
-              {(householdAccess?.members||[{user_id:"self",display_name:displayName,email:accountEmail,role:"owner",status:"active"}]).map((member,index)=><span key={member.user_id}><i className={`avatar ${index%2?"rose":""}`}>{member.display_name.split(" ").map(value=>value[0]).join("").slice(0,2).toUpperCase()}</i><b>{member.display_name}<small>{member.email} · {member.role.replaceAll("_"," ")}{member.accepted_at?` · joined ${new Date(member.accepted_at).toLocaleString()}`:""}</small></b><em>{member.user_id==="local_owner"||member.email===accountEmail?"YOU":"ACTIVE"}</em>{["owner","co_owner"].includes(householdAccess?.role||"")&&member.role!=="owner"&&member.email!==accountEmail&&<button className="remove-access" type="button" onClick={()=>removeHouseholdMember(member.user_id,member.display_name)}>Remove access</button>}</span>)}
+              {(householdAccess?.members||[{user_id:"self",display_name:displayName,email:accountEmail,role:"owner",status:"active"}]).map((member,index)=><span key={member.user_id}><i className={`avatar ${index%2?"rose":""}`}>{member.display_name.split(" ").map(value=>value[0]).join("").slice(0,2).toUpperCase()}</i><b>{member.display_name}<small>{member.email} · {member.role.replaceAll("_"," ")}{member.accepted_at?` · joined ${new Date(member.accepted_at).toLocaleString()}`:""}</small></b><em>{member.email===accountEmail?"YOU":"ACTIVE"}</em>{["owner","co_owner"].includes(householdAccess?.role||"")&&member.role!=="owner"&&member.email!==accountEmail&&<button className="remove-access" type="button" onClick={()=>removeHouseholdMember(member.user_id,member.display_name)}>Remove access</button>}</span>)}
               {householdAccess?.invitations.map(invite=>{const status=invite.status==="pending"&&new Date(invite.expires_at)<=new Date()?"expired":invite.status,inviteType=invite.invitation_type||"join_household";return <span key={invite.id} className={`invitation-${status}`}><i className="avatar gold-bg">{status==="accepted"?"✓":"?"}</i><b>{invite.email}<small>{inviteType==="create_household"?`new owner · ${invite.household_name}`:invite.role.replaceAll("_"," ")} · {status==="accepted"&&invite.accepted_at?`accepted ${new Date(invite.accepted_at).toLocaleString()}`:status==="pending"?`expires ${new Date(invite.expires_at).toLocaleDateString()}`:status}</small></b><em>{status.toUpperCase()}</em>{status==="pending"&&<div className="invitation-actions"><button type="button" disabled={inviteNotice.includes("resending")} onClick={()=>createInvitation(invite.email,invite.role,true,inviteType,invite.household_name||"")}>↻ Resend</button><button className="remove-access" type="button" onClick={()=>cancelInvitation(invite.id)}>Cancel invitation</button></div>}</span>})}
             </div>
             <div className="role-note">
@@ -2162,7 +2142,7 @@ export function NorthstarWorkspace({ initialTab = "Dashboard", initialInvestment
               <article><span>04</span><h3>Money & Debt</h3><p>Bills, cards, loans, mortgage, savings, and investments share one financial picture. High-cost debt and weak reserves can lower investing capacity.</p></article>
               <article><span>05</span><h3>Household Access</h3><p>Invite family members and assign roles. An owner can manage everything; collaborators should receive only the permissions needed for shared finances.</p></article>
               <article><span>06</span><h3>Alerts & Focus</h3><p>Choose your timezone, travel mode, daily analysis limit, quiet hours, and alert urgency. Push alerts require HTTPS plus a configured notification service.</p></article>
-              <article><span>07</span><h3>Accounts & Security</h3><p>Email or SMS verification requires a production OTP provider. The visible bypass is localhost-only for development and must never ship in production.</p></article>
+              <article><span>07</span><h3>Accounts & Security</h3><p>Every environment requires verified AWS Cognito authentication. No local or development sign-in bypass is available.</p></article>
               <article><span>08</span><h3>Data Connections</h3><p>Live quotes, brokerage orders, bank balances, news, email/SMS, and push delivery require approved provider credentials. Illustrative data is clearly labeled.</p></article>
             </div>
             <div className="guide-safety">

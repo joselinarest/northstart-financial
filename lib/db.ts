@@ -99,13 +99,7 @@ export async function workspace(request: Request) {
   const user = await requireUser(request), db = await database(), personalHouseholdId = `household_${user.userId}`, personalEntityId = `entity_${user.userId}_personal`;
   await db.prepare("INSERT INTO users(id,email,display_name,last_login_at) VALUES(?,?,?,CURRENT_TIMESTAMP) ON CONFLICT(id) DO UPDATE SET email=excluded.email,display_name=excluded.display_name,last_login_at=CURRENT_TIMESTAMP").bind(user.userId,user.email,user.name).run();
   const existingMembership=await db.prepare("SELECT household_id FROM household_members WHERE user_id=? AND status='active' LIMIT 1").bind(user.userId).first();
-  const localBootstrap=user.userId==="local_owner"&&process.env.ALLOW_LOCAL_DEV_AUTH==="true";
-  if(!existingMembership&&!localBootstrap)throw new Response(JSON.stringify({error:"A valid Northstar invitation for this email address is required. Google sign-in verifies identity but does not create workspace access.",code:"INVITATION_REQUIRED"}),{status:403,headers:{"Content-Type":"application/json"}});
-  if(!existingMembership&&localBootstrap)await db.batch([
-    db.prepare("INSERT OR IGNORE INTO households(id,name,goal_date) VALUES(?,?,?)").bind(personalHouseholdId,"My Household","2036-12-31"),
-    db.prepare("INSERT OR IGNORE INTO household_members(household_id,user_id,role) VALUES(?,?,?)").bind(personalHouseholdId,user.userId,"owner"),
-    db.prepare("INSERT OR IGNORE INTO entities(id,household_id,type,name) VALUES(?,?,?,?)").bind(personalEntityId,personalHouseholdId,"personal","Personal Finances"),
-  ]);
+  if(!existingMembership)throw new Response(JSON.stringify({error:"A valid Northstar invitation for this email address is required. Google sign-in verifies identity but does not create workspace access.",code:"INVITATION_REQUIRED"}),{status:403,headers:{"Content-Type":"application/json"}});
   const requested = request.headers.get("x-household-id");
   let membership = requested ? await db.prepare("SELECT household_id,role FROM household_members WHERE household_id=? AND user_id=? AND status='active'").bind(requested,user.userId).first<{household_id:string;role:string}>() : null;
   if (requested && !membership) throw new Response(JSON.stringify({error:"You do not have access to this household"}),{status:403,headers:{"Content-Type":"application/json"}});
