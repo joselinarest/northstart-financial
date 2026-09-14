@@ -441,8 +441,8 @@ export default function ConnectedHoldingsAnalysis({
                         text: `One company represents ${weight.toFixed(1)}% of this account, so company-specific losses could materially affect the plan.`,
                       };
           return (
-            <article className={x?.state || "pending"} key={symbol}>
-              <header>
+            <details className={`holding-evaluation-accordion ${x?.state || "pending"}`} key={symbol}>
+              <summary>
                 <div>
                   <b>{symbol}</b>
                   <small>
@@ -465,7 +465,8 @@ export default function ConnectedHoldingsAnalysis({
                       : `${value - cost >= 0 ? "+" : "−"}${usd(value - cost)} unrealized`}
                   </small>
                 </strong>
-              </header>
+                <i className="holding-chevron" aria-hidden="true">⌄</i>
+              </summary>
               <HoldingPriceLimits
                 holdings={[h]}
                 accessToken={accessToken || ""}
@@ -609,7 +610,7 @@ export default function ConnectedHoldingsAnalysis({
                   </footer>
                 </div>
               )}
-            </article>
+            </details>
           );
         })}
       </div>
