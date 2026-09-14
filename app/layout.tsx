@@ -19,11 +19,9 @@ import './action-guidance.css';
 import './investment-command-center.css';
 import './automatic-market-copilot.css';
 import './paper-trading-simulator.css';
-import './holding-disclosure.css';
 import './selected-account-plan.css';
 import './responsive-mobile.css';
 import './design-system.css';
-import HoldingDisclosureController from './holding-disclosure-controller';
 import { ConfirmProvider } from './confirmation-modal';
 import PwaManager from './pwa-manager';
 
@@ -67,7 +65,7 @@ export default function RootLayout({
         suppressHydrationWarning
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
-        <ConfirmProvider><PwaManager/><HoldingDisclosureController />{children}</ConfirmProvider>
+        <ConfirmProvider><PwaManager/>{children}</ConfirmProvider>
       </body>
     </html>
   );
