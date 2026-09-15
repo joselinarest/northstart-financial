@@ -173,6 +173,8 @@ export default function AutomaticMarketCopilot({
     ),
     [prepareStatus, setPrepareStatus] = useState("");
   const lastAlertKey = useRef("");
+  const accountId=String(holdings.find(holding=>holding.account_id)?.account_id||(typeof window!=="undefined"?localStorage.getItem("northstar-advisor-account"):"")||"");
+  const accountScope=accountId||`unlinked-${accountName.toLowerCase().replace(/[^a-z0-9]+/g,"-")}`;
   const stabilizeCandidates = (candidates: Candidate[]) => {
     type Memory = {
       stableBuy: boolean;
@@ -183,7 +185,7 @@ export default function AutomaticMarketCopilot({
     let memory: Record<string, Memory> = {};
     try {
       memory = JSON.parse(
-        localStorage.getItem(`northstar-decision-memory-${strategy}`) || "{}",
+        localStorage.getItem(`northstar-decision-memory-${accountScope}-${strategy}`) || "{}",
       );
     } catch {}
     const now = new Date().toISOString(),
@@ -261,7 +263,7 @@ export default function AutomaticMarketCopilot({
         };
       });
     localStorage.setItem(
-      `northstar-decision-memory-${strategy}`,
+      `northstar-decision-memory-${accountScope}-${strategy}`,
       JSON.stringify(next),
     );
     return stabilized;
@@ -298,6 +300,8 @@ export default function AutomaticMarketCopilot({
           action,
           suggestedAction,
           reason,
+          accountId,
+          accountName,
           strategy,
           holdingPeriod,
           createdAt: new Date().toISOString(),
@@ -313,6 +317,12 @@ export default function AutomaticMarketCopilot({
       );
     }
   };
+  useEffect(() => {
+    setData({});
+    setPlannedActions({});
+    setPrepareStatus("");
+    lastAlertKey.current="";
+  }, [accountScope]);
   useEffect(() => {
     if (marketPhase !== "open" && refresh === 0) {
       setLoading(false);
@@ -348,7 +358,7 @@ export default function AutomaticMarketCopilot({
     return () => {
       active = false;
     };
-  }, [refresh, strategy, marketPhase]);
+  }, [refresh, strategy, marketPhase, accountScope]);
   useEffect(() => {
     const update = () => setRefresh((value) => value + 1);
     window.addEventListener("northstar:realtime", update);
@@ -519,9 +529,9 @@ export default function AutomaticMarketCopilot({
             : "New candidate — open account-specific research";
     new Notification(`Northstar decision review · ${first.symbol}`, {
       body: `${action}. ${accountName}; screening score ${first.score}/100. Northstar never places an order.`,
-      tag: `northstar-${first.symbol}`,
+      tag: `northstar-${accountScope}-${first.symbol}`,
     });
-  }, [data.asOf, strategy, accountName, holdings]);
+  }, [data.asOf, strategy, accountName, accountScope, holdings]);
   return (
     <section className="auto-copilot">
       <header>

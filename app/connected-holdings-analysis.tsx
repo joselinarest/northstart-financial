@@ -77,11 +77,14 @@ export default function ConnectedHoldingsAnalysis({
       "Run the analysis to generate an evidence-based suggestion for every holding.",
     );
   const [history, setHistory] = useState<R[]>([]);
+  const accountId=String(holdings.find(holding=>holding.account_id)?.account_id||"");
+  useEffect(()=>{setResults([]);setHistory([]);setBusy(false);setStatus(accountId?`Ready to analyze only investment account ${accountId}.`:"No investment account selected.")},[accountId]);
   useEffect(() => {
     let active = true;
     const refresh = async () => {
       try {
-        const response = await fetch("/api/portfolio/history", {
+        if(!accountId)return;
+        const response = await fetch(`/api/portfolio/history?accountId=${encodeURIComponent(accountId)}`, {
             headers: accessToken
               ? { Authorization: `Bearer ${accessToken}` }
               : {},
@@ -99,7 +102,7 @@ export default function ConnectedHoldingsAnalysis({
       active = false;
       window.removeEventListener("northstar:portfolio-changed",update);
     };
-  }, [accessToken, holdings]);
+  }, [accessToken, accountId]);
   const analyze = async () => {
     setBusy(true);
     setStatus(`Analyzing ${unique.length} holdings for a ${horizon} horizon…`);
@@ -366,13 +369,13 @@ export default function ConnectedHoldingsAnalysis({
     );
     setResults(out);
     setStatus(
-      `Evaluated ${out.length} holdings · ${new Date().toLocaleString()} · horizon ${horizon}`,
+      `Evaluated ${out.length} holdings for account ${accountId} · ${new Date().toLocaleString()} · horizon ${horizon}`,
     );
     setBusy(false);
   };
   useEffect(() => {
     if (marketOpen && unique.length) void analyze();
-  }, [unique, horizon, marketOpen]); // Closed sessions require an explicit refresh and do not consume market API quota.
+  }, [unique, horizon, marketOpen, accountId]); // Closed sessions require an explicit refresh and do not consume market API quota.
   return (
     <div className="connected-analysis embedded">
       <div className="analysis-controls">
