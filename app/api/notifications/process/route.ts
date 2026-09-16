@@ -8,6 +8,7 @@ import {generateDailyMarketReview} from "@/lib/daily-market-review";
 import {marketSessionAt} from "@/lib/market-session";
 import {evaluateTacticalSellRebuy,monitorTacticalReentries} from "@/lib/tactical-rebuy-engine";
 import {evaluateTacticalOutcomes} from "@/lib/tactical-rebuy-outcomes";
+import {evaluateOptionsFlow} from "@/lib/options-flow-engine";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 const escape = (value: unknown) =>
@@ -47,6 +48,7 @@ export async function POST(request: Request) {
   for(const household of households.results)await db.prepare("INSERT INTO background_jobs(id,household_id,job_type,idempotency_key,payload_json) VALUES(?,?,'MARKET_INTELLIGENCE',?,?) ON CONFLICT(idempotency_key) DO NOTHING").bind(id("job"),household.household_id,`market:${household.household_id}:${minuteBucket}`,JSON.stringify({householdId:household.household_id})).run();
   const discoveryBucket=new Date().toISOString().slice(0,13);
   await db.prepare("INSERT INTO background_jobs(id,job_type,idempotency_key,payload_json) VALUES(?,'MARKET_DISCOVERY',?,?) ON CONFLICT(idempotency_key) DO NOTHING").bind(id("job"),`discovery:${discoveryBucket}`,JSON.stringify({scheduledAt:new Date().toISOString()})).run();
+  if(session!=="CLOSED"){const flowBucket=`${sessionDate}:${Math.floor(etMinute/5)}`;await db.prepare("INSERT INTO background_jobs(id,job_type,idempotency_key,payload_json) VALUES(?,'OPTIONS_FLOW',?,?) ON CONFLICT(idempotency_key) DO NOTHING").bind(id("job"),`options-flow:${flowBucket}`,JSON.stringify({session,scheduledAt:new Date().toISOString()})).run()}
   if(session==="AFTER_HOURS"&&etMinute>=16*60+5)for(const household of households.results)await db.prepare("INSERT INTO background_jobs(id,household_id,job_type,idempotency_key,payload_json) VALUES(?,?,'DAILY_CLOSE_REVIEW',?,?) ON CONFLICT(idempotency_key) DO NOTHING").bind(id("job"),household.household_id,`close-review:${household.household_id}:${sessionDate}`,JSON.stringify({householdId:household.household_id,sessionDate})).run();
   if(session==="PREMARKET"&&etMinute>=8*60+30)for(const household of households.results)await db.prepare("INSERT INTO background_jobs(id,household_id,job_type,idempotency_key,payload_json) VALUES(?,?,'OVERNIGHT_OUTLOOK_REFRESH',?,?) ON CONFLICT(idempotency_key) DO NOTHING").bind(id("job"),household.household_id,`premarket-review:${household.household_id}:${sessionDate}`,JSON.stringify({householdId:household.household_id,sessionDate})).run();
   if(session!=="CLOSED"){const tacticalBucket=`${sessionDate}:${Math.floor(etMinute/5)}`;await db.prepare("INSERT INTO background_jobs(id,job_type,idempotency_key,payload_json) VALUES(?,'TACTICAL_REENTRY_MONITOR',?,?) ON CONFLICT(idempotency_key) DO NOTHING").bind(id("job"),`tactical-monitor:${tacticalBucket}`,JSON.stringify({session,tacticalBucket})).run()}
@@ -73,7 +75,7 @@ export async function POST(request: Request) {
       .bind(job.id)
       .run();
     try {
-      if (job.job_type === "PLAID_SYNC") {
+      if (job.job_type === "PLAID_SYNC" || job.job_type === "PLAID_INVESTMENT_SYNC") {
         const payload = json(job.payload_json),
           response = await fetch(`${base}/api/connections/plaid/sync`, {
             method: "POST",
@@ -91,6 +93,7 @@ export async function POST(request: Request) {
         await evaluateMarketIntelligence(db,householdId);
       }
       if(job.job_type==="MARKET_DISCOVERY")await runMarketDiscovery(db);
+      if(job.job_type==="OPTIONS_FLOW")await evaluateOptionsFlow(db);
       if(job.job_type==="DAILY_CLOSE_REVIEW"||job.job_type==="OVERNIGHT_OUTLOOK_REFRESH"){
         const householdId=String(job.household_id||"");if(!householdId)throw new Error("REVIEW_HOUSEHOLD_REQUIRED");
         await generateDailyMarketReview(db,householdId,job.job_type==="DAILY_CLOSE_REVIEW"?"MARKET_CLOSE":"PREMARKET_REVISION");

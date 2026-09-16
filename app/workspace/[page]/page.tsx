@@ -7,7 +7,7 @@ const tabs: Record<string,string> = {
   assistant:"Ask Northstar", planner:"Prepare Trade", simulation:"Paper Simulator", journal:"Journal",
   "daily-action-plan":"Daily Action Plan",
   academy:"Learn", settings:"Settings", help:"Help", charts:"Professional Charts",
-  "market-news":"Market News", growth:"Growth Finder", "dividend-growth":"Growth Finder",
+  "market-news":"Market News", growth:"Growth Finder", "dividend-growth":"Growth Finder", "new-candidates":"New Candidates",
   "real-estate":"Real Estate",
 };
 

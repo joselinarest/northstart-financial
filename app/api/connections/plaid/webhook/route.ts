@@ -48,15 +48,19 @@ export async function POST(request: Request) {
       if (connection)
         await db
           .prepare(
-            "INSERT INTO background_jobs(id,household_id,job_type,idempotency_key,payload_json) VALUES(?,?,'PLAID_SYNC',?,?) ON CONFLICT(idempotency_key) DO NOTHING",
+            `INSERT INTO background_jobs(id,household_id,job_type,idempotency_key,payload_json) VALUES(?,?,?, ?,?) ON CONFLICT(idempotency_key) DO NOTHING`,
           )
           .bind(
             id("job"),
             connection.household_id,
+            type === "INVESTMENTS" ? "PLAID_INVESTMENT_SYNC" : "PLAID_SYNC",
             `plaid:${hash}`,
             JSON.stringify({
               connectionId: connection.id,
               householdId: connection.household_id,
+              investmentOnly: type === "INVESTMENTS",
+              trigger: type === "INVESTMENTS" ? `WEBHOOK_${code}` : `WEBHOOK_${type}_${code}`,
+              webhookHash: hash,
             }),
           )
           .run();

@@ -47,6 +47,9 @@ export async function POST(request: Request) {
     const body = (await request.json()) as {
         connectionId?: string;
         householdId?: string;
+        investmentOnly?: boolean;
+        trigger?: string;
+        webhookHash?: string;
       },
       internal =
         Boolean(process.env.CRON_SECRET) &&
@@ -151,7 +154,7 @@ export async function POST(request: Request) {
       modified = 0,
       removed = 0,
       notificationsQueued = 0,
-      hasMore = true;
+      hasMore = !body.investmentOnly;
     while (hasMore) {
       const data = await plaid("/transactions/sync", token, {
           cursor,
@@ -427,14 +430,15 @@ export async function POST(request: Request) {
     }
     let investments:Record<string,any>|null=null,investmentError:{code:string;message:string}|null=null;
     try{investments=await plaid("/investments/holdings/get",token)}catch(error){investmentError=plaidError(error)}
-    let holdingCount = 0;
+    let holdingCount = 0,holdingsAdded=0,holdingsChanged=0,holdingsClosed=0;
     if (investments) {
       const writes: DbStatement[] = [];
+      const priorHoldings=await db.prepare("SELECT h.id,h.account_id,h.provider_security_id,h.quantity,h.cost_basis_cents,h.price_cents FROM holdings h JOIN accounts a ON a.id=h.account_id WHERE a.connection_id=? AND h.provider_security_id IS NOT NULL").bind(body.connectionId).all<Record<string,any>>(),priorByKey=new Map(priorHoldings.results.map(row=>[`${row.account_id}|${row.provider_security_id}`,row])),seen=new Set<string>();
       for (const security of investments.securities || [])
         writes.push(
           db
             .prepare(
-              "INSERT INTO securities(id,ticker,name,type,currency) VALUES(?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET ticker=excluded.ticker,name=excluded.name,type=excluded.type,currency=excluded.currency",
+              "INSERT INTO securities(id,ticker,name,type,currency,provider_security_id) VALUES(?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET ticker=excluded.ticker,name=excluded.name,type=excluded.type,currency=excluded.currency,provider_security_id=excluded.provider_security_id",
             )
             .bind(
               `plaid_sec_${security.security_id}`,
@@ -442,14 +446,16 @@ export async function POST(request: Request) {
               security.name || "Unknown security",
               security.type || null,
               security.iso_currency_code || "USD",
+              security.security_id,
             ),
         );
       for (const holding of investments.holdings || []) {
         holdingCount++;
+        const accountId=`plaid_${holding.account_id}`,key=`${accountId}|${holding.security_id}`,prior=priorByKey.get(key),quantity=Number(holding.quantity||0),cost=holding.cost_basis==null?null:cents(holding.cost_basis),price=cents(holding.institution_price);seen.add(key);if(!prior)holdingsAdded++;else if(Number(prior.quantity)!==quantity||Number(prior.cost_basis_cents??0)!==Number(cost??0)||Number(prior.price_cents??0)!==price)holdingsChanged++;
         writes.push(
           db
             .prepare(
-              "INSERT INTO holdings(id,account_id,security_id,quantity,cost_basis_cents,price_cents,price_at) VALUES(?,?,?,?,?,?,?) ON CONFLICT(account_id,security_id) DO UPDATE SET quantity=excluded.quantity,cost_basis_cents=excluded.cost_basis_cents,price_cents=excluded.price_cents,price_at=excluded.price_at",
+              "INSERT INTO holdings(id,account_id,security_id,quantity,cost_basis_cents,price_cents,price_at,provider_holding_id,provider_account_id,provider_security_id,provider_updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,CURRENT_TIMESTAMP) ON CONFLICT(account_id,security_id) DO UPDATE SET quantity=excluded.quantity,cost_basis_cents=excluded.cost_basis_cents,price_cents=excluded.price_cents,price_at=excluded.price_at,provider_holding_id=excluded.provider_holding_id,provider_account_id=excluded.provider_account_id,provider_security_id=excluded.provider_security_id,provider_updated_at=CURRENT_TIMESTAMP",
             )
             .bind(
               `plaid_hold_${holding.account_id}_${holding.security_id}`,
@@ -459,25 +465,29 @@ export async function POST(request: Request) {
               holding.cost_basis == null ? null : cents(holding.cost_basis),
               cents(holding.institution_price),
               holding.institution_price_as_of || new Date().toISOString(),
+              `${holding.account_id}:${holding.security_id}`,
+              holding.account_id,
+              holding.security_id,
             ),
         );
       }
+      for(const prior of priorHoldings.results)if(!seen.has(`${prior.account_id}|${prior.provider_security_id}`)){holdingsClosed++;writes.push(db.prepare("DELETE FROM holdings WHERE id=?").bind(prior.id))}
       if (writes.length) await db.batch(writes);
-      await db.prepare("UPDATE connections SET last_holdings_sync_at=CURRENT_TIMESTAMP,investment_access_status='ENABLED',latest_plaid_error_message=NULL WHERE id=? AND household_id=?").bind(body.connectionId,householdId).run();
+      await db.batch([db.prepare("UPDATE connections SET last_holdings_sync_at=CURRENT_TIMESTAMP,investment_access_status='ENABLED',latest_plaid_error_message=NULL WHERE id=? AND household_id=?").bind(body.connectionId,householdId),db.prepare("UPDATE accounts SET last_investment_sync_at=CURRENT_TIMESTAMP,last_provider_update_at=CURRENT_TIMESTAMP,investment_sync_status='SYNCED',investment_sync_error=NULL WHERE connection_id=? AND type='investment'").bind(body.connectionId)]);
     }
     let investmentTransactionCount=0;
     if(investments){
       const now=new Date(),start=new Date(now);start.setUTCFullYear(start.getUTCFullYear()-2);const iso=(date:Date)=>date.toISOString().slice(0,10);let offset=0,total=1;
       try{
         while(offset<total){const page=await plaid("/investments/transactions/get",token,{start_date:iso(start),end_date:iso(now),options:{count:500,offset}});total=Number(page.total_investment_transactions||0);const writes:DbStatement[]=[];
-          for(const security of page.securities||[])writes.push(db.prepare("INSERT INTO securities(id,ticker,name,type,currency) VALUES(?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET ticker=excluded.ticker,name=excluded.name,type=excluded.type,currency=excluded.currency").bind(`plaid_sec_${security.security_id}`,security.ticker_symbol||null,security.name||"Unknown security",security.type||null,security.iso_currency_code||"USD"));
-          for(const transaction of page.investment_transactions||[]){const rawType=String(transaction.type||"").toLowerCase(),subtype=String(transaction.subtype||"").toLowerCase();const type=rawType==="buy"?"BUY":rawType==="sell"?"SELL":rawType==="fee"?"FEE":/dividend/.test(subtype)?"DIVIDEND":/interest/.test(subtype)?"INTEREST":rawType==="transfer"?"TRANSFER":rawType==="cash"&&Number(transaction.amount)<0?"WITHDRAWAL":"DEPOSIT";writes.push(db.prepare(`INSERT INTO investment_transactions(id,household_id,account_id,security_id,transaction_type,trade_at,settle_at,quantity,price_cents,amount_cents,fee_cents,currency,source,external_id,notes,created_by_user_id)
-            VALUES(?,?,?,?,?,?,?,?,?,?,?,?, 'PLAID',?,?,?) ON CONFLICT(account_id,source,external_id) DO UPDATE SET security_id=excluded.security_id,transaction_type=excluded.transaction_type,trade_at=excluded.trade_at,settle_at=excluded.settle_at,quantity=excluded.quantity,price_cents=excluded.price_cents,amount_cents=excluded.amount_cents,fee_cents=excluded.fee_cents,currency=excluded.currency,notes=excluded.notes`).bind(`plaid_inv_tx_${transaction.investment_transaction_id}`,householdId,`plaid_${transaction.account_id}`,transaction.security_id?`plaid_sec_${transaction.security_id}`:null,type,transaction.date,transaction.date,transaction.quantity==null?null:Number(transaction.quantity),transaction.price==null?null:cents(transaction.price),cents(transaction.amount),cents(transaction.fees),transaction.iso_currency_code||"USD",transaction.investment_transaction_id,[transaction.name,transaction.subtype].filter(Boolean).join(" · ")||null,connectionOwner));investmentTransactionCount++}
+          for(const security of page.securities||[])writes.push(db.prepare("INSERT INTO securities(id,ticker,name,type,currency,provider_security_id) VALUES(?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET ticker=excluded.ticker,name=excluded.name,type=excluded.type,currency=excluded.currency,provider_security_id=excluded.provider_security_id").bind(`plaid_sec_${security.security_id}`,security.ticker_symbol||null,security.name||"Unknown security",security.type||null,security.iso_currency_code||"USD",security.security_id));
+          for(const transaction of page.investment_transactions||[]){const rawType=String(transaction.type||"").toLowerCase(),subtype=String(transaction.subtype||"").toLowerCase(),existingInvestment=await db.prepare("SELECT id FROM investment_transactions WHERE account_id=? AND source='PLAID' AND external_id=?").bind(`plaid_${transaction.account_id}`,transaction.investment_transaction_id).first();const type=rawType==="buy"?"BUY":rawType==="sell"?"SELL":rawType==="fee"?"FEE":/dividend/.test(subtype)?"DIVIDEND":/interest/.test(subtype)?"INTEREST":rawType==="transfer"?"TRANSFER":rawType==="cash"&&Number(transaction.amount)<0?"WITHDRAWAL":"DEPOSIT";writes.push(db.prepare(`INSERT INTO investment_transactions(id,household_id,account_id,security_id,transaction_type,trade_at,settle_at,quantity,price_cents,amount_cents,fee_cents,currency,source,external_id,notes,created_by_user_id)
+            VALUES(?,?,?,?,?,?,?,?,?,?,?,?, 'PLAID',?,?,?) ON CONFLICT(account_id,source,external_id) DO UPDATE SET security_id=excluded.security_id,transaction_type=excluded.transaction_type,trade_at=excluded.trade_at,settle_at=excluded.settle_at,quantity=excluded.quantity,price_cents=excluded.price_cents,amount_cents=excluded.amount_cents,fee_cents=excluded.fee_cents,currency=excluded.currency,notes=excluded.notes`).bind(`plaid_inv_tx_${transaction.investment_transaction_id}`,householdId,`plaid_${transaction.account_id}`,transaction.security_id?`plaid_sec_${transaction.security_id}`:null,type,transaction.date,transaction.date,transaction.quantity==null?null:Number(transaction.quantity),transaction.price==null?null:cents(transaction.price),cents(transaction.amount),cents(transaction.fees),transaction.iso_currency_code||"USD",transaction.investment_transaction_id,[transaction.name,transaction.subtype].filter(Boolean).join(" · ")||null,connectionOwner));writes.push(db.prepare("UPDATE investment_transactions SET provider_account_id=?,provider_security_id=? WHERE account_id=? AND source='PLAID' AND external_id=?").bind(transaction.account_id,transaction.security_id||null,`plaid_${transaction.account_id}`,transaction.investment_transaction_id));if(!existingInvestment)investmentTransactionCount++}
           if(writes.length)await db.batch(writes);offset+=(page.investment_transactions||[]).length;if(!(page.investment_transactions||[]).length)break}
         await db.prepare("UPDATE connections SET last_investment_transactions_sync_at=CURRENT_TIMESTAMP,investment_access_status='ENABLED',latest_plaid_error_message=NULL WHERE id=? AND household_id=?").bind(body.connectionId,householdId).run();
       }catch(error){investmentError=plaidError(error)}
     }
-    if(investmentError){const status=investmentStatusFor(investmentError.code);await db.prepare("UPDATE connections SET investment_access_status=?,error_code=?,latest_plaid_error_message=? WHERE id=? AND household_id=?").bind(status,investmentError.code,investmentError.message.slice(0,300),body.connectionId,householdId).run()}
+    if(investmentError){const status=investmentStatusFor(investmentError.code);await db.batch([db.prepare("UPDATE connections SET investment_access_status=?,error_code=?,latest_plaid_error_message=? WHERE id=? AND household_id=?").bind(status,investmentError.code,investmentError.message.slice(0,300),body.connectionId,householdId),db.prepare("UPDATE accounts SET investment_sync_status=?,investment_sync_error=? WHERE connection_id=? AND type='investment'").bind(status,investmentError.message.slice(0,300),body.connectionId),db.prepare("INSERT INTO investment_sync_history(id,household_id,connection_id,trigger,status,error_code,error_message,completed_at) VALUES(?,?,?,?,'FAILED',?,?,CURRENT_TIMESTAMP)").bind(`inv_sync_${crypto.randomUUID()}`,householdId,body.connectionId,body.trigger||'DIRECT_SYNC',investmentError.code,investmentError.message.slice(0,300))])}else if(investments){const changed=holdingsAdded+holdingsChanged+holdingsClosed+investmentTransactionCount>0;await db.prepare("INSERT INTO investment_sync_history(id,household_id,connection_id,trigger,status,holdings_added,holdings_changed,holdings_closed,transactions_added,result_json,completed_at) VALUES(?,?,?,?,?,?,?,?,?,?::jsonb,CURRENT_TIMESTAMP)").bind(`inv_sync_${crypto.randomUUID()}`,householdId,body.connectionId,body.trigger||'DIRECT_SYNC',changed?'SUCCEEDED':'NO_CHANGES',holdingsAdded,holdingsChanged,holdingsClosed,investmentTransactionCount,JSON.stringify({holdings:holdingCount,reconciliation:changed?'provider changes applied':'no provider changes'})).run();if(body.webhookHash)await db.prepare("UPDATE plaid_webhook_events SET processed_at=CURRENT_TIMESTAMP,processing_error=NULL WHERE request_hash=?").bind(body.webhookHash).run()}
     await db
       .prepare(
         "UPDATE connections SET cursor=?,last_synced_at=CURRENT_TIMESTAMP,error_code=CASE WHEN investment_access_status IN ('RECONNECT_REQUIRED','PENDING','UNSUPPORTED','TEMPORARILY_UNAVAILABLE','ERROR') THEN error_code ELSE NULL END WHERE id=? AND household_id=?",
@@ -498,6 +508,7 @@ export async function POST(request: Request) {
       accounts: (accountData.accounts || []).length,
       holdings: holdingCount,
       investmentTransactions:investmentTransactionCount,
+      reconciliation:{holdingsAdded,holdingsChanged,holdingsClosed,result:holdingsAdded+holdingsChanged+holdingsClosed+investmentTransactionCount>0?"provider changes applied":"no provider changes"},
       investmentAccess:investmentError?{status:investmentStatusFor(investmentError.code),...investmentError}:{status:"ENABLED"},
       added,
       modified,

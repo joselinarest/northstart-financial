@@ -679,4 +679,143 @@ export const migrations: readonly Migration[] = [
       `CREATE INDEX IF NOT EXISTS idx_tactical_plans_account_symbol ON tactical_rebuy_plans(account_id,security_id,created_at DESC)`,
     ],
   },
+  {
+    id: "0025_ai_decision_engine_options",
+    description: "Versioned central decision runs, controlled model evaluation, immutable outcomes, and options positions",
+    statements: [
+      `CREATE TABLE IF NOT EXISTS ai_model_versions (
+        version TEXT NOT NULL, strategy TEXT NOT NULL, status TEXT NOT NULL CHECK(status IN ('CHAMPION','CHALLENGER','RETIRED','ROLLED_BACK')),
+        provider TEXT NOT NULL, prompt_hash TEXT NOT NULL, strategy_version TEXT NOT NULL,
+        training_window_json JSONB NOT NULL DEFAULT '{}'::jsonb, validation_results_json JSONB NOT NULL DEFAULT '{}'::jsonb,
+        safety_gates_json JSONB NOT NULL DEFAULT '{}'::jsonb, calibration_factor NUMERIC(8,6) NOT NULL DEFAULT 0.85,
+        released_at TIMESTAMPTZ, created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        PRIMARY KEY(version,strategy)
+      )`,
+      `CREATE TABLE IF NOT EXISTS ai_decision_runs (
+        id TEXT PRIMARY KEY, household_id TEXT NOT NULL REFERENCES households(id) ON DELETE CASCADE,
+        account_id TEXT NOT NULL REFERENCES accounts(id) ON DELETE CASCADE, ticker TEXT NOT NULL,
+        strategy TEXT NOT NULL, request_type TEXT NOT NULL, input_snapshot_json JSONB NOT NULL,
+        evidence_json JSONB NOT NULL, output_json JSONB NOT NULL, data_quality INTEGER NOT NULL CHECK(data_quality BETWEEN 0 AND 100),
+        model_version TEXT NOT NULL, strategy_version TEXT NOT NULL, provider TEXT NOT NULL,
+        status TEXT NOT NULL CHECK(status IN ('COMPLETED','FAILED','REJECTED_BY_GATE')),
+        latency_ms INTEGER NOT NULL, data_timestamp TIMESTAMPTZ NOT NULL, created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+      )`,
+      `CREATE TABLE IF NOT EXISTS ai_decision_outcomes (
+        id TEXT PRIMARY KEY, decision_id TEXT NOT NULL UNIQUE REFERENCES ai_decision_runs(id) ON DELETE CASCADE,
+        evaluation_horizon TEXT NOT NULL, actual_return_bps INTEGER, alternative_return_bps INTEGER,
+        max_adverse_excursion_bps INTEGER, max_favorable_excursion_bps INTEGER, drawdown_bps INTEGER,
+        direction_correct BOOLEAN, outperformed_alternative BOOLEAN, false_positive BOOLEAN,
+        outcome_json JSONB NOT NULL, evaluated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+      )`,
+      `CREATE TABLE IF NOT EXISTS ai_model_evaluation_runs (
+        id TEXT PRIMARY KEY, model_version TEXT NOT NULL, strategy TEXT NOT NULL,
+        evaluation_type TEXT NOT NULL CHECK(evaluation_type IN ('BACKTEST','WALK_FORWARD','OUT_OF_SAMPLE','CALIBRATION')),
+        window_start TIMESTAMPTZ NOT NULL, window_end TIMESTAMPTZ NOT NULL, no_future_leakage BOOLEAN NOT NULL DEFAULT FALSE,
+        metrics_json JSONB NOT NULL, gates_json JSONB NOT NULL, passed BOOLEAN NOT NULL,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+      )`,
+      `CREATE TABLE IF NOT EXISTS option_positions (
+        id TEXT PRIMARY KEY, household_id TEXT NOT NULL REFERENCES households(id) ON DELETE CASCADE,
+        account_id TEXT NOT NULL REFERENCES accounts(id) ON DELETE CASCADE, underlying_symbol TEXT NOT NULL,
+        contract_symbol TEXT NOT NULL, option_type TEXT NOT NULL CHECK(option_type IN ('CALL','PUT')),
+        expiration DATE NOT NULL, strike_cents BIGINT NOT NULL, quantity INTEGER NOT NULL CHECK(quantity>0),
+        entry_premium_cents BIGINT NOT NULL, current_premium_cents BIGINT, underlying_entry_cents BIGINT NOT NULL,
+        underlying_current_cents BIGINT, thesis TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'OPEN' CHECK(status IN ('OPEN','CLOSED','EXPIRED','INVALIDATED')),
+        target_premium_cents BIGINT, stop_premium_cents BIGINT, underlying_invalidation_cents BIGINT,
+        greeks_json JSONB NOT NULL DEFAULT '{}'::jsonb, evidence_json JSONB NOT NULL DEFAULT '{}'::jsonb,
+        opened_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP, closed_at TIMESTAMPTZ, updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+      )`,
+      `CREATE INDEX IF NOT EXISTS idx_ai_decisions_account_time ON ai_decision_runs(account_id,created_at DESC)`,
+      `CREATE INDEX IF NOT EXISTS idx_ai_decisions_model_strategy ON ai_decision_runs(model_version,strategy,created_at DESC)`,
+      `CREATE INDEX IF NOT EXISTS idx_option_positions_monitor ON option_positions(status,expiration,updated_at)`,
+    ],
+  },
+  {
+    id: "0026_market_discovery_operations",
+    description: "Operational metrics and AI audit fields for market-wide candidate discovery",
+    statements: [
+      `ALTER TABLE market_discovery_runs ADD COLUMN IF NOT EXISTS rejected_count INTEGER NOT NULL DEFAULT 0`,
+      `ALTER TABLE market_discovery_runs ADD COLUMN IF NOT EXISTS candidates_created INTEGER NOT NULL DEFAULT 0`,
+      `ALTER TABLE market_discovery_runs ADD COLUMN IF NOT EXISTS provider_errors_json JSONB NOT NULL DEFAULT '[]'::jsonb`,
+      `ALTER TABLE market_discovery_runs ADD COLUMN IF NOT EXISTS ai_analysis_failures INTEGER NOT NULL DEFAULT 0`,
+      `ALTER TABLE market_discovery_candidates ADD COLUMN IF NOT EXISTS ai_decision_json JSONB NOT NULL DEFAULT '{}'::jsonb`,
+    ],
+  },
+  {
+    id: "0027_institutional_options_flow",
+    description: "Raw institutional options flow, transparent Northstar classifications, summaries, and server monitoring",
+    statements: [
+      `ALTER TABLE background_jobs DROP CONSTRAINT IF EXISTS background_jobs_job_type_check`,
+      `ALTER TABLE background_jobs ADD CONSTRAINT background_jobs_job_type_check CHECK(job_type IN ('PLAID_SYNC','NOTIFICATION_DELIVERY','MARKET_INTELLIGENCE','MARKET_DISCOVERY','DAILY_CLOSE_REVIEW','OVERNIGHT_OUTLOOK_REFRESH','TACTICAL_REENTRY_MONITOR','OPTIONS_FLOW'))`,
+      `CREATE TABLE IF NOT EXISTS options_flow_events (
+        id TEXT PRIMARY KEY, provider_event_id TEXT NOT NULL, provider TEXT NOT NULL, symbol TEXT NOT NULL,
+        contract_symbol TEXT, option_type TEXT CHECK(option_type IN ('CALL','PUT')), strike_cents BIGINT,
+        expiration DATE, occurred_at TIMESTAMPTZ NOT NULL, underlying_price_cents BIGINT,
+        trade_price_cents BIGINT, bid_cents BIGINT, ask_cents BIGINT, contracts INTEGER,
+        premium_cents BIGINT, volume INTEGER, open_interest INTEGER, volume_oi_ratio NUMERIC(16,6),
+        implied_volatility NUMERIC(16,8), delta NUMERIC(16,8), gamma NUMERIC(16,8),
+        theta NUMERIC(16,8), vega NUMERIC(16,8), exchange_routes_json JSONB NOT NULL DEFAULT '[]'::jsonb,
+        raw_json JSONB NOT NULL, provider_classification TEXT, northstar_classification TEXT NOT NULL,
+        direction TEXT NOT NULL CHECK(direction IN ('BULLISH','BEARISH','NEUTRAL','UNKNOWN')),
+        opening_likelihood TEXT NOT NULL, execution_aggression TEXT NOT NULL,
+        conviction_score INTEGER NOT NULL CHECK(conviction_score BETWEEN 0 AND 100),
+        reasons_json JSONB NOT NULL, next_day_oi_confirmed BOOLEAN, cluster_key TEXT,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(provider,provider_event_id)
+      )`,
+      `CREATE TABLE IF NOT EXISTS options_flow_summaries (
+        symbol TEXT PRIMARY KEY, source_mode TEXT NOT NULL, net_call_premium_cents BIGINT NOT NULL DEFAULT 0,
+        net_put_premium_cents BIGINT NOT NULL DEFAULT 0, bullish_premium_cents BIGINT NOT NULL DEFAULT 0,
+        bearish_premium_cents BIGINT NOT NULL DEFAULT 0, sweep_count INTEGER NOT NULL DEFAULT 0,
+        high_conviction_count INTEGER NOT NULL DEFAULT 0, largest_trades_json JSONB NOT NULL DEFAULT '[]'::jsonb,
+        timeline_json JSONB NOT NULL DEFAULT '[]'::jsonb, dark_pool_levels_json JSONB NOT NULL DEFAULT '[]'::jsonb,
+        gex_json JSONB NOT NULL DEFAULT '{}'::jsonb, call_wall_cents BIGINT, put_wall_cents BIGINT,
+        zero_gamma_cents BIGINT, flow_trend TEXT NOT NULL DEFAULT 'INSUFFICIENT_DATA',
+        institutional_conviction INTEGER NOT NULL DEFAULT 0, provider_status TEXT NOT NULL,
+        provider_error TEXT, data_as_of TIMESTAMPTZ, updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+      )`,
+      `CREATE TABLE IF NOT EXISTS options_flow_settings (
+        id TEXT PRIMARY KEY DEFAULT 'global', golden_min_premium_cents BIGINT NOT NULL DEFAULT 100000000,
+        golden_min_contracts INTEGER NOT NULL DEFAULT 500, golden_min_volume_oi NUMERIC(10,4) NOT NULL DEFAULT 1.5,
+        high_conviction_threshold INTEGER NOT NULL DEFAULT 75, alert_threshold INTEGER NOT NULL DEFAULT 82,
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+      )`,
+      `INSERT INTO options_flow_settings(id) VALUES('global') ON CONFLICT(id) DO NOTHING`,
+      `CREATE INDEX IF NOT EXISTS idx_options_flow_symbol_time ON options_flow_events(symbol,occurred_at DESC)`,
+      `CREATE INDEX IF NOT EXISTS idx_options_flow_conviction ON options_flow_events(conviction_score DESC,occurred_at DESC)`,
+    ],
+  },
+  {
+    id: "0028_plaid_investment_reconciliation",
+    description: "Provider-confirmed investment refresh lifecycle, account freshness, webhook health, and reconciliation history",
+    statements: [
+      `ALTER TABLE background_jobs DROP CONSTRAINT IF EXISTS background_jobs_job_type_check`,
+      `ALTER TABLE background_jobs ADD CONSTRAINT background_jobs_job_type_check CHECK(job_type IN ('PLAID_SYNC','PLAID_INVESTMENT_SYNC','NOTIFICATION_DELIVERY','MARKET_INTELLIGENCE','MARKET_DISCOVERY','DAILY_CLOSE_REVIEW','OVERNIGHT_OUTLOOK_REFRESH','TACTICAL_REENTRY_MONITOR','OPTIONS_FLOW'))`,
+      `ALTER TABLE accounts ADD COLUMN IF NOT EXISTS last_investment_sync_at TIMESTAMPTZ`,
+      `ALTER TABLE accounts ADD COLUMN IF NOT EXISTS last_provider_update_at TIMESTAMPTZ`,
+      `ALTER TABLE accounts ADD COLUMN IF NOT EXISTS investment_sync_status TEXT NOT NULL DEFAULT 'UNKNOWN'`,
+      `ALTER TABLE accounts ADD COLUMN IF NOT EXISTS investment_sync_error TEXT`,
+      `ALTER TABLE holdings ADD COLUMN IF NOT EXISTS provider_holding_id TEXT`,
+      `ALTER TABLE holdings ADD COLUMN IF NOT EXISTS provider_account_id TEXT`,
+      `ALTER TABLE holdings ADD COLUMN IF NOT EXISTS provider_security_id TEXT`,
+      `ALTER TABLE holdings ADD COLUMN IF NOT EXISTS provider_updated_at TIMESTAMPTZ`,
+      `ALTER TABLE securities ADD COLUMN IF NOT EXISTS provider_security_id TEXT`,
+      `ALTER TABLE investment_transactions ADD COLUMN IF NOT EXISTS provider_account_id TEXT`,
+      `ALTER TABLE investment_transactions ADD COLUMN IF NOT EXISTS provider_security_id TEXT`,
+      `ALTER TABLE plaid_webhook_events ADD COLUMN IF NOT EXISTS processed_at TIMESTAMPTZ`,
+      `ALTER TABLE plaid_webhook_events ADD COLUMN IF NOT EXISTS processing_error TEXT`,
+      `CREATE TABLE IF NOT EXISTS investment_sync_history (
+        id TEXT PRIMARY KEY, household_id TEXT NOT NULL REFERENCES households(id) ON DELETE CASCADE,
+        connection_id TEXT NOT NULL REFERENCES connections(id) ON DELETE CASCADE, account_id TEXT REFERENCES accounts(id) ON DELETE CASCADE,
+        trigger TEXT NOT NULL, status TEXT NOT NULL CHECK(status IN ('REFRESH_REQUESTED','WAITING_PROVIDER','SUCCEEDED','NO_CHANGES','FAILED')),
+        provider_request_id TEXT, holdings_added INTEGER NOT NULL DEFAULT 0, holdings_changed INTEGER NOT NULL DEFAULT 0,
+        holdings_closed INTEGER NOT NULL DEFAULT 0, transactions_added INTEGER NOT NULL DEFAULT 0,
+        result_json JSONB NOT NULL DEFAULT '{}'::jsonb, error_code TEXT, error_message TEXT,
+        started_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP, completed_at TIMESTAMPTZ
+      )`,
+      `CREATE UNIQUE INDEX IF NOT EXISTS idx_holdings_provider_identity ON holdings(account_id,provider_security_id) WHERE provider_security_id IS NOT NULL`,
+      `CREATE INDEX IF NOT EXISTS idx_investment_sync_history_connection ON investment_sync_history(connection_id,started_at DESC)`,
+      `CREATE INDEX IF NOT EXISTS idx_plaid_webhook_investment_health ON plaid_webhook_events(webhook_type,webhook_code,received_at DESC)`,
+    ],
+  },
 ] as const;
