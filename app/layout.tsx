@@ -22,6 +22,9 @@ import './paper-trading-simulator.css';
 import './selected-account-plan.css';
 import './responsive-mobile.css';
 import './design-system.css';
+import './market-discovery.css';
+import './daily-close-review.css';
+import './tactical-rebuy-panel.css';
 import { ConfirmProvider } from './confirmation-modal';
 import PwaManager from './pwa-manager';
 

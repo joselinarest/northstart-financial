@@ -1,0 +1,91 @@
+import {id,type PostgresDatabase} from "@/lib/db";
+import {loadRuntimeSecrets} from "@/lib/runtime-secrets";
+
+type Asset={symbol:string;name:string;exchange:string;tradable:boolean;status:string;class:string};
+type Bar={t:string;o:number;h:number;l:number;c:number;v:number};
+type CandidateStatus="DISCOVERED_TODAY"|"EARLY_WATCH"|"RESEARCH_NOW"|"POSSIBLE_BUY_SETUP"|"REJECTED";
+type Candidate={symbol:string;companyName:string;exchange:string;ipoDate:string|null;status:CandidateStatus;strategyFit:"SWING"|"LONG_TERM"|"BOTH";businessQuality:number;growthAcceleration:number;catalyst:number;valuation:number;technicalSetup:number;risk:number;discoveryConfidence:number;whyFound:string;changedRecently:string[];metrics:Record<string,unknown>;catalystData:Record<string,unknown>;valuationData:Record<string,unknown>;technical:Record<string,unknown>;risks:string[];evidence:Record<string,unknown>;rejectedReason:string|null;sourceAsOf:string};
+const clamp=(n:number)=>Math.max(0,Math.min(100,Math.round(n)));
+const average=(v:number[])=>v.length?v.reduce((a,b)=>a+b,0)/v.length:0;
+const number=(v:unknown):number|null=>Number.isFinite(Number(v))?Number(v):null;
+const theme=/(artificial intelligence|\bai\b|data center|semiconductor|electrical|power|grid|cloud|cyber|automat|robot|aerospace|defen[sc]e|biotech|health|infrastructure)/i;
+const inflection=/(guidance (?:raised|increase)|record backlog|orders? (?:accelerat|growth)|book.to.bill|capacity expansion|major contract|hyperscaler|customer adoption|new market|profitability|margin expansion|earnings surprise)/i;
+const riskWords=/(offering|dilution|secondary sale|insider sell|customer concentration|going concern|material weakness|debt covenant|guidance cut|investigation)/i;
+const parse=(v:unknown,fallback:any)=>{if(v&&typeof v==="object")return v;try{return JSON.parse(String(v))}catch{return fallback}};
+
+async function alpacaDirectory(headers:Record<string,string>){
+ const base=(process.env.ALPACA_CLOCK_BASE_URL||"https://paper-api.alpaca.markets").replace(/\/(?:v2(?:\/clock)?)?\/?$/,"");
+ const response=await fetch(`${base}/v2/assets?status=active&asset_class=us_equity`,{headers,cache:"no-store",signal:AbortSignal.timeout(15000)});
+ if(!response.ok)throw new Error(`ALPACA_DIRECTORY_${response.status}`);return await response.json() as Asset[];
+}
+async function recentIpos(token:string){
+ const to=new Date(),from=new Date(Date.now()-730*86400000),date=(d:Date)=>d.toISOString().slice(0,10);
+ const response=await fetch(`https://finnhub.io/api/v1/calendar/ipo?from=${date(from)}&to=${date(to)}&token=${encodeURIComponent(token)}`,{cache:"no-store",signal:AbortSignal.timeout(15000)});
+ if(!response.ok)return[];const data=await response.json() as {ipoCalendar?:Array<{symbol?:string;name?:string;date?:string;status?:string}>};
+ return (data.ipoCalendar||[]).filter(x=>x.symbol&&x.date&&!/withdraw/i.test(x.status||""));
+}
+async function barsFor(symbols:string[],headers:Record<string,string>){
+ if(!symbols.length)return{};const feed=process.env.ALPACA_DATA_FEED||"iex",start=new Date(Date.now()-190*86400000).toISOString();
+ const response=await fetch(`https://data.alpaca.markets/v2/stocks/bars?symbols=${symbols.join(",")}&timeframe=1Day&start=${encodeURIComponent(start)}&limit=10000&adjustment=all&feed=${encodeURIComponent(feed)}`,{headers,cache:"no-store",signal:AbortSignal.timeout(20000)});
+ if(!response.ok)throw new Error(`ALPACA_BARS_${response.status}`);return ((await response.json()) as {bars?:Record<string,Bar[]>}).bars||{};
+}
+async function enrich(symbol:string,token:string){
+ const today=new Date(),from=new Date(Date.now()-32*86400000),date=(d:Date)=>d.toISOString().slice(0,10),headers={"X-Finnhub-Token":token};
+ const [profileResponse,metricResponse,newsResponse]=await Promise.all([
+  fetch(`https://finnhub.io/api/v1/stock/profile2?symbol=${symbol}`,{headers,cache:"no-store",signal:AbortSignal.timeout(10000)}),
+  fetch(`https://finnhub.io/api/v1/stock/metric?symbol=${symbol}&metric=all`,{headers,cache:"no-store",signal:AbortSignal.timeout(10000)}),
+  fetch(`https://finnhub.io/api/v1/company-news?symbol=${symbol}&from=${date(from)}&to=${date(today)}`,{headers,cache:"no-store",signal:AbortSignal.timeout(10000)}),
+ ]);
+ const profile=profileResponse.ok?await profileResponse.json() as Record<string,any>:{};
+ const metric=metricResponse.ok?((await metricResponse.json()) as {metric?:Record<string,number>}).metric||{}:{};
+ const news=newsResponse.ok?(await newsResponse.json() as Array<{headline?:string;summary?:string;datetime?:number}>).slice(0,20):[];
+ return{profile,metric,news};
+}
+
+function technicalSeed(asset:Asset,bars:Bar[],ipoDate:string|null){
+ if(bars.length<12)return null;const last=bars.at(-1)!,previous=bars.at(-2)!,recent=bars.slice(-21),prior=bars.slice(-42,-21),avgVol=average(recent.slice(0,-1).map(x=>x.v)),priorVol=average(prior.map(x=>x.v)),relVol=avgVol?last.v/avgVol:0,volumeAcceleration=priorVol?avgVol/priorVol:1,high20=Math.max(...recent.slice(0,-1).map(x=>x.h)),low20=Math.min(...recent.map(x=>x.l)),sma20=average(recent.map(x=>x.c)),return20=recent[0]?.c?(last.c/recent[0].c-1)*100:0,dayChange=previous.c?(last.c/previous.c-1)*100:0;
+ const liquidity=avgVol*last.c,young=Boolean(ipoDate),technical=clamp(45+(last.c>sma20?13:-8)+(last.c>high20?15:0)+(relVol>=1.5?12:0)+(return20>8?8:return20<-12?-8:0)),seed=technical+(relVol>=1.5?10:0)+(volumeAcceleration>1.25?8:0)+(young?12:0)+(theme.test(`${asset.name}`)?8:0);
+ return{seed,technical,metrics:{price:last.c,dayChange,return20,relativeVolume:relVol,volumeAcceleration,averageDollarVolume:liquidity,sma20,support:low20,resistance:high20,historyDays:bars.length}};
+}
+
+function scored(asset:Asset,seed:ReturnType<typeof technicalSeed> extends infer T?Exclude<T,null>:never,enrichment:Awaited<ReturnType<typeof enrich>>,ipoDate:string|null,sourceAsOf:string):Candidate{
+ const m=enrichment.metric,p=enrichment.profile,news=enrichment.news,headlines=news.map(x=>`${x.headline||""} ${x.summary||""}`),changes=headlines.filter(x=>inflection.test(x)).slice(0,4).map(x=>x.replace(/\s+/g," ").slice(0,180)),riskNews=headlines.filter(x=>riskWords.test(x)).slice(0,3),revenue=number(m.revenueGrowthTTMYoy??m.revenueGrowth3Y),eps=number(m.epsGrowthTTMYoy??m.epsGrowth3Y),gross=number(m.grossMarginTTM),operating=number(m.operatingMarginTTM),fcf=number(m.freeCashFlowPerShareTTM),debtEquity=number(m.totalDebtToEquityQuarterly),forwardPe=number(m.forwardPE),marketCap=number(p.marketCapitalization),coverage=[revenue,eps,gross,operating,fcf,debtEquity,marketCap].filter(x=>x!==null).length;
+ const grossScore=gross===null?0:gross>=40?18:gross>=20?9:-5,operatingScore=operating===null?0:operating>=15?18:operating>0?8:-12,fcfScore=fcf===null?0:fcf>0?14:-10,debtScore=debtEquity===null?0:debtEquity<80?10:debtEquity>200?-14:0;
+ const revenueScore=revenue===null?0:revenue>=40?30:revenue>=20?20:revenue>8?10:revenue<0?-18:0,epsScore=eps===null?0:eps>=30?20:eps>0?10:eps<-10?-12:0;
+ const business=clamp(40+grossScore+operatingScore+fcfScore+debtScore);
+ const growth=clamp(35+revenueScore+epsScore+(seed.metrics.volumeAcceleration>1.25?8:0));
+ const catalyst=clamp(30+changes.length*16+(seed.metrics.relativeVolume>=1.5?12:0)+(theme.test(`${p.finnhubIndustry||""} ${asset.name} ${headlines.join(" ")}`)?10:0));
+ const valuation=clamp(55+(forwardPe===null?0:forwardPe<25?18:forwardPe<45?4:forwardPe>80?-24:-8)+(revenue!==null&&forwardPe!==null&&revenue>forwardPe?12:0));
+ const risks:string[]=[];if(coverage<4)risks.push("Limited fundamental coverage reduces confidence");if(ipoDate)risks.push("Recently public company with a shorter operating and trading record");if(debtEquity!==null&&debtEquity>150)risks.push("Elevated debt-to-equity requires balance-sheet review");if(riskNews.length)risks.push(...riskNews.map(x=>x.slice(0,160)));if(seed.metrics.averageDollarVolume<5_000_000)risks.push("Low dollar liquidity can increase slippage and volatility");
+ const risk=clamp(20+(coverage<4?18:0)+(ipoDate?12:0)+(debtEquity!==null&&debtEquity>150?18:0)+riskNews.length*10+(seed.metrics.averageDollarVolume<5_000_000?20:0));
+ const confidence=clamp(28+coverage*7+Math.min(18,changes.length*6)+(seed.metrics.historyDays>=60?10:seed.metrics.historyDays>=20?5:0)-(ipoDate?5:0));
+ const composite=business*.2+growth*.25+catalyst*.18+valuation*.12+seed.technical*.2-risk*.15,status:CandidateStatus=risk>=75||seed.metrics.averageDollarVolume<750_000?"REJECTED":confidence>=72&&composite>=67&&seed.technical>=65?"POSSIBLE_BUY_SETUP":confidence>=62&&(growth>=65||catalyst>=65)?"RESEARCH_NOW":ipoDate||changes.length?"DISCOVERED_TODAY":"EARLY_WATCH";
+ const why=[ipoDate?`Recent IPO (${ipoDate})`:null,growth>=65?"growth acceleration passed":null,changes.length?`${changes.length} material inflection signal${changes.length===1?"":"s"}`:null,seed.metrics.relativeVolume>=1.5?`${seed.metrics.relativeVolume.toFixed(1)}× relative volume`:null,seed.technical>=65?"constructive technical setup":null].filter(Boolean).join(" · ")||"Early quantitative watch candidate requiring more evidence";
+ return{symbol:asset.symbol,companyName:String(p.name||asset.name||asset.symbol),exchange:asset.exchange,ipoDate,status,strategyFit:business>=65&&growth>=60&&seed.technical>=60?"BOTH":seed.technical>=68?"SWING":"LONG_TERM",businessQuality:business,growthAcceleration:growth,catalyst,valuation,technicalSetup:seed.technical,risk,discoveryConfidence:confidence,whyFound:why,changedRecently:changes,metrics:{...seed.metrics,revenueGrowth:revenue,epsGrowth:eps,grossMargin:gross,operatingMargin:operating,freeCashFlowPerShare:fcf,debtToEquity:debtEquity,marketCap},catalystData:{materialNewsSignals:changes,themeMatched:theme.test(`${p.finnhubIndustry||""} ${asset.name} ${headlines.join(" ")}`)},valuationData:{forwardPE:forwardPe,context:forwardPe===null?"Valuation coverage unavailable—research required":forwardPe>60?"Premium valuation requires exceptional execution":forwardPe<25?"Multiple is below the discovery growth threshold":"Valuation is mid-range; compare with sector peers"},technical:{...seed.metrics,entryZoneLow:seed.metrics.sma20,entryZoneHigh:seed.metrics.resistance,invalidation:seed.metrics.support},risks,evidence:{provider:"Alpaca + Finnhub",fundamentalCoverage:`${coverage}/7`,newsReviewed:news.length,youngCompany:!!ipoDate,independentOfPortfolio:true},rejectedReason:status==="REJECTED"?(risks[0]||"Risk/liquidity threshold failed"):null,sourceAsOf};
+}
+
+export async function runMarketDiscovery(db:PostgresDatabase,{force=false}:{force?:boolean}={}){
+ await loadRuntimeSecrets();const recent=await db.prepare("SELECT completed_at FROM market_discovery_runs WHERE status='SUCCEEDED' ORDER BY completed_at DESC LIMIT 1").first<{completed_at:string}>();
+ if(!force&&recent?.completed_at&&Date.now()-new Date(recent.completed_at).getTime()<6*3600000)return{status:"cached",reason:"A completed market-wide scan is less than six hours old",completedAt:recent.completed_at};
+ const key=process.env.ALPACA_API_KEY,secret=process.env.ALPACA_API_SECRET,token=process.env.FINNHUB_API_KEY;if(!key||!secret||!token)throw new Error("Market-wide discovery requires Alpaca and Finnhub provider credentials");
+ const runId=id("discovery_run"),sourceAsOf=new Date().toISOString();await db.prepare("INSERT INTO market_discovery_runs(id,status) VALUES(?,'RUNNING')").bind(runId).run();
+ try{const headers={"APCA-API-KEY-ID":key,"APCA-API-SECRET-KEY":secret},[directory,ipos]=await Promise.all([alpacaDirectory(headers),recentIpos(token)]),ipoMap=new Map(ipos.map(x=>[String(x.symbol).toUpperCase(),x]));
+  const eligible=directory.filter(x=>x.tradable&&["NASDAQ","NYSE","AMEX","ARCA","BATS"].includes(x.exchange)&&!/ warrant| unit| right/i.test(x.name||""));
+  const day=Math.floor(Date.now()/86400000),batchSize=Math.min(450,eligible.length),start=(day*batchSize)%Math.max(1,eligible.length),rotating=[...eligible.slice(start,start+batchSize),...eligible.slice(0,Math.max(0,start+batchSize-eligible.length))],ipoAssets=eligible.filter(x=>ipoMap.has(x.symbol)),universe=[...new Map([...ipoAssets,...rotating].map(x=>[x.symbol,x])).values()];
+  const barMap:Record<string,Bar[]>={};for(let i=0;i<universe.length;i+=120)Object.assign(barMap,await barsFor(universe.slice(i,i+120).map(x=>x.symbol),headers));
+  const seeds=universe.map(asset=>({asset,ipoDate:ipoMap.get(asset.symbol)?.date||null,seed:technicalSeed(asset,barMap[asset.symbol]||[],ipoMap.get(asset.symbol)?.date||null)})).filter(x=>x.seed).sort((a,b)=>b.seed!.seed-a.seed!.seed).slice(0,35),candidates:Candidate[]=[];
+  for(const item of seeds){const enrichment=await enrich(item.asset.symbol,token);candidates.push(scored(item.asset,item.seed!,enrichment,item.ipoDate,sourceAsOf))}
+  for(const c of candidates){const existing=await db.prepare("SELECT first_detected_at,status,discovery_confidence FROM market_discovery_candidates WHERE symbol=?").bind(c.symbol).first<Record<string,any>>(),first=existing?.first_detected_at||sourceAsOf,status=c.status==="DISCOVERED_TODAY"&&existing?c.discoveryConfidence>=68?"RESEARCH_NOW":"EARLY_WATCH":c.status;
+   await db.prepare(`INSERT INTO market_discovery_candidates(symbol,company_name,exchange,ipo_date,status,strategy_fit,business_quality,growth_acceleration,catalyst,valuation,technical_setup,risk,discovery_confidence,why_found,changed_recently_json,metrics_json,catalyst_json,valuation_json,technical_json,risks_json,evidence_json,rejected_reason,first_detected_at,last_detected_at,source_as_of,scan_run_id,model_version) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(symbol) DO UPDATE SET company_name=EXCLUDED.company_name,exchange=EXCLUDED.exchange,ipo_date=COALESCE(EXCLUDED.ipo_date,market_discovery_candidates.ipo_date),status=EXCLUDED.status,strategy_fit=EXCLUDED.strategy_fit,business_quality=EXCLUDED.business_quality,growth_acceleration=EXCLUDED.growth_acceleration,catalyst=EXCLUDED.catalyst,valuation=EXCLUDED.valuation,technical_setup=EXCLUDED.technical_setup,risk=EXCLUDED.risk,discovery_confidence=EXCLUDED.discovery_confidence,why_found=EXCLUDED.why_found,changed_recently_json=EXCLUDED.changed_recently_json,metrics_json=EXCLUDED.metrics_json,catalyst_json=EXCLUDED.catalyst_json,valuation_json=EXCLUDED.valuation_json,technical_json=EXCLUDED.technical_json,risks_json=EXCLUDED.risks_json,evidence_json=EXCLUDED.evidence_json,rejected_reason=EXCLUDED.rejected_reason,last_detected_at=EXCLUDED.last_detected_at,source_as_of=EXCLUDED.source_as_of,scan_run_id=EXCLUDED.scan_run_id,model_version=EXCLUDED.model_version`).bind(c.symbol,c.companyName,c.exchange,c.ipoDate,status,c.strategyFit,c.businessQuality,c.growthAcceleration,c.catalyst,c.valuation,c.technicalSetup,c.risk,c.discoveryConfidence,c.whyFound,JSON.stringify(c.changedRecently),JSON.stringify(c.metrics),JSON.stringify(c.catalystData),JSON.stringify(c.valuationData),JSON.stringify(c.technical),JSON.stringify(c.risks),JSON.stringify(c.evidence),c.rejectedReason,first,sourceAsOf,sourceAsOf,runId,"discovery-v1").run();
+   await db.prepare("INSERT INTO market_discovery_history(id,symbol,scan_run_id,status,strategy_fit,scores_json,thesis,evidence_json,source_as_of) VALUES(?,?,?,?,?,?,?,?,?)").bind(id("discovery_history"),c.symbol,runId,status,c.strategyFit,JSON.stringify({businessQuality:c.businessQuality,growthAcceleration:c.growthAcceleration,catalyst:c.catalyst,valuation:c.valuation,technicalSetup:c.technicalSetup,risk:c.risk,discoveryConfidence:c.discoveryConfidence}),c.whyFound,JSON.stringify(c.evidence),sourceAsOf).run();
+  }
+  await db.prepare("UPDATE market_discovery_runs SET status='SUCCEEDED',universe_size=?,screened_count=?,enriched_count=?,source_summary_json=?,completed_at=CURRENT_TIMESTAMP WHERE id=?").bind(eligible.length,universe.length,candidates.length,JSON.stringify({directory:"Alpaca active U.S. equities",recentIpos:"Finnhub previous 24 months",rotatingBatch:batchSize}),runId).run();return{status:"completed",runId,universeSize:eligible.length,screened:universe.length,enriched:candidates.length};
+ }catch(error){await db.prepare("UPDATE market_discovery_runs SET status='FAILED',error_code=?,completed_at=CURRENT_TIMESTAMP WHERE id=?").bind(String(error instanceof Error?error.message:error).slice(0,100),runId).run();throw error}
+}
+
+export async function listMarketDiscoveries(db:PostgresDatabase,search="",strategy="ALL"){
+ const q=`%${search.trim()}%`,rows=await db.prepare("SELECT * FROM market_discovery_candidates WHERE (?='' OR symbol ILIKE ? OR company_name ILIKE ?) AND (?='ALL' OR strategy_fit=? OR strategy_fit='BOTH') ORDER BY CASE status WHEN 'POSSIBLE_BUY_SETUP' THEN 0 WHEN 'RESEARCH_NOW' THEN 1 WHEN 'DISCOVERED_TODAY' THEN 2 WHEN 'EARLY_WATCH' THEN 3 ELSE 4 END,discovery_confidence DESC,last_detected_at DESC LIMIT 160").bind(search.trim(),q,q,strategy,strategy).all<Record<string,any>>();
+ const run=await db.prepare("SELECT * FROM market_discovery_runs ORDER BY started_at DESC LIMIT 1").first<Record<string,any>>();return{run,candidates:rows.results.map(row=>({...row,changed_recently:parse(row.changed_recently_json,[]),metrics:parse(row.metrics_json,{}),catalyst_data:parse(row.catalyst_json,{}),valuation_data:parse(row.valuation_json,{}),technical:parse(row.technical_json,{}),risks:parse(row.risks_json,[]),evidence:parse(row.evidence_json,{})}))};
+}
+
+export async function discoveryHistory(db:PostgresDatabase,symbol:string){const rows=await db.prepare("SELECT * FROM market_discovery_history WHERE symbol=? ORDER BY created_at DESC LIMIT 24").bind(symbol.toUpperCase()).all<Record<string,any>>();return rows.results.map(row=>({...row,scores:parse(row.scores_json,{}),evidence:parse(row.evidence_json,{})}))}

@@ -13,8 +13,11 @@
     "lint": "eslint . --ignore-pattern dist --ignore-pattern .next",
     "test:pwa": "node scripts/pwa-check.mjs",
     "test:market-alerts": "node scripts/market-alert-check.mjs",
-    "test:transaction-alerts": "node scripts/transaction-alert-check.mjs"
-    ,"db:migrate": "node scripts/run-migrations.mjs"
+    "test:transaction-alerts": "node scripts/transaction-alert-check.mjs",
+    "test:market-discovery": "node scripts/market-discovery-check.mjs",
+    "test:daily-close-review": "node scripts/daily-close-review-check.mjs",
+    "test:tactical-rebuy": "node scripts/tactical-rebuy-check.mjs",
+    "db:migrate": "node scripts/run-migrations.mjs"
   },
   "dependencies": {
     "@aws-sdk/client-secrets-manager": "^3.1125.0",
@@ -25,6 +28,7 @@
     "web-push": "^3.6.7"
   },
   "devDependencies": {
+    "@eslint/eslintrc": "^3.3.7",
     "@tailwindcss/postcss": "4.2.1",
     "@types/node": "22.19.19",
     "@types/pg": "^8.23.1",

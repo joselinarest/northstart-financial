@@ -1,5 +1,5 @@
 AWSTemplateFormatVersion: "2010-09-09"
-Description: Northstar server-driven market and notification worker schedule
+Description: Northstar server-driven market, close-review, discovery, and notification worker schedule
 Parameters:
   NorthstarAppUrl:
     Type: String

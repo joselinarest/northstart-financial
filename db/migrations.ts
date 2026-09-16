@@ -558,4 +558,125 @@ export const migrations: readonly Migration[] = [
       `CREATE INDEX IF NOT EXISTS idx_investment_transactions_external ON investment_transactions(account_id,source,external_id)`,
     ],
   },
+  {
+    id: "0022_market_wide_discovery",
+    description: "Independent market-wide candidate discovery runs, current theses, and immutable history",
+    statements: [
+      `ALTER TABLE background_jobs DROP CONSTRAINT IF EXISTS background_jobs_job_type_check`,
+      `ALTER TABLE background_jobs ADD CONSTRAINT background_jobs_job_type_check CHECK(job_type IN ('PLAID_SYNC','NOTIFICATION_DELIVERY','MARKET_INTELLIGENCE','MARKET_DISCOVERY'))`,
+      `CREATE TABLE IF NOT EXISTS market_discovery_runs (
+        id TEXT PRIMARY KEY, status TEXT NOT NULL CHECK(status IN ('RUNNING','SUCCEEDED','FAILED')),
+        universe_size INTEGER NOT NULL DEFAULT 0, screened_count INTEGER NOT NULL DEFAULT 0,
+        enriched_count INTEGER NOT NULL DEFAULT 0, source_summary_json JSONB NOT NULL DEFAULT '{}'::jsonb,
+        error_code TEXT, started_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP, completed_at TIMESTAMPTZ
+      )`,
+      `CREATE TABLE IF NOT EXISTS market_discovery_candidates (
+        symbol TEXT PRIMARY KEY, company_name TEXT NOT NULL, exchange TEXT, sector TEXT, industry TEXT, ipo_date DATE,
+        status TEXT NOT NULL CHECK(status IN ('DISCOVERED_TODAY','EARLY_WATCH','RESEARCH_NOW','POSSIBLE_BUY_SETUP','REJECTED')),
+        strategy_fit TEXT NOT NULL CHECK(strategy_fit IN ('SWING','LONG_TERM','BOTH')),
+        business_quality INTEGER NOT NULL, growth_acceleration INTEGER NOT NULL, catalyst INTEGER NOT NULL,
+        valuation INTEGER NOT NULL, technical_setup INTEGER NOT NULL, risk INTEGER NOT NULL, discovery_confidence INTEGER NOT NULL,
+        why_found TEXT NOT NULL, changed_recently_json JSONB NOT NULL DEFAULT '[]'::jsonb,
+        metrics_json JSONB NOT NULL DEFAULT '{}'::jsonb, catalyst_json JSONB NOT NULL DEFAULT '{}'::jsonb,
+        valuation_json JSONB NOT NULL DEFAULT '{}'::jsonb, technical_json JSONB NOT NULL DEFAULT '{}'::jsonb,
+        risks_json JSONB NOT NULL DEFAULT '[]'::jsonb, evidence_json JSONB NOT NULL DEFAULT '{}'::jsonb,
+        rejected_reason TEXT, first_detected_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        last_detected_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP, source_as_of TIMESTAMPTZ NOT NULL,
+        scan_run_id TEXT REFERENCES market_discovery_runs(id) ON DELETE SET NULL, model_version TEXT NOT NULL
+      )`,
+      `CREATE TABLE IF NOT EXISTS market_discovery_history (
+        id TEXT PRIMARY KEY, symbol TEXT NOT NULL, scan_run_id TEXT REFERENCES market_discovery_runs(id) ON DELETE SET NULL,
+        status TEXT NOT NULL, strategy_fit TEXT NOT NULL, scores_json JSONB NOT NULL, thesis TEXT NOT NULL,
+        evidence_json JSONB NOT NULL, source_as_of TIMESTAMPTZ NOT NULL, created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+      )`,
+      `CREATE INDEX IF NOT EXISTS idx_discovery_status_confidence ON market_discovery_candidates(status,discovery_confidence DESC,last_detected_at DESC)`,
+      `CREATE INDEX IF NOT EXISTS idx_discovery_ipo ON market_discovery_candidates(ipo_date DESC)`,
+      `CREATE INDEX IF NOT EXISTS idx_discovery_history_symbol ON market_discovery_history(symbol,created_at DESC)`,
+      `CREATE INDEX IF NOT EXISTS idx_discovery_runs_time ON market_discovery_runs(started_at DESC)`,
+    ],
+  },
+  {
+    id: "0023_daily_market_close_reviews",
+    description: "Server-generated close reviews, next-session scenario forecasts, immutable revisions, and calibration outcomes",
+    statements: [
+      `ALTER TABLE background_jobs DROP CONSTRAINT IF EXISTS background_jobs_job_type_check`,
+      `ALTER TABLE background_jobs ADD CONSTRAINT background_jobs_job_type_check CHECK(job_type IN ('PLAID_SYNC','NOTIFICATION_DELIVERY','MARKET_INTELLIGENCE','MARKET_DISCOVERY','DAILY_CLOSE_REVIEW','OVERNIGHT_OUTLOOK_REFRESH'))`,
+      `CREATE TABLE IF NOT EXISTS daily_market_reviews (
+        id TEXT PRIMARY KEY, household_id TEXT NOT NULL REFERENCES households(id) ON DELETE CASCADE,
+        session_date DATE NOT NULL, next_session_date DATE NOT NULL, revision INTEGER NOT NULL DEFAULT 1,
+        review_kind TEXT NOT NULL CHECK(review_kind IN ('MARKET_CLOSE','OVERNIGHT_REVISION','PREMARKET_REVISION')),
+        status TEXT NOT NULL DEFAULT 'READY' CHECK(status IN ('BUILDING','READY','FAILED')),
+        market_summary_json JSONB NOT NULL, portfolio_summary_json JSONB NOT NULL, ticker_statuses_json JSONB NOT NULL,
+        changes_json JSONB NOT NULL, confirmed_signals_json JSONB NOT NULL, invalidated_signals_json JSONB NOT NULL,
+        overnight_events_json JSONB NOT NULL, watchlist_json JSONB NOT NULL, prepared_orders_json JSONB NOT NULL,
+        scenarios_json JSONB NOT NULL, risk_summary_json JSONB NOT NULL, source_snapshot_json JSONB NOT NULL,
+        material_change_reason TEXT, parent_review_id TEXT REFERENCES daily_market_reviews(id) ON DELETE SET NULL,
+        generated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP, source_as_of TIMESTAMPTZ NOT NULL,
+        UNIQUE(household_id,session_date,revision)
+      )`,
+      `CREATE TABLE IF NOT EXISTS daily_market_review_outcomes (
+        id TEXT PRIMARY KEY, review_id TEXT NOT NULL REFERENCES daily_market_reviews(id) ON DELETE CASCADE,
+        evaluated_session_date DATE NOT NULL, actual_scenario TEXT NOT NULL, scenario_match BOOLEAN,
+        brier_score NUMERIC(10,6), false_positive_count INTEGER NOT NULL DEFAULT 0,
+        outcome_json JSONB NOT NULL, evaluated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(review_id,evaluated_session_date)
+      )`,
+      `CREATE TABLE IF NOT EXISTS market_monitor_state (
+        monitor_key TEXT PRIMARY KEY, last_processed_at TIMESTAMPTZ, last_event_cursor TEXT,
+        trigger_state_json JSONB NOT NULL DEFAULT '{}'::jsonb, last_success_at TIMESTAMPTZ,
+        latest_error_code TEXT, updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+      )`,
+      `CREATE TABLE IF NOT EXISTS worker_heartbeats (
+        worker_name TEXT PRIMARY KEY, status TEXT NOT NULL, market_session TEXT, metadata_json JSONB NOT NULL DEFAULT '{}'::jsonb,
+        jobs_succeeded INTEGER NOT NULL DEFAULT 0, jobs_failed INTEGER NOT NULL DEFAULT 0,
+        heartbeat_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+      )`,
+      `CREATE INDEX IF NOT EXISTS idx_daily_reviews_household_date ON daily_market_reviews(household_id,session_date DESC,revision DESC)`,
+      `CREATE INDEX IF NOT EXISTS idx_daily_review_outcomes_review ON daily_market_review_outcomes(review_id,evaluated_at DESC)`,
+      `CREATE INDEX IF NOT EXISTS idx_worker_heartbeats_time ON worker_heartbeats(heartbeat_at DESC)`,
+    ],
+  },
+  {
+    id: "0024_tactical_sell_rebuy",
+    description: "Tax-aware tactical trim proposals, durable re-entry monitoring, and hold-benchmark outcomes",
+    statements: [
+      `ALTER TABLE background_jobs DROP CONSTRAINT IF EXISTS background_jobs_job_type_check`,
+      `ALTER TABLE background_jobs ADD CONSTRAINT background_jobs_job_type_check CHECK(job_type IN ('PLAID_SYNC','NOTIFICATION_DELIVERY','MARKET_INTELLIGENCE','MARKET_DISCOVERY','DAILY_CLOSE_REVIEW','OVERNIGHT_OUTLOOK_REFRESH','TACTICAL_REENTRY_MONITOR'))`,
+      `CREATE TABLE IF NOT EXISTS tactical_rebuy_plans (
+        id TEXT PRIMARY KEY, household_id TEXT NOT NULL REFERENCES households(id) ON DELETE CASCADE,
+        account_id TEXT NOT NULL REFERENCES accounts(id) ON DELETE CASCADE, security_id TEXT NOT NULL REFERENCES securities(id),
+        status TEXT NOT NULL CHECK(status IN ('PROPOSED','PREPARE_TO_TRIM','AWAITING_EXECUTION','MONITORING_REENTRY','REENTRY_READY','INVALIDATED_UPWARD','REENTERED','CANCELLED','EXPIRED')),
+        action TEXT NOT NULL CHECK(action IN ('HOLD','TRIM_REBUY','TACTICAL_EXIT_REENTRY')),
+        current_shares NUMERIC(28,8) NOT NULL, trim_shares NUMERIC(28,8) NOT NULL, keep_shares NUMERIC(28,8) NOT NULL,
+        reference_price_cents BIGINT NOT NULL, trigger_low_cents BIGINT, trigger_high_cents BIGINT,
+        expected_pullback_low_cents BIGINT NOT NULL, expected_pullback_high_cents BIGINT NOT NULL,
+        rebuy_low_cents BIGINT NOT NULL, rebuy_high_cents BIGINT NOT NULL, upward_invalidation_cents BIGINT NOT NULL,
+        estimated_proceeds_cents BIGINT NOT NULL, cost_basis_cents BIGINT, estimated_realized_pnl_cents BIGINT,
+        estimated_tax_cents BIGINT NOT NULL DEFAULT 0, estimated_costs_cents BIGINT NOT NULL DEFAULT 0,
+        expected_net_benefit_cents BIGINT NOT NULL, expected_share_improvement NUMERIC(28,8) NOT NULL DEFAULT 0,
+        pullback_probability INTEGER NOT NULL, continuation_probability INTEGER NOT NULL,
+        confirmation_groups_json JSONB NOT NULL, scenarios_json JSONB NOT NULL, evidence_json JSONB NOT NULL,
+        why_not_hold TEXT NOT NULL, why_not_sell_all TEXT NOT NULL, failure_case TEXT NOT NULL,
+        exit_transaction_id TEXT REFERENCES investment_transactions(id), actual_exit_price_cents BIGINT, actual_exit_proceeds_cents BIGINT,
+        rebuy_transaction_id TEXT REFERENCES investment_transactions(id), actual_rebuy_price_cents BIGINT,
+        first_alerted_at TIMESTAMPTZ, last_evaluated_at TIMESTAMPTZ, expires_at TIMESTAMPTZ NOT NULL,
+        model_version TEXT NOT NULL, created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP, updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+      )`,
+      `CREATE TABLE IF NOT EXISTS tactical_rebuy_outcomes (
+        id TEXT PRIMARY KEY, plan_id TEXT NOT NULL UNIQUE REFERENCES tactical_rebuy_plans(id) ON DELETE CASCADE,
+        shares_gained NUMERIC(28,8), net_dollars_saved_cents BIGINT, missed_upside_cents BIGINT,
+        hold_value_cents BIGINT, tactical_value_cents BIGINT, excess_value_vs_hold_cents BIGINT,
+        outcome_json JSONB NOT NULL, evaluated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+      )`,
+      `CREATE TABLE IF NOT EXISTS tactical_symbol_calibration (
+        household_id TEXT NOT NULL REFERENCES households(id) ON DELETE CASCADE, symbol TEXT NOT NULL,
+        completed_plans INTEGER NOT NULL DEFAULT 0, wins_vs_hold INTEGER NOT NULL DEFAULT 0,
+        cumulative_excess_cents BIGINT NOT NULL DEFAULT 0, required_confirmation_groups INTEGER NOT NULL DEFAULT 4,
+        minimum_advantage_bps INTEGER NOT NULL DEFAULT 75, updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        PRIMARY KEY(household_id,symbol)
+      )`,
+      `CREATE INDEX IF NOT EXISTS idx_tactical_plans_monitor ON tactical_rebuy_plans(status,last_evaluated_at,expires_at)`,
+      `CREATE INDEX IF NOT EXISTS idx_tactical_plans_account_symbol ON tactical_rebuy_plans(account_id,security_id,created_at DESC)`,
+    ],
+  },
 ] as const;

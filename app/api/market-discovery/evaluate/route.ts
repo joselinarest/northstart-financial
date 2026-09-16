@@ -1,0 +1,3 @@
+import {database,id} from "@/lib/db";
+export const dynamic="force-dynamic";export const runtime="nodejs";
+export async function POST(request:Request){if(!process.env.CRON_SECRET||request.headers.get("authorization")!==`Bearer ${process.env.CRON_SECRET}`)return Response.json({error:"Unauthorized"},{status:401});const db=await database(),bucket=new Date().toISOString().slice(0,13),result=await db.prepare("INSERT INTO background_jobs(id,job_type,idempotency_key,payload_json) VALUES(?,'MARKET_DISCOVERY',?,?) ON CONFLICT(idempotency_key) DO NOTHING RETURNING id").bind(id("job"),`discovery:${bucket}`,JSON.stringify({scheduledAt:new Date().toISOString()})).first();return Response.json({queued:Boolean(result),bucket})}

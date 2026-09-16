@@ -3,6 +3,11 @@ import { loadRuntimeSecrets } from "@/lib/runtime-secrets";
 import { decryptSecret } from "@/lib/crypto";
 import webpush from "web-push";
 import {evaluateMarketIntelligence} from "@/lib/market-alert-engine";
+import {runMarketDiscovery} from "@/lib/market-discovery-engine";
+import {generateDailyMarketReview} from "@/lib/daily-market-review";
+import {marketSessionAt} from "@/lib/market-session";
+import {evaluateTacticalSellRebuy,monitorTacticalReentries} from "@/lib/tactical-rebuy-engine";
+import {evaluateTacticalOutcomes} from "@/lib/tactical-rebuy-outcomes";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 const escape = (value: unknown) =>
@@ -35,9 +40,16 @@ export async function POST(request: Request) {
   )
     return Response.json({ error: "Unauthorized" }, { status: 401 });
   const db = await database(),base = process.env.APP_URL || new URL(request.url).origin,
-    households=await db.prepare("SELECT DISTINCT household_id FROM market_alert_preferences WHERE enabled=TRUE UNION SELECT DISTINCT household_id FROM market_watchlist").all<{household_id:string}>(),
+    households=await db.prepare("SELECT DISTINCT household_id FROM household_members WHERE status='active'").all<{household_id:string}>(),
     minuteBucket=new Date().toISOString().slice(0,16);
+  const session=marketSessionAt(Date.now()),et=Object.fromEntries(new Intl.DateTimeFormat("en-US",{timeZone:"America/New_York",year:"numeric",month:"2-digit",day:"2-digit",hour:"2-digit",minute:"2-digit",hourCycle:"h23"}).formatToParts(new Date()).filter(x=>x.type!=="literal").map(x=>[x.type,x.value])),sessionDate=`${et.year}-${et.month}-${et.day}`,etMinute=Number(et.hour)*60+Number(et.minute);
+  await db.prepare("INSERT INTO worker_heartbeats(worker_name,status,market_session,metadata_json,heartbeat_at) VALUES('aws-market-worker','RUNNING',?,?,CURRENT_TIMESTAMP) ON CONFLICT(worker_name) DO UPDATE SET status='RUNNING',market_session=EXCLUDED.market_session,metadata_json=EXCLUDED.metadata_json,heartbeat_at=CURRENT_TIMESTAMP").bind(session,JSON.stringify({minuteBucket,households:households.results.length})).run();
   for(const household of households.results)await db.prepare("INSERT INTO background_jobs(id,household_id,job_type,idempotency_key,payload_json) VALUES(?,?,'MARKET_INTELLIGENCE',?,?) ON CONFLICT(idempotency_key) DO NOTHING").bind(id("job"),household.household_id,`market:${household.household_id}:${minuteBucket}`,JSON.stringify({householdId:household.household_id})).run();
+  const discoveryBucket=new Date().toISOString().slice(0,13);
+  await db.prepare("INSERT INTO background_jobs(id,job_type,idempotency_key,payload_json) VALUES(?,'MARKET_DISCOVERY',?,?) ON CONFLICT(idempotency_key) DO NOTHING").bind(id("job"),`discovery:${discoveryBucket}`,JSON.stringify({scheduledAt:new Date().toISOString()})).run();
+  if(session==="AFTER_HOURS"&&etMinute>=16*60+5)for(const household of households.results)await db.prepare("INSERT INTO background_jobs(id,household_id,job_type,idempotency_key,payload_json) VALUES(?,?,'DAILY_CLOSE_REVIEW',?,?) ON CONFLICT(idempotency_key) DO NOTHING").bind(id("job"),household.household_id,`close-review:${household.household_id}:${sessionDate}`,JSON.stringify({householdId:household.household_id,sessionDate})).run();
+  if(session==="PREMARKET"&&etMinute>=8*60+30)for(const household of households.results)await db.prepare("INSERT INTO background_jobs(id,household_id,job_type,idempotency_key,payload_json) VALUES(?,?,'OVERNIGHT_OUTLOOK_REFRESH',?,?) ON CONFLICT(idempotency_key) DO NOTHING").bind(id("job"),household.household_id,`premarket-review:${household.household_id}:${sessionDate}`,JSON.stringify({householdId:household.household_id,sessionDate})).run();
+  if(session!=="CLOSED"){const tacticalBucket=`${sessionDate}:${Math.floor(etMinute/5)}`;await db.prepare("INSERT INTO background_jobs(id,job_type,idempotency_key,payload_json) VALUES(?,'TACTICAL_REENTRY_MONITOR',?,?) ON CONFLICT(idempotency_key) DO NOTHING").bind(id("job"),`tactical-monitor:${tacticalBucket}`,JSON.stringify({session,tacticalBucket})).run()}
   const jobs = await db
       .prepare(
         "SELECT * FROM background_jobs WHERE status IN ('QUEUED','FAILED') AND available_at<=CURRENT_TIMESTAMP AND attempts<6 ORDER BY created_at LIMIT 25",
@@ -78,6 +90,12 @@ export async function POST(request: Request) {
         if(!householdId)throw new Error("MARKET_HOUSEHOLD_REQUIRED");
         await evaluateMarketIntelligence(db,householdId);
       }
+      if(job.job_type==="MARKET_DISCOVERY")await runMarketDiscovery(db);
+      if(job.job_type==="DAILY_CLOSE_REVIEW"||job.job_type==="OVERNIGHT_OUTLOOK_REFRESH"){
+        const householdId=String(job.household_id||"");if(!householdId)throw new Error("REVIEW_HOUSEHOLD_REQUIRED");
+        await generateDailyMarketReview(db,householdId,job.job_type==="DAILY_CLOSE_REVIEW"?"MARKET_CLOSE":"PREMARKET_REVISION");
+      }
+      if(job.job_type==="TACTICAL_REENTRY_MONITOR"){if(session==="REGULAR")for(const household of households.results)await evaluateTacticalSellRebuy(db,household.household_id);await monitorTacticalReentries(db);await evaluateTacticalOutcomes(db)}
       await db
         .prepare(
           "UPDATE background_jobs SET status='SUCCEEDED',completed_at=CURRENT_TIMESTAMP,error_code=NULL,updated_at=CURRENT_TIMESTAMP WHERE id=?",
@@ -106,6 +124,7 @@ export async function POST(request: Request) {
       jobsFailed++;
     }
   }
+  await db.prepare("UPDATE worker_heartbeats SET status='IDLE',jobs_succeeded=jobs_succeeded+?,jobs_failed=jobs_failed+?,metadata_json=?,heartbeat_at=CURRENT_TIMESTAMP WHERE worker_name='aws-market-worker'").bind(jobsCompleted,jobsFailed,JSON.stringify({minuteBucket,session,jobsProcessed:jobs.results.length})).run();
   const deliveries = await db
     .prepare(
       `SELECT d.*,a.household_id,a.title,a.explanation,a.evidence_json,a.severity,a.type,u.email,np.fallback_json FROM alert_deliveries d JOIN alerts a ON a.id=d.alert_id JOIN users u ON u.id=d.user_id LEFT JOIN notification_preferences np ON np.household_id=a.household_id AND np.user_id=d.user_id WHERE d.status IN ('QUEUED','FAILED') AND d.available_at<=CURRENT_TIMESTAMP AND (d.status='QUEUED' OR NOT EXISTS(SELECT 1 FROM notification_delivery_attempts x WHERE x.delivery_id=d.id AND x.next_retry_at>CURRENT_TIMESTAMP)) ORDER BY CASE a.severity WHEN 'action_now' THEN 0 WHEN 'critical' THEN 0 WHEN 'important' THEN 1 WHEN 'warning' THEN 1 WHEN 'watch' THEN 2 ELSE 3 END,d.created_at LIMIT 50`,
