@@ -5,7 +5,7 @@ export type ActionType=(typeof actionTypes)[number];export type ActionLifecycle=
 type Category={category:string;currentBps:number;targetBps:number;gapCents:string;status:string};
 type Holding={id:string;symbol:string;name:string;category:string;weightBps:number;marketValueCents:string;action:"BUY_MORE"|"HOLD"|"REDUCE";amountCents:string;suggestedQuantity:string};
 export type GuidanceInput={account:{id:string;name:string;strategyType:string;shareMode:"WHOLE"|"FRACTIONAL";goalName:string;horizonMonths:number;goalTargetCents:string|null;monthlyContributionCents:string;maximumPositionBps:number};portfolio:{totalValueCents:string;cashCents:string;categories:Category[];holdings:Holding[];projections:{bearCents:string;baseCents:string;bullCents:string};goalProgressBps:number|null};safety:{status:string;highInterestDebtCents:string;reserveGapCents:string;safeInvestmentCapacityCents:string}};
-export type ActionGuidance={rank:number;priority:ActionPriority;action:ActionType;symbol:string|null;quantity:string;amountCents:string;priceCondition:string;when:string;why:string;capitalSource:string;lifecycle:ActionLifecycle};
+export type ActionGuidance={rank:number;priority:ActionPriority;action:ActionType;symbol:string|null;quantity:string;amountCents:string;priceCondition:string;when:string;why:string;capitalSource:string;lifecycle:ActionLifecycle;details?:Record<string,any>};
 const money=(cents:bigint)=>`$${(Number(cents)/100).toLocaleString(undefined,{maximumFractionDigits:0})}`;
 export function buildActionGuidance(input:GuidanceInput){
  const cash=BigInt(input.portfolio.cashCents),safe=BigInt(input.safety.safeInvestmentCapacityCents),monthly=BigInt(input.account.monthlyContributionCents),blocked=input.safety.status!=="READY",actions:ActionGuidance[]=[];
