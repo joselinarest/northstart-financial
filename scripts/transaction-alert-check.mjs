@@ -4,6 +4,8 @@ import { readFile } from "node:fs/promises";
 const notifications = await readFile(new URL("../lib/transaction-notifications.ts", import.meta.url), "utf8");
 const sync = await readFile(new URL("../app/api/connections/plaid/sync/route.ts", import.meta.url), "utf8");
 const webhook = await readFile(new URL("../app/api/connections/plaid/webhook/route.ts", import.meta.url), "utf8");
+const alerts = await readFile(new URL("../app/api/alerts/route.ts", import.meta.url), "utf8");
+const history = await readFile(new URL("../app/api/notifications/history/route.ts", import.meta.url), "utf8");
 const worker = await readFile(new URL("../app/api/notifications/process/route.ts", import.meta.url), "utf8");
 const serviceWorker = await readFile(new URL("../public/sw.js", import.meta.url), "utf8");
 
@@ -14,6 +16,9 @@ for (const eventType of [
 ]) assert.match(notifications + sync, new RegExp(`\\b${eventType}\\b`));
 
 assert.match(webhook, /verifyPlaidWebhook/);
+assert.match(alerts, /COALESCE\(read_at,CURRENT_TIMESTAMP\)/);
+assert.doesNotMatch(alerts, /CURRENT_TIMESTAMP::text/);
+assert.doesNotMatch(history, /CURRENT_TIMESTAMP::text/);
 assert.match(webhook, /PLAID_SYNC/);
 assert.match(notifications, /idempotency_key/);
 assert.match(notifications, /EVERY_TRANSACTION/);
