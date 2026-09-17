@@ -177,7 +177,7 @@ export async function enqueueTransactionNotification(
       "transaction",
       title,
       explanation,
-      JSON.stringify({ ...snapshot, eventId, eventType: input.eventType }),
+      JSON.stringify({ ...snapshot, eventId, eventType: input.eventType, sourceJob: "PLAID_TRANSACTION_SYNC" }),
     )
     .run();
   const recipients = await db

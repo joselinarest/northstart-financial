@@ -26,11 +26,14 @@ import './responsive-mobile.css';
 import './design-system.css';
 import './market-discovery.css';
 import './market-discovery-controls.css';
+import './integrated-research-chart.css';
 import './flow-intelligence.css';
 import './daily-close-review.css';
 import './tactical-rebuy-panel.css';
+import './mobile-primary.css';
 import { ConfirmProvider } from './confirmation-modal';
 import PwaManager from './pwa-manager';
+import MobileOverflowDebug from './mobile-overflow-debug';
 
 const geistSans = Geist({
   variable: '--font-geist-sans',
@@ -72,7 +75,7 @@ export default function RootLayout({
         suppressHydrationWarning
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
-        <ConfirmProvider><PwaManager/>{children}</ConfirmProvider>
+        <ConfirmProvider><PwaManager/><MobileOverflowDebug/>{children}</ConfirmProvider>
       </body>
     </html>
   );

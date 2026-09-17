@@ -1,0 +1,4 @@
+import {workspace} from "@/lib/db";
+import {authoritativeRecommendation} from "@/lib/authoritative-recommendation";
+export const dynamic="force-dynamic";
+export async function GET(request:Request){try{const{db,householdId}=await workspace(request),url=new URL(request.url),accountId=url.searchParams.get("accountId")||"",symbol=url.searchParams.get("symbol")||"",force=url.searchParams.get("refresh")==="true";if(!accountId||!symbol)return Response.json({error:"accountId and symbol are required"},{status:400});return Response.json(await authoritativeRecommendation(db,{householdId,accountId,symbol,force}),{headers:{"Cache-Control":"private, no-store"}})}catch(error){if(error instanceof Response)return error;return Response.json({error:error instanceof Error?error.message:"Recommendation pipeline unavailable"},{status:500})}}

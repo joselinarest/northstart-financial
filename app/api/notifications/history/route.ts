@@ -57,7 +57,7 @@ export async function PATCH(request: Request) {
       await db.batch([
         db
           .prepare(
-            "UPDATE alerts SET read_at=COALESCE(read_at,CURRENT_TIMESTAMP) WHERE id=?",
+            "UPDATE alerts SET read_at=CURRENT_TIMESTAMP WHERE id=?",
           )
           .bind(body.alertId),
         db

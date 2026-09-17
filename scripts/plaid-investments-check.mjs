@@ -11,6 +11,8 @@ assert.match(link, /additional_consented_products:updateMode\?\["investments"\]/
 assert.match(link, /user:\{client_user_id:userId\}/);
 assert.match(link, /update:updateMode\?\{account_selection_enabled:true\}/);
 assert.match(link, /products:updateMode\?undefined:products/);
+assert.match(link, /products=body\.includeInvestments\?\["investments"\]/);
+assert.match(link, /\["transactions","auth","identity","liabilities","signal"\]/);
 assert.match(sync, /\/investments\/holdings\/get/);
 assert.match(sync, /\/investments\/transactions\/get/);
 assert.match(sync, /investmentUnsupportedCodes=new Set\(\["NO_INVESTMENT_ACCOUNTS","PRODUCTS_NOT_SUPPORTED"\]\)/);

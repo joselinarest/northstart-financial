@@ -9,6 +9,9 @@ import {marketSessionAt} from "@/lib/market-session";
 import {evaluateTacticalSellRebuy,monitorTacticalReentries} from "@/lib/tactical-rebuy-engine";
 import {evaluateTacticalOutcomes} from "@/lib/tactical-rebuy-outcomes";
 import {evaluateOptionsFlow} from "@/lib/options-flow-engine";
+import {refreshInvestmentNotificationCoverage} from "@/lib/investment-notification-coverage";
+import {runAccountIntelligenceLoop} from "@/lib/continuous-intelligence-loop";
+import {reviewKidsPlans} from "@/lib/kids-planning";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 const escape = (value: unknown) =>
@@ -46,17 +49,26 @@ export async function POST(request: Request) {
   const session=marketSessionAt(Date.now()),et=Object.fromEntries(new Intl.DateTimeFormat("en-US",{timeZone:"America/New_York",year:"numeric",month:"2-digit",day:"2-digit",hour:"2-digit",minute:"2-digit",hourCycle:"h23"}).formatToParts(new Date()).filter(x=>x.type!=="literal").map(x=>[x.type,x.value])),sessionDate=`${et.year}-${et.month}-${et.day}`,etMinute=Number(et.hour)*60+Number(et.minute);
   await db.prepare("INSERT INTO worker_heartbeats(worker_name,status,market_session,metadata_json,heartbeat_at) VALUES('aws-market-worker','RUNNING',?,?,CURRENT_TIMESTAMP) ON CONFLICT(worker_name) DO UPDATE SET status='RUNNING',market_session=EXCLUDED.market_session,metadata_json=EXCLUDED.metadata_json,heartbeat_at=CURRENT_TIMESTAMP").bind(session,JSON.stringify({minuteBucket,households:households.results.length})).run();
   for(const household of households.results)await db.prepare("INSERT INTO background_jobs(id,household_id,job_type,idempotency_key,payload_json) VALUES(?,?,'MARKET_INTELLIGENCE',?,?) ON CONFLICT(idempotency_key) DO NOTHING").bind(id("job"),household.household_id,`market:${household.household_id}:${minuteBucket}`,JSON.stringify({householdId:household.household_id})).run();
-  const discoveryBucket=new Date().toISOString().slice(0,13);
+  const loopWindow=session==="REGULAR"?5:30,loopBucket=`${sessionDate}:${Math.floor(etMinute/loopWindow)}`;
+  for(const household of households.results){const accounts=await db.prepare("SELECT a.id FROM accounts a JOIN entities e ON e.id=a.entity_id LEFT JOIN investment_account_settings s ON s.account_id=a.id WHERE e.household_id=? AND a.hidden=0 AND (a.type='investment' OR s.account_id IS NOT NULL)").bind(household.household_id).all<{id:string}>();for(const account of accounts.results)await db.prepare("INSERT INTO background_jobs(id,household_id,job_type,idempotency_key,payload_json) VALUES(?,?,'ACCOUNT_INTELLIGENCE_LOOP',?,?) ON CONFLICT(idempotency_key) DO NOTHING").bind(id("job"),household.household_id,`account-loop:${account.id}:${loopBucket}`,JSON.stringify({householdId:household.household_id,accountId:account.id,trigger:"SCHEDULED",cycleKey:`scheduled:${account.id}:${loopBucket}`})).run()}  const discoveryBucket=new Date().toISOString().slice(0,13);
   await db.prepare("INSERT INTO background_jobs(id,job_type,idempotency_key,payload_json) VALUES(?,'MARKET_DISCOVERY',?,?) ON CONFLICT(idempotency_key) DO NOTHING").bind(id("job"),`discovery:${discoveryBucket}`,JSON.stringify({scheduledAt:new Date().toISOString()})).run();
   if(session!=="CLOSED"){const flowBucket=`${sessionDate}:${Math.floor(etMinute/5)}`;await db.prepare("INSERT INTO background_jobs(id,job_type,idempotency_key,payload_json) VALUES(?,'OPTIONS_FLOW',?,?) ON CONFLICT(idempotency_key) DO NOTHING").bind(id("job"),`options-flow:${flowBucket}`,JSON.stringify({session,scheduledAt:new Date().toISOString()})).run()}
+  if(session==="AFTER_HOURS"&&etMinute>=16*60+5)for(const household of households.results)await db.prepare("INSERT INTO background_jobs(id,household_id,job_type,idempotency_key,payload_json) VALUES(?,?,'INVESTMENT_COVERAGE_AUDIT',?,?) ON CONFLICT(idempotency_key) DO NOTHING").bind(id("job"),household.household_id,`coverage:${household.household_id}:${sessionDate}`,JSON.stringify({householdId:household.household_id,sessionDate})).run();
+  if(session==="AFTER_HOURS"&&etMinute>=16*60+5)for(const household of households.results)await db.prepare("INSERT INTO background_jobs(id,household_id,job_type,idempotency_key,payload_json) VALUES(?,?,'KIDS_PLAN_REVIEW',?,?) ON CONFLICT(idempotency_key) DO NOTHING").bind(id("job"),household.household_id,`kids-review:${household.household_id}:${sessionDate}`,JSON.stringify({householdId:household.household_id,sessionDate})).run();
   if(session==="AFTER_HOURS"&&etMinute>=16*60+5)for(const household of households.results)await db.prepare("INSERT INTO background_jobs(id,household_id,job_type,idempotency_key,payload_json) VALUES(?,?,'DAILY_CLOSE_REVIEW',?,?) ON CONFLICT(idempotency_key) DO NOTHING").bind(id("job"),household.household_id,`close-review:${household.household_id}:${sessionDate}`,JSON.stringify({householdId:household.household_id,sessionDate})).run();
   if(session==="PREMARKET"&&etMinute>=8*60+30)for(const household of households.results)await db.prepare("INSERT INTO background_jobs(id,household_id,job_type,idempotency_key,payload_json) VALUES(?,?,'OVERNIGHT_OUTLOOK_REFRESH',?,?) ON CONFLICT(idempotency_key) DO NOTHING").bind(id("job"),household.household_id,`premarket-review:${household.household_id}:${sessionDate}`,JSON.stringify({householdId:household.household_id,sessionDate})).run();
   if(session!=="CLOSED"){const tacticalBucket=`${sessionDate}:${Math.floor(etMinute/5)}`;await db.prepare("INSERT INTO background_jobs(id,job_type,idempotency_key,payload_json) VALUES(?,'TACTICAL_REENTRY_MONITOR',?,?) ON CONFLICT(idempotency_key) DO NOTHING").bind(id("job"),`tactical-monitor:${tacticalBucket}`,JSON.stringify({session,tacticalBucket})).run()}
-  const jobs = await db
-      .prepare(
-        "SELECT * FROM background_jobs WHERE status IN ('QUEUED','FAILED') AND available_at<=CURRENT_TIMESTAMP AND attempts<6 ORDER BY created_at LIMIT 25",
-      )
-      .all<Record<string, any>>();
+  // Claim work atomically. EventBridge can invoke more than once and an SSR
+  // request can die mid-job; SKIP LOCKED plus stale-lock recovery prevents both
+  // duplicate execution and permanently RUNNING work.
+  const jobs = await db.prepare(`WITH claimable AS (
+      SELECT id FROM background_jobs
+      WHERE attempts<6 AND available_at<=CURRENT_TIMESTAMP
+        AND (status IN ('QUEUED','FAILED') OR (status='RUNNING' AND locked_at<CURRENT_TIMESTAMP-INTERVAL '10 minutes'))
+      ORDER BY created_at FOR UPDATE SKIP LOCKED LIMIT 25
+    ) UPDATE background_jobs j SET status='RUNNING',attempts=j.attempts+1,
+      locked_at=CURRENT_TIMESTAMP,updated_at=CURRENT_TIMESTAMP
+      FROM claimable c WHERE j.id=c.id RETURNING j.*`).all<Record<string, any>>();
   if (process.env.VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY)
     webpush.setVapidDetails(
       process.env.EMAIL_FROM?.match(/<([^>]+)>/)?.[1]
@@ -68,12 +80,6 @@ export async function POST(request: Request) {
   let jobsCompleted = 0,
     jobsFailed = 0;
   for (const job of jobs.results) {
-    await db
-      .prepare(
-        "UPDATE background_jobs SET status='RUNNING',attempts=attempts+1,locked_at=CURRENT_TIMESTAMP,updated_at=CURRENT_TIMESTAMP WHERE id=?",
-      )
-      .bind(job.id)
-      .run();
     try {
       if (job.job_type === "PLAID_SYNC" || job.job_type === "PLAID_INVESTMENT_SYNC") {
         const payload = json(job.payload_json),
@@ -94,6 +100,9 @@ export async function POST(request: Request) {
       }
       if(job.job_type==="MARKET_DISCOVERY")await runMarketDiscovery(db);
       if(job.job_type==="OPTIONS_FLOW")await evaluateOptionsFlow(db);
+      if(job.job_type==="KIDS_PLAN_REVIEW"){const householdId=String(job.household_id||"");if(!householdId)throw new Error("KIDS_REVIEW_HOUSEHOLD_REQUIRED");await reviewKidsPlans(db,householdId,"MONTHLY");}
+      if(job.job_type==="ACCOUNT_INTELLIGENCE_LOOP"){const payload=json(job.payload_json);await runAccountIntelligenceLoop(db,{householdId:String(payload.householdId||job.household_id||""),accountId:String(payload.accountId||""),trigger:String(payload.trigger||"SCHEDULED"),cycleKey:String(payload.cycleKey||job.id)});}
+      if(job.job_type==="INVESTMENT_COVERAGE_AUDIT"){const householdId=String(job.household_id||"");if(!householdId)throw new Error("COVERAGE_HOUSEHOLD_REQUIRED");await refreshInvestmentNotificationCoverage(db,householdId);}
       if(job.job_type==="DAILY_CLOSE_REVIEW"||job.job_type==="OVERNIGHT_OUTLOOK_REFRESH"){
         const householdId=String(job.household_id||"");if(!householdId)throw new Error("REVIEW_HOUSEHOLD_REQUIRED");
         await generateDailyMarketReview(db,householdId,job.job_type==="DAILY_CLOSE_REVIEW"?"MARKET_CLOSE":"PREMARKET_REVISION");
@@ -107,7 +116,7 @@ export async function POST(request: Request) {
         .run();
       jobsCompleted++;
     } catch (error) {
-      const attempt = Number(job.attempts || 0) + 1,
+      const attempt = Number(job.attempts || 0),
         dead = attempt >= 6,
         delay = Math.min(3600, 30 * 2 ** Math.max(0, attempt - 1));
       await db
@@ -128,10 +137,22 @@ export async function POST(request: Request) {
     }
   }
   await db.prepare("UPDATE worker_heartbeats SET status='IDLE',jobs_succeeded=jobs_succeeded+?,jobs_failed=jobs_failed+?,metadata_json=?,heartbeat_at=CURRENT_TIMESTAMP WHERE worker_name='aws-market-worker'").bind(jobsCompleted,jobsFailed,JSON.stringify({minuteBucket,session,jobsProcessed:jobs.results.length})).run();
-  const deliveries = await db
-    .prepare(
-      `SELECT d.*,a.household_id,a.title,a.explanation,a.evidence_json,a.severity,a.type,u.email,np.fallback_json FROM alert_deliveries d JOIN alerts a ON a.id=d.alert_id JOIN users u ON u.id=d.user_id LEFT JOIN notification_preferences np ON np.household_id=a.household_id AND np.user_id=d.user_id WHERE d.status IN ('QUEUED','FAILED') AND d.available_at<=CURRENT_TIMESTAMP AND (d.status='QUEUED' OR NOT EXISTS(SELECT 1 FROM notification_delivery_attempts x WHERE x.delivery_id=d.id AND x.next_retry_at>CURRENT_TIMESTAMP)) ORDER BY CASE a.severity WHEN 'action_now' THEN 0 WHEN 'critical' THEN 0 WHEN 'important' THEN 1 WHEN 'warning' THEN 1 WHEN 'watch' THEN 2 ELSE 3 END,d.created_at LIMIT 50`,
-    )
+  const deliveries = await db.prepare(`WITH claimable AS (
+      SELECT d.id FROM alert_deliveries d JOIN alerts a ON a.id=d.alert_id
+      WHERE d.available_at<=CURRENT_TIMESTAMP AND (
+        d.status='QUEUED' OR
+        (d.status='FAILED' AND NOT EXISTS(SELECT 1 FROM notification_delivery_attempts x WHERE x.delivery_id=d.id AND x.next_retry_at>CURRENT_TIMESTAMP)) OR
+        (d.status='SENT' AND d.attempted_at<CURRENT_TIMESTAMP-INTERVAL '5 minutes' AND EXISTS(
+          SELECT 1 FROM notification_delivery_attempts x WHERE x.delivery_id=d.id AND x.provider_code IS NULL
+        ))
+      ) ORDER BY CASE a.severity WHEN 'action_now' THEN 0 WHEN 'critical' THEN 0 WHEN 'important' THEN 1 WHEN 'warning' THEN 1 WHEN 'watch' THEN 2 ELSE 3 END,d.created_at
+      FOR UPDATE OF d SKIP LOCKED LIMIT 50
+    ), claimed AS (
+      UPDATE alert_deliveries d SET status='SENT',attempted_at=CURRENT_TIMESTAMP
+      FROM claimable c WHERE d.id=c.id RETURNING d.*
+    ) SELECT d.*,a.household_id,a.title,a.explanation,a.evidence_json,a.severity,a.type,u.email,np.fallback_json
+      FROM claimed d JOIN alerts a ON a.id=d.alert_id JOIN users u ON u.id=d.user_id
+      LEFT JOIN notification_preferences np ON np.household_id=a.household_id AND np.user_id=d.user_id`)
     .all<Record<string, any>>();
   let delivered = 0,
     failed = 0;
@@ -146,11 +167,6 @@ export async function POST(request: Request) {
     if (attempt > 5) continue;
     const attemptId = id("delivery_attempt");
     await db.batch([
-      db
-        .prepare(
-          "UPDATE alert_deliveries SET status='SENT',attempted_at=CURRENT_TIMESTAMP WHERE id=?",
-        )
-        .bind(row.id),
       db
         .prepare(
           "INSERT INTO notification_delivery_attempts(id,delivery_id,attempt_number,status) VALUES(?,?,?,'SENT')",
@@ -207,6 +223,7 @@ export async function POST(request: Request) {
               }),
               {
                 TTL: 300,
+                timeout: 10_000,
                 urgency: ["critical","action_now"].includes(String(row.severity).toLowerCase())||String(row.title).toLowerCase().includes("suspicious")
                   ? "high"
                   : "normal",

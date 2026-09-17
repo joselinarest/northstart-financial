@@ -1,0 +1,40 @@
+/* Northstar mobile-primary foundation. Base rules target phones; larger screens enhance. */
+*,*::before,*::after{box-sizing:border-box}
+html,body{width:100%;max-width:100%;min-height:100%;overflow-x:clip}
+body{margin:0;overflow-wrap:break-word}
+.ui-page-container{width:100%;max-width:100%;min-width:0;margin:0 auto;padding:12px}
+.ui-responsive-grid{display:grid;grid-template-columns:minmax(0,1fr);gap:12px;min-width:0}
+.ui-mobile-card{min-width:0;padding:14px;border:1px solid var(--ns-line,#d5e1dc);border-radius:14px;background:#fff;overflow-wrap:anywhere}
+.ui-mobile-list{display:grid;gap:9px;min-width:0}
+.ui-scrollable-tabs{display:flex;max-width:100%;gap:7px;overflow-x:auto;overscroll-behavior-inline:contain;scrollbar-width:none}
+.ui-scrollable-tabs>*{flex:0 0 auto;min-height:44px}
+.ui-responsive-table{width:100%;min-width:0;overflow:hidden}
+.ui-bottom-sheet,.ui-responsive-dialog{position:fixed;z-index:2147483600;right:8px;bottom:max(8px,env(safe-area-inset-bottom));left:8px;max-width:none;max-height:calc(100dvh - 16px - env(safe-area-inset-top));overflow:auto;border-radius:18px;background:#fff;box-shadow:0 24px 80px rgba(4,22,15,.3)}
+.ui-fullscreen-chart{width:100%;max-width:100%;min-width:0;overflow:hidden}
+[data-mobile-overflow]{outline:3px solid #ef3157!important;outline-offset:-3px!important}
+
+@media(max-width:950px){
+ .workspace-view{width:100%;min-height:100dvh;overflow-x:clip}
+ .workspace-view>.app-shell>.app-sidebar{display:flex!important}
+ .workspace-view>.app-shell>.app-sidebar:not(.mobile-open){visibility:hidden!important;pointer-events:none!important}
+ .workspace-view>.app-shell>.page-container,.workspace-view .content{width:100%!important;max-width:100%!important;min-width:0!important;margin:0!important;padding:12px max(12px,env(safe-area-inset-right)) calc(var(--ns-bottom-nav-h,66px) + max(20px,env(safe-area-inset-bottom))) max(12px,env(safe-area-inset-left))!important;overflow-x:clip!important}
+ .workspace-view .page-container :where(section,article,div,header,footer,main,aside,form,fieldset,label,dl,ol,ul){min-width:0;max-width:100%}
+ .workspace-view :where(h1,h2,h3,h4,p,li,dt,dd,b,strong,small,span,em,a){overflow-wrap:anywhere;word-break:normal}
+ .workspace-view :where(button,a,input,select,textarea,[role="button"]){min-height:44px}
+ .workspace-view :where(input,select,textarea){width:100%;font-size:16px}
+ .workspace-view :where(.main-grid,.lower-grid,.finance-grid,.household,.real-estate-grid,.property-workflow-grid,.analysis-grid,.dashboard-grid){grid-template-columns:minmax(0,1fr)!important}
+ .workspace-view :where(canvas,svg,img,video){max-width:100%!important;height:auto}
+ .workspace-view :where(.chart,.chart-wrap,.chart-stage,.transaction-chart,.integrated-research-chart){width:100%!important;max-width:100%!important;min-width:0!important;overflow:hidden!important}
+ .workspace-view :where(.modal,[role="dialog"]){max-width:calc(100vw - 16px)!important;max-height:calc(100dvh - 16px)!important}
+ .workspace-view .hero{gap:10px!important;margin-bottom:12px!important;padding:0 0 12px!important}
+ .workspace-view .hero h1{font-size:clamp(24px,8vw,32px)!important}
+ .workspace-view .hero p{font-size:14px!important;line-height:1.45!important}
+ .workspace-view .card{width:100%;min-width:0;padding-inline:min(14px,4vw)}
+ .workspace-view table{width:100%!important;max-width:100%!important;table-layout:fixed}
+ .workspace-view table td{font-size:13px!important}
+ .notification-modal-layer{align-items:end!important;padding:8px!important}
+ .header-notification-modal{width:100%!important;max-width:none!important;height:min(88dvh,760px)!important;margin:0!important;border-radius:20px 20px 10px 10px!important;padding-bottom:env(safe-area-inset-bottom)}
+ .confirmation-modal>footer,.header-notification-modal>footer{position:sticky;bottom:0;background:#fff;padding-bottom:max(14px,env(safe-area-inset-bottom))!important}
+}
+@media(min-width:768px){.ui-page-container{padding:18px}.ui-responsive-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}.ui-bottom-sheet,.ui-responsive-dialog{top:50%;right:auto;bottom:auto;left:50%;width:min(620px,calc(100vw - 32px));transform:translate(-50%,-50%)}}
+@media(min-width:951px){.ui-page-container{max-width:1440px;padding:24px}.ui-responsive-grid{grid-template-columns:repeat(12,minmax(0,1fr))}.ui-mobile-card{padding:18px}}

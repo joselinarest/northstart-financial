@@ -818,4 +818,185 @@ export const migrations: readonly Migration[] = [
       `CREATE INDEX IF NOT EXISTS idx_plaid_webhook_investment_health ON plaid_webhook_events(webhook_type,webhook_code,received_at DESC)`,
     ],
   },
-] as const;
+  {
+    id: "0029_investment_notification_reliability",
+    description: "Account-specific notification coverage, auditability, suppression reasons, and pipeline tests",
+    statements: [
+      `ALTER TABLE background_jobs DROP CONSTRAINT IF EXISTS background_jobs_job_type_check`,
+      `ALTER TABLE background_jobs ADD CONSTRAINT background_jobs_job_type_check CHECK(job_type IN ('PLAID_SYNC','PLAID_INVESTMENT_SYNC','NOTIFICATION_DELIVERY','MARKET_INTELLIGENCE','MARKET_DISCOVERY','DAILY_CLOSE_REVIEW','OVERNIGHT_OUTLOOK_REFRESH','TACTICAL_REENTRY_MONITOR','OPTIONS_FLOW','INVESTMENT_COVERAGE_AUDIT'))`,
+      `CREATE TABLE IF NOT EXISTS investment_notification_coverage (
+        account_id TEXT PRIMARY KEY REFERENCES accounts(id) ON DELETE CASCADE,
+        household_id TEXT NOT NULL REFERENCES households(id) ON DELETE CASCADE,
+        strategy TEXT NOT NULL, status TEXT NOT NULL CHECK(status IN ('HEALTHY','STALE','DEGRADED','ERROR','NOT_CONFIGURED')),
+        positions_monitored INTEGER NOT NULL DEFAULT 0, watchlist_symbols_monitored INTEGER NOT NULL DEFAULT 0,
+        option_contracts_monitored INTEGER NOT NULL DEFAULT 0, price_rules_active INTEGER NOT NULL DEFAULT 0,
+        recommendation_rules_active INTEGER NOT NULL DEFAULT 0, unmapped_positions INTEGER NOT NULL DEFAULT 0,
+        last_provider_sync_at TIMESTAMPTZ, last_market_data_at TIMESTAMPTZ, last_ai_analysis_at TIMESTAMPTZ,
+        last_recommendation_at TIMESTAMPTZ, last_alert_evaluation_at TIMESTAMPTZ, last_notification_at TIMESTAMPTZ,
+        last_push_at TIMESTAMPTZ, last_email_at TIMESTAMPTZ, last_in_app_at TIMESTAMPTZ,
+        worker_status TEXT NOT NULL DEFAULT 'UNKNOWN', error_code TEXT, details_json JSONB NOT NULL DEFAULT '{}'::jsonb,
+        heartbeat_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP, updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+      )`,
+      `CREATE TABLE IF NOT EXISTS investment_notification_suppressions (
+        id TEXT PRIMARY KEY, household_id TEXT NOT NULL REFERENCES households(id) ON DELETE CASCADE,
+        account_id TEXT REFERENCES accounts(id) ON DELETE CASCADE, ticker TEXT, event_type TEXT NOT NULL,
+        fingerprint TEXT NOT NULL, reason TEXT NOT NULL CHECK(reason IN ('DUPLICATE','BELOW_THRESHOLD','QUIET_HOURS','USER_DISABLED','STALE_DATA','INSUFFICIENT_CONFIRMATION')),
+        detail TEXT, data_timestamp TIMESTAMPTZ, created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+      )`,
+      `CREATE TABLE IF NOT EXISTS investment_notification_preferences (
+        household_id TEXT NOT NULL REFERENCES households(id) ON DELETE CASCADE, user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        account_id TEXT NOT NULL REFERENCES accounts(id) ON DELETE CASCADE, event_type TEXT NOT NULL DEFAULT '*', enabled BOOLEAN NOT NULL DEFAULT TRUE,
+        channels_json JSONB NOT NULL DEFAULT '{"inApp":true,"push":true,"email":true}'::jsonb,
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP, PRIMARY KEY(household_id,user_id,account_id,event_type)
+      )`,
+      `CREATE INDEX IF NOT EXISTS idx_investment_coverage_household ON investment_notification_coverage(household_id,status,heartbeat_at DESC)`,
+      `CREATE INDEX IF NOT EXISTS idx_investment_suppressions_search ON investment_notification_suppressions(household_id,account_id,ticker,event_type,created_at DESC)`,
+      `CREATE INDEX IF NOT EXISTS idx_alert_delivery_audit ON alert_deliveries(user_id,created_at DESC,status)`,
+    ],
+  },  {
+    id: "0030_continuous_intelligence_loop",
+    description: "Persisted account-first Sync Analyze Predict Recommend Alert Measure Learn loop",
+    statements: [
+      `ALTER TABLE background_jobs DROP CONSTRAINT IF EXISTS background_jobs_job_type_check`,
+      `ALTER TABLE background_jobs ADD CONSTRAINT background_jobs_job_type_check CHECK(job_type IN ('PLAID_SYNC','PLAID_INVESTMENT_SYNC','NOTIFICATION_DELIVERY','MARKET_INTELLIGENCE','MARKET_DISCOVERY','DAILY_CLOSE_REVIEW','OVERNIGHT_OUTLOOK_REFRESH','TACTICAL_REENTRY_MONITOR','OPTIONS_FLOW','INVESTMENT_COVERAGE_AUDIT','ACCOUNT_INTELLIGENCE_LOOP'))`,
+      `CREATE TABLE IF NOT EXISTS intelligence_loop_runs (
+        id TEXT PRIMARY KEY, household_id TEXT NOT NULL REFERENCES households(id) ON DELETE CASCADE,
+        account_id TEXT NOT NULL REFERENCES accounts(id) ON DELETE CASCADE, strategy TEXT NOT NULL,
+        status TEXT NOT NULL CHECK(status IN ('QUEUED','RUNNING','SUCCEEDED','DEGRADED','FAILED')),
+        trigger TEXT NOT NULL, cycle_key TEXT NOT NULL UNIQUE, data_timestamp TIMESTAMPTZ,
+        model_version TEXT, strategy_version TEXT, positions_loaded INTEGER NOT NULL DEFAULT 0,
+        decisions_created INTEGER NOT NULL DEFAULT 0, recommendations_evaluated INTEGER NOT NULL DEFAULT 0,
+        alerts_created INTEGER NOT NULL DEFAULT 0, outcomes_measured INTEGER NOT NULL DEFAULT 0,
+        error_code TEXT, summary_json JSONB NOT NULL DEFAULT '{}'::jsonb,
+        started_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP, completed_at TIMESTAMPTZ,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+      )`,
+      `CREATE TABLE IF NOT EXISTS intelligence_loop_stages (
+        id TEXT PRIMARY KEY, run_id TEXT NOT NULL REFERENCES intelligence_loop_runs(id) ON DELETE CASCADE,
+        stage TEXT NOT NULL CHECK(stage IN ('SYNC','ANALYZE','PREDICT','RECOMMEND','ALERT','MEASURE','LEARN','REANALYZE')),
+        status TEXT NOT NULL CHECK(status IN ('PENDING','RUNNING','SUCCEEDED','SKIPPED','DEGRADED','FAILED')),
+        input_count INTEGER NOT NULL DEFAULT 0, output_count INTEGER NOT NULL DEFAULT 0,
+        evidence_json JSONB NOT NULL DEFAULT '{}'::jsonb, error_code TEXT,
+        started_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP, completed_at TIMESTAMPTZ,
+        UNIQUE(run_id,stage)
+      )`,
+      `CREATE INDEX IF NOT EXISTS idx_intelligence_loop_account_time ON intelligence_loop_runs(account_id,created_at DESC)`,
+      `CREATE INDEX IF NOT EXISTS idx_intelligence_loop_household_status ON intelligence_loop_runs(household_id,status,created_at DESC)`,
+      `CREATE INDEX IF NOT EXISTS idx_intelligence_loop_stage_run ON intelligence_loop_stages(run_id,stage)`,
+    ],
+  },  {
+    id: "0031_kids_future_wealth_planning",
+    description: "Independent child profiles, goals, linked accounts, deterministic projections, contributions, reviews, and alerts",
+    statements: [
+      `ALTER TABLE background_jobs DROP CONSTRAINT IF EXISTS background_jobs_job_type_check`,
+      `ALTER TABLE background_jobs ADD CONSTRAINT background_jobs_job_type_check CHECK(job_type IN ('PLAID_SYNC','PLAID_INVESTMENT_SYNC','NOTIFICATION_DELIVERY','MARKET_INTELLIGENCE','MARKET_DISCOVERY','DAILY_CLOSE_REVIEW','OVERNIGHT_OUTLOOK_REFRESH','TACTICAL_REENTRY_MONITOR','OPTIONS_FLOW','INVESTMENT_COVERAGE_AUDIT','ACCOUNT_INTELLIGENCE_LOOP','KIDS_PLAN_REVIEW'))`,
+      `CREATE TABLE IF NOT EXISTS child_profiles (
+        id TEXT PRIMARY KEY, household_id TEXT NOT NULL REFERENCES households(id) ON DELETE CASCADE,
+        nickname TEXT NOT NULL, birth_date DATE, birth_year INTEGER, expected_college_start_year INTEGER,
+        expected_college_duration_years INTEGER NOT NULL DEFAULT 4, planning_mode TEXT NOT NULL CHECK(planning_mode IN ('EDUCATION','WEALTH','BOTH')),
+        risk_preference TEXT NOT NULL CHECK(risk_preference IN ('CONSERVATIVE','BALANCED','GROWTH','AGGRESSIVE')),
+        monthly_contribution_capacity_cents BIGINT NOT NULL DEFAULT 0, expected_family_contributions_cents BIGINT NOT NULL DEFAULT 0,
+        avatar_color TEXT, created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP, updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+      )`,
+      `CREATE TABLE IF NOT EXISTS child_goals (
+        id TEXT PRIMARY KEY, child_id TEXT NOT NULL REFERENCES child_profiles(id) ON DELETE CASCADE,
+        goal_type TEXT NOT NULL CHECK(goal_type IN ('EDUCATION','FUTURE_WEALTH')), name TEXT NOT NULL,
+        target_amount_cents BIGINT NOT NULL, target_date DATE, target_age INTEGER, current_manual_balance_cents BIGINT NOT NULL DEFAULT 0,
+        monthly_contribution_cents BIGINT NOT NULL DEFAULT 0, minimum_monthly_cents BIGINT NOT NULL DEFAULT 0,
+        priority INTEGER NOT NULL DEFAULT 50 CHECK(priority BETWEEN 0 AND 100), education_cost_type TEXT,
+        current_annual_cost_cents BIGINT, education_inflation_bps INTEGER NOT NULL DEFAULT 500,
+        return_conservative_bps INTEGER NOT NULL DEFAULT 500, return_base_bps INTEGER NOT NULL DEFAULT 700, return_aggressive_bps INTEGER NOT NULL DEFAULT 900,
+        satellite_allocation_bps INTEGER NOT NULL DEFAULT 0 CHECK(satellite_allocation_bps BETWEEN 0 AND 2000),
+        status TEXT NOT NULL DEFAULT 'ACTIVE' CHECK(status IN ('ACTIVE','PAUSED','FUNDED','WITHDRAWING','COMPLETED')),
+        created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP, updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+      )`,
+      `CREATE TABLE IF NOT EXISTS child_goal_accounts (
+        goal_id TEXT NOT NULL REFERENCES child_goals(id) ON DELETE CASCADE, account_id TEXT NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+        account_structure TEXT NOT NULL CHECK(account_structure IN ('529','UTMA_UGMA','PARENT_TAXABLE','CUSTODIAL_ROTH_IRA','SAVINGS','OTHER')),
+        allocation_percent INTEGER NOT NULL DEFAULT 100 CHECK(allocation_percent BETWEEN 0 AND 100), linked_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        PRIMARY KEY(goal_id,account_id)
+      )`,
+      `CREATE TABLE IF NOT EXISTS child_plan_projections (
+        id TEXT PRIMARY KEY, child_id TEXT NOT NULL REFERENCES child_profiles(id) ON DELETE CASCADE, goal_id TEXT NOT NULL REFERENCES child_goals(id) ON DELETE CASCADE,
+        assumption_version TEXT NOT NULL, source_date DATE NOT NULL, current_balance_cents BIGINT NOT NULL,
+        conservative_balance_cents BIGINT NOT NULL, base_balance_cents BIGINT NOT NULL, aggressive_balance_cents BIGINT NOT NULL,
+        required_monthly_conservative_cents BIGINT NOT NULL, required_monthly_base_cents BIGINT NOT NULL, required_monthly_aggressive_cents BIGINT NOT NULL,
+        required_lump_sum_base_cents BIGINT NOT NULL, funding_percent INTEGER NOT NULL, funding_status TEXT NOT NULL CHECK(funding_status IN ('AHEAD','ON_TRACK','BEHIND')),
+        contribution_principal_cents BIGINT NOT NULL, projected_growth_cents BIGINT NOT NULL, funding_gap_cents BIGINT NOT NULL,
+        assumptions_json JSONB NOT NULL, calculated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+      )`,
+      `CREATE TABLE IF NOT EXISTS child_contributions (
+        id TEXT PRIMARY KEY, child_id TEXT NOT NULL REFERENCES child_profiles(id) ON DELETE CASCADE, goal_id TEXT NOT NULL REFERENCES child_goals(id) ON DELETE CASCADE,
+        account_id TEXT REFERENCES accounts(id) ON DELETE SET NULL, investment_transaction_id TEXT REFERENCES investment_transactions(id) ON DELETE SET NULL,
+        amount_cents BIGINT NOT NULL, expected_cents BIGINT, contribution_date DATE NOT NULL, source TEXT NOT NULL CHECK(source IN ('DETECTED','MANUAL','FAMILY','TRANSFER')),
+        status TEXT NOT NULL CHECK(status IN ('EXPECTED','RECEIVED','MISSED')), created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+      )`,
+      `CREATE TABLE IF NOT EXISTS child_plan_reviews (
+        id TEXT PRIMARY KEY, child_id TEXT NOT NULL REFERENCES child_profiles(id) ON DELETE CASCADE,
+        review_type TEXT NOT NULL CHECK(review_type IN ('MONTHLY','ANNUAL','ON_DEMAND','RISK_GUARDRAIL')), status TEXT NOT NULL,
+        summary_json JSONB NOT NULL, assumptions_version TEXT NOT NULL, source_date DATE NOT NULL,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+      )`,
+      `CREATE TABLE IF NOT EXISTS child_plan_recommendations (
+        id TEXT PRIMARY KEY, child_id TEXT NOT NULL REFERENCES child_profiles(id) ON DELETE CASCADE, goal_id TEXT REFERENCES child_goals(id) ON DELETE CASCADE,
+        account_id TEXT REFERENCES accounts(id) ON DELETE SET NULL, action TEXT NOT NULL, amount_cents BIGINT,
+        explanation TEXT NOT NULL, impact_json JSONB NOT NULL, confidence INTEGER NOT NULL, data_timestamp TIMESTAMPTZ NOT NULL,
+        status TEXT NOT NULL DEFAULT 'ACTIVE', created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+      )`,
+      `CREATE INDEX IF NOT EXISTS idx_child_profiles_household ON child_profiles(household_id,created_at)`,
+      `CREATE INDEX IF NOT EXISTS idx_child_goals_child ON child_goals(child_id,goal_type,status)`,
+      `CREATE INDEX IF NOT EXISTS idx_child_projections_goal_time ON child_plan_projections(goal_id,calculated_at DESC)`,
+      `CREATE INDEX IF NOT EXISTS idx_child_contributions_goal_date ON child_contributions(goal_id,contribution_date DESC)`,
+    ],
+  },
+  {
+    id: "0032_fidelity_manual_and_plaid_diagnostics",
+    description: "Fidelity manual ownership, cash, holding acquisition dates, and durable Plaid connection diagnostics",
+    statements: [
+      `ALTER TABLE accounts ADD COLUMN IF NOT EXISTS manual_owner_name TEXT`,
+      `ALTER TABLE holdings ADD COLUMN IF NOT EXISTS acquisition_date DATE`,
+      `CREATE INDEX IF NOT EXISTS idx_audit_plaid_connection_issue ON audit_log(household_id,action,created_at DESC)`,
+    ],
+  },
+  {
+    id: "0033_notification_timestamp_consistency",
+    description: "Normalize alert lifecycle timestamps to timestamptz and remove legacy text/timestamp ambiguity",
+    statements: [
+      `ALTER TABLE alerts ALTER COLUMN read_at TYPE TIMESTAMPTZ USING NULLIF(BTRIM(read_at::text),'')::timestamptz`,
+      `ALTER TABLE alerts ALTER COLUMN created_at DROP DEFAULT`,
+      `ALTER TABLE alerts ALTER COLUMN created_at TYPE TIMESTAMPTZ USING COALESCE(NULLIF(BTRIM(created_at::text),'')::timestamptz,CURRENT_TIMESTAMP)`,
+      `ALTER TABLE alerts ALTER COLUMN created_at SET DEFAULT CURRENT_TIMESTAMP`,
+      `ALTER TABLE alerts ALTER COLUMN created_at SET NOT NULL`,
+      `ALTER TABLE alerts ALTER COLUMN dismissed_at TYPE TIMESTAMPTZ USING NULLIF(BTRIM(dismissed_at::text),'')::timestamptz`,
+      `CREATE INDEX IF NOT EXISTS idx_alerts_household_active_unread ON alerts(household_id,created_at DESC) WHERE dismissed_at IS NULL AND read_at IS NULL`,
+    ],
+  },
+  {
+    id: "0034_authoritative_recommendations",
+    description: "One versioned active account-specific recommendation per security with snapshot lineage and supersession",
+    statements: [
+      `ALTER TABLE recommendations DROP CONSTRAINT IF EXISTS recommendations_lifecycle_check`,
+      `ALTER TABLE recommendations ADD CONSTRAINT recommendations_lifecycle_check CHECK(lifecycle IN ('MONITORING','TRIGGERED','EXPIRED','CANCELLED','INVALIDATED','SUPERSEDED','COMPLETED','MISSED'))`,
+      `ALTER TABLE recommendations ADD COLUMN IF NOT EXISTS strategy_version TEXT`,
+      `ALTER TABLE recommendations ADD COLUMN IF NOT EXISTS research_snapshot_id TEXT`,
+      `ALTER TABLE recommendations ADD COLUMN IF NOT EXISTS market_snapshot_id TEXT`,
+      `ALTER TABLE recommendations ADD COLUMN IF NOT EXISTS generated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP`,
+      `ALTER TABLE recommendations ADD COLUMN IF NOT EXISTS superseded_by TEXT REFERENCES recommendations(id)`,
+      `CREATE UNIQUE INDEX IF NOT EXISTS idx_one_active_recommendation_per_account_security ON recommendations(account_id,security_id) WHERE lifecycle IN ('MONITORING','TRIGGERED')`,
+    ],
+  },
+  {
+    id: "0035_discovery_diversity_scores",
+    description: "Independent discovery categories, crowding risk, diversified scorecard, and market coverage evidence",
+    statements: [
+      `ALTER TABLE market_discovery_candidates ADD COLUMN IF NOT EXISTS discovery_category TEXT`,
+      `ALTER TABLE market_discovery_candidates ADD COLUMN IF NOT EXISTS cap_bucket TEXT`,
+      `ALTER TABLE market_discovery_candidates ADD COLUMN IF NOT EXISTS hotness_crowding INTEGER NOT NULL DEFAULT 0 CHECK(hotness_crowding BETWEEN 0 AND 100)`,
+      `ALTER TABLE market_discovery_candidates ADD COLUMN IF NOT EXISTS scores_json JSONB NOT NULL DEFAULT '{}'::jsonb`,
+      `ALTER TABLE market_discovery_candidates ADD COLUMN IF NOT EXISTS underfollowed_reason TEXT`,
+      `ALTER TABLE market_discovery_runs ADD COLUMN IF NOT EXISTS coverage_json JSONB NOT NULL DEFAULT '{}'::jsonb`,
+      `ALTER TABLE market_discovery_runs ADD COLUMN IF NOT EXISTS concentration_warning TEXT`,
+      `CREATE INDEX IF NOT EXISTS idx_discovery_category_confidence ON market_discovery_candidates(discovery_category,discovery_confidence DESC)`,
+      `CREATE INDEX IF NOT EXISTS idx_discovery_cap_bucket ON market_discovery_candidates(cap_bucket,discovery_confidence DESC)`,
+    ],
+  },] as const;

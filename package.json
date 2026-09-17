@@ -15,12 +15,16 @@
     "test:market-alerts": "node scripts/market-alert-check.mjs",
     "test:transaction-alerts": "node scripts/transaction-alert-check.mjs",
     "test:plaid-investments": "node scripts/plaid-investments-check.mjs",
+    "test:notification-clear": "node scripts/notification-clear-check.mjs",
     "test:market-discovery": "node scripts/market-discovery-check.mjs",
     "test:daily-close-review": "node scripts/daily-close-review-check.mjs",
     "test:tactical-rebuy": "node scripts/tactical-rebuy-check.mjs",
     "test:mobile-ux": "node scripts/mobile-ux-check.mjs",
+    "test:mobile-routes": "playwright test tests/mobile/mobile-routes.spec.ts",
     "test:ai-decision": "node scripts/ai-decision-engine-check.mjs",
-    "db:migrate": "node scripts/run-migrations.mjs"
+    "db:migrate": "node scripts/run-migrations.mjs",
+    "test:intelligence-loop": "node scripts/continuous-intelligence-loop-check.mjs",
+    "test:kids-planning": "node scripts/kids-planning-check.mjs"
   },
   "dependencies": {
     "@aws-sdk/client-secrets-manager": "^3.1125.0",
@@ -32,6 +36,7 @@
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3.3.7",
+    "@playwright/test": "^1.63.0",
     "@tailwindcss/postcss": "4.2.1",
     "@types/node": "22.19.19",
     "@types/pg": "^8.23.1",
