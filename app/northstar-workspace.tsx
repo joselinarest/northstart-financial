@@ -42,6 +42,7 @@ import BillTransactionHistory from "@/app/bill-transaction-history";
 import LongTermPortfolioPlan from "@/app/long-term-portfolio-plan";
 import MarketSessionReport from "@/app/market-session-report";
 import PortfolioBuilderWizard from "@/app/portfolio-builder-wizard";
+import LongTermBalanceCard from "@/app/long-term-balance-card";
 
 const opportunities = [
   {
@@ -957,6 +958,7 @@ export function NorthstarWorkspace({ initialTab = "Dashboard", initialInvestment
           </section>}
           {tab==="Accounts"&&<InvestmentAccountManager accessToken={accessToken} onChanged={()=>{loadConnectedFinance(true);setRealtimeTick(value=>value+1)}}/>}
           {tab==="Portfolio"&&analysisScope!==ALL_ACCOUNTS_SCOPE&&advisorAccountId&&<PortfolioBuilderWizard key={`builder:${advisorAccountId}`} accountId={advisorAccountId} accountName={advisorAccountName} accessToken={accessToken}/>}
+          {tab==="Portfolio"&&analysisScope!==ALL_ACCOUNTS_SCOPE&&advisorAccountId&&advisorStrategy==="long-term"&&<LongTermBalanceCard key={`balance:${advisorAccountId}`} accountId={advisorAccountId} accessToken={accessToken}/>}
           {tab==="Portfolio"&&analysisScope!==ALL_ACCOUNTS_SCOPE&&<PortfolioIntelligenceLoader key={advisorAccountId||"unselected"} accountId={advisorAccountId} accessToken={accessToken}/>}
           {tab==="Portfolio"&&analysisScope!==ALL_ACCOUNTS_SCOPE&&advisorAccount&&advisorStrategy==="long-term"&&<LongTermPortfolioPlan accountName={advisorAccountName} accountType={advisorAccountType} accountValue={connectedPortfolioAnalysis.total} accountCash={Math.max(0,Number(advisorAccount.available_balance_cents||advisorAccount.current_balance_cents||0)/100-connectedPortfolioAnalysis.total)} householdCash={familyCapital.liquid} monthlyIncome={monthlySpending.income} monthlySpending={monthlySpending.spending+monthlySpending.debtPayments} holdings={connectedPortfolioAnalysis.concentration} rows={connectedPortfolioAnalysis.rows} candidates={advisorSuggestions} targetMix={portfolioMix}/>}
           <section className={`portfolio-builder card ${tab==="Portfolio"&&analysisScope!==ALL_ACCOUNTS_SCOPE?"":"account-scope-hidden"}`}>

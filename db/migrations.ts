@@ -1022,4 +1022,13 @@ export const migrations: readonly Migration[] = [
       `CREATE INDEX IF NOT EXISTS idx_portfolio_goals_account ON portfolio_goal_profiles(investment_account_id,status,updated_at DESC)`,
       `CREATE INDEX IF NOT EXISTS idx_portfolio_goals_household ON portfolio_goal_profiles(household_id,status,updated_at DESC)`,
     ],
+  },
+  {
+    id: "0037_long_term_portfolio_balance",
+    description: "Persist account target policies and whole-portfolio long-term balance reviews",
+    statements: [
+      `CREATE TABLE IF NOT EXISTS long_term_portfolio_policies (account_id TEXT PRIMARY KEY REFERENCES accounts(id) ON DELETE CASCADE,household_id TEXT NOT NULL REFERENCES households(id) ON DELETE CASCADE,model TEXT NOT NULL,target_allocation_json JSONB NOT NULL,tolerance_json JSONB NOT NULL,limits_json JSONB NOT NULL,contribution_rules_json JSONB NOT NULL,updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP)`,
+      `CREATE TABLE IF NOT EXISTS long_term_portfolio_reviews (id TEXT PRIMARY KEY,account_id TEXT NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,household_id TEXT NOT NULL REFERENCES households(id) ON DELETE CASCADE,policy_json JSONB NOT NULL,metrics_json JSONB NOT NULL,overlap_json JSONB NOT NULL,actions_json JSONB NOT NULL,stress_tests_json JSONB NOT NULL,data_timestamp TIMESTAMPTZ NOT NULL,created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP)`,
+      `CREATE INDEX IF NOT EXISTS idx_long_term_reviews_account ON long_term_portfolio_reviews(account_id,created_at DESC)`,
+    ],
   },] as const;
