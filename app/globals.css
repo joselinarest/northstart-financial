@@ -16852,6 +16852,115 @@ footer {
   display: grid;
   gap: 18px;
 }
+.child-account-attachment {
+  display: grid;
+  gap: 14px;
+  padding: 18px;
+  border: 1px solid #bcd4c9;
+  border-radius: 14px;
+  background: #fff;
+}
+.child-account-attachment.empty {
+  background: #edf6f1;
+}
+.child-account-attachment.empty span,
+.child-account-attachment header span {
+  color: #567068;
+  font-size: 11px;
+}
+.child-account-attachment header span {
+  color: #087557;
+  font-weight: 900;
+  letter-spacing: .12em;
+}
+.child-account-attachment h2 {
+  margin: 5px 0 0;
+  font-size: 19px;
+}
+.child-account-fields {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr)) auto;
+  gap: 10px;
+  align-items: end;
+}
+.child-account-fields label {
+  display: grid;
+  gap: 5px;
+  color: #435b51;
+  font-size: 11px;
+  font-weight: 800;
+}
+.child-account-fields select,
+.child-account-fields button {
+  min-height: 43px;
+  padding: 8px 10px;
+  border: 1px solid #abc7bb;
+  border-radius: 8px;
+  background: #fff;
+}
+.child-account-fields button {
+  border: 0;
+  background: #0d805e;
+  color: #fff;
+  font-weight: 900;
+}
+.child-template-preview {
+  display: grid;
+  grid-template-columns: minmax(180px, .65fr) minmax(0, 1.35fr);
+  gap: 10px;
+  padding: 13px;
+  border-radius: 10px;
+  background: #eef6f2;
+}
+.child-template-preview > div,
+.child-template-preview > div > * {
+  display: block;
+}
+.child-template-preview dl {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+  margin: 0;
+}
+.child-template-preview dl div {
+  padding: 8px;
+  border-radius: 7px;
+  background: #fff;
+}
+.child-template-preview dt,
+.child-template-preview span,
+.child-template-preview p {
+  color: #64766e;
+  font-size: 10px;
+}
+.child-template-preview dd {
+  margin: 3px 0 0;
+  font-weight: 900;
+}
+.child-template-preview p {
+  grid-column: 1/-1;
+  margin: 0;
+}
+.child-account-status {
+  margin: 0;
+  padding: 9px 11px;
+  border-radius: 7px;
+  background: #fff4d9;
+  color: #6a5124;
+  font-size: 11px;
+}
+@media (max-width: 760px) {
+  .child-account-fields,
+  .child-template-preview {
+    grid-template-columns: 1fr;
+  }
+  .child-template-preview dl {
+    grid-template-columns: 1fr 1fr;
+  }
+  .child-template-preview p {
+    grid-column: 1;
+  }
+}
 .kids-render-error {
   display: grid;
   gap: 8px;

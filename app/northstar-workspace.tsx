@@ -18,6 +18,7 @@ import HeaderMarketSearch from "@/app/header-market-search";
 import InvestmentAccountProfile from "@/app/investment-account-profile";
 import KidsGoalsCenter from "@/app/kids-goals-center";
 import KidsGoalsErrorBoundary from "@/app/kids-goals-error-boundary";
+import ChildAccountAttachment from "@/app/child-account-attachment";
 import AccountScopeDashboard, {
   ALL_ACCOUNTS_SCOPE,
 } from "@/app/account-scope-dashboard";
@@ -7128,6 +7129,7 @@ export function NorthstarWorkspace({
           {tab === "Kids / Goals" && (
             <KidsGoalsErrorBoundary>
               <section className="kids-workspace">
+                <ChildAccountAttachment accessToken={accessToken} />
                 <KidsGoalsCenter accessToken={accessToken} />
               </section>
             </KidsGoalsErrorBoundary>
