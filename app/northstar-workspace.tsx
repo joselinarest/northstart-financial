@@ -7128,67 +7128,6 @@ export function NorthstarWorkspace({
           {tab === "Kids / Goals" && (
             <KidsGoalsErrorBoundary>
               <section className="kids-workspace">
-              <section className="kids-portfolio-overview">
-                <header>
-                  <div>
-                    <span>AVAILABLE INVESTMENT PORTFOLIOS</span>
-                    <h2>Choose which real account supports each child goal</h2>
-                    <p>
-                      Accounts remain owned by the household until you explicitly
-                      link one to a child and goal below. Northstar never mixes one
-                      child&apos;s education or future-wealth plan with another.
-                    </p>
-                  </div>
-                  <b>{investmentAccounts.length} accounts</b>
-                </header>
-                {investmentAccounts.length ? (
-                  <div>
-                    {investmentAccounts.map((account) => {
-                      const holdings = connectedFinance.holdings.filter(
-                        (holding) => String(holding.account_id) === String(account.id),
-                      );
-                      const value = Number(
-                        account.current_balance_cents ||
-                          holdings.reduce(
-                            (sum, holding) =>
-                              sum + Number(holding.market_value_cents || 0),
-                            0,
-                          ),
-                      );
-                      return (
-                        <article key={`kids_portfolio_${account.id}`}>
-                          <div>
-                            <strong>
-                              {account.nickname || account.official_name || account.name}
-                            </strong>
-                            <span>
-                              {account.institution_name || "Investment account"} · {account.subtype || account.type}
-                            </span>
-                          </div>
-                          <dl>
-                            <div><dt>Portfolio value</dt><dd>{new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 }).format(value / 100)}</dd></div>
-                            <div><dt>Holdings</dt><dd>{holdings.length}</dd></div>
-                            <div><dt>Sync</dt><dd>{account.investment_sync_status || "AVAILABLE"}</dd></div>
-                          </dl>
-                          <small>Available to link to one child goal in the planner below.</small>
-                        </article>
-                      );
-                    })}
-                  </div>
-                ) : !financeDataReady ? (
-                  <section className="kids-portfolio-state">
-                    <b>Investment accounts are still synchronizing.</b>
-                    <span>The child planner remains available below. Account synchronization will not block this page.</span>
-                    <button type="button" onClick={() => loadConnectedFinance(true)}>Retry account sync</button>
-                  </section>
-                ) : (
-                  <section className="kids-portfolio-state">
-                    <b>No investment portfolio is connected yet.</b>
-                    <span>Connect or manually add an investment account, then return here to assign it to a child goal.</span>
-                    <button type="button" onClick={() => navigate("Accounts")}>Open Accounts</button>
-                  </section>
-                )}
-              </section>
                 <KidsGoalsCenter accessToken={accessToken} />
               </section>
             </KidsGoalsErrorBoundary>

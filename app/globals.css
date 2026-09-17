@@ -9247,6 +9247,9 @@ aside > button,
 .page-dashboard .command-center {
   display: block;
 }
+.page-kids-goals .content > .kids-workspace {
+  display: grid;
+}
 .page-markets #market-charts,
 .page-markets .asset-screener,
 .page-markets .intel,
