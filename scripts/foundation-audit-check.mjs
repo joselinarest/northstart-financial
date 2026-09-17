@@ -1,0 +1,10 @@
+import assert from "node:assert/strict";
+import {access,readFile} from "node:fs/promises";
+const expected=["Authentication","Users / households","Investment accounts","Plaid bank accounts","Plaid investment accounts","Holdings","Investment transactions","Market data","Fundamentals","News","Technical indicators","Candidate discovery","Portfolio analysis","Recommendations","Swing trading","Long-term investing","Options","Options flow","Household finance","Budgets","Fraud monitoring","Notifications","Push","Email","Workers / cron / queues","AI models","Model evaluation","Charts","Mobile UI","Kids / goals","Retirement","System health"];
+const source=await readFile(new URL("../lib/foundation-audit.ts",import.meta.url),"utf8");
+for(const feature of expected)assert.match(source,new RegExp(`area\\(\\"${feature.replace(/[.*+?^${}()|[\\]\\\\]/g,"\\$&")}\\"`),`Missing ${feature}`);
+for(const status of ["WORKING","PARTIAL","UI_ONLY","BACKEND_ONLY","BROKEN","NOT_IMPLEMENTED"])assert.match(source,new RegExp(status));
+const paths=[...source.matchAll(/\"((?:app|lib|db|scripts|tests|infra|public)\/[^\"]+)\"/g)].map(match=>match[1]).filter(path=>!path.startsWith("/"));
+for(const file of new Set(paths))await access(new URL(`../${file}`,import.meta.url));
+assert.equal((source.match(/ area\(\"/g)||[]).length,expected.length);
+console.log(`Foundation Phase 1 audit verified: ${expected.length} areas and ${new Set(paths).size} evidence paths exist.`);

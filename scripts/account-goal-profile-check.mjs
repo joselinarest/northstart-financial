@@ -1,0 +1,5 @@
+import assert from "node:assert/strict";import{readFile}from"node:fs/promises";
+const [route,card,builder]=await Promise.all(["../app/api/portfolio/balance/route.ts","../app/long-term-balance-card.tsx","../lib/portfolio-builder.ts"].map(path=>readFile(new URL(path,import.meta.url),"utf8")));
+for(const field of ["goalType","goalName","beneficiary","targetAmount","targetDate","currentValue","monthlyContribution","projectedValue","requiredContribution","riskTolerance","riskCapacity","maxDrawdownPct","liquidityNeed","nextAction"])assert.match(route,new RegExp(field));
+for(const label of ["GOAL PROFILE","Target","Target date","Current value","Monthly contribution","Projected value","Required contribution","Goal progress","Risk level","Next action"])assert.match(card,new RegExp(label));
+assert.match(builder,/CHILD_EDUCATION/);assert.match(builder,/RETIREMENT/);assert.match(builder,/glidePath/);assert.match(card,/slice\(0,3\)/);console.log("Long-term account goal profile, differentiated allocation inputs, status and limited high-impact actions verified.");

@@ -35,7 +35,8 @@ async function plaid(
   }
   return payload;
 }
-const plaidError=(error:unknown)=>({code:String((error as any)?.code||"PLAID_API_ERROR"),message:error instanceof Error?error.message:"Plaid request failed"});
+const safePlaidMessage=(code:string)=>code==="INSTITUTION_DOWN"?"The financial institution is temporarily unavailable.":code==="ADDITIONAL_CONSENT_REQUIRED"||code==="ACCESS_NOT_GRANTED"?"Additional investment-account consent is required.":code==="PRODUCTS_NOT_SUPPORTED"?"This institution does not support the requested Investments configuration.":code==="NO_INVESTMENT_ACCOUNTS"?"Plaid did not return an eligible investment account.":code==="PRODUCT_NOT_READY"?"Plaid is still preparing the investment data.":code==="ITEM_LOGIN_REQUIRED"?"The institution requires authentication again.":"The provider could not synchronize investment data.";
+const plaidError=(error:unknown)=>{const code=String((error as any)?.code||"PLAID_API_ERROR"),referenceId=`plaid_sync_${crypto.randomUUID()}`;console.error("PLAID_INVESTMENT_REQUEST_FAILED",{referenceId,code,type:String((error as any)?.type||"API_ERROR"),requestId:String((error as any)?.requestId||"")||null,message:error instanceof Error?error.message:"Plaid request failed",occurredAt:new Date().toISOString()});return{code,message:`${safePlaidMessage(code)} Reference ${referenceId}.`}};
 const investmentReconnectCodes=new Set(["ADDITIONAL_CONSENT_REQUIRED","ACCESS_NOT_GRANTED","ITEM_LOGIN_REQUIRED"]);
 const investmentUnsupportedCodes=new Set(["NO_INVESTMENT_ACCOUNTS","PRODUCTS_NOT_SUPPORTED"]);
 const investmentStatusFor=(code:string)=>code==="PRODUCT_NOT_READY"?"PENDING":investmentUnsupportedCodes.has(code)?"UNSUPPORTED":code==="INSTITUTION_DOWN"?"TEMPORARILY_UNAVAILABLE":investmentReconnectCodes.has(code)?"RECONNECT_REQUIRED":"ERROR";
@@ -517,8 +518,8 @@ export async function POST(request: Request) {
     });
   } catch (error) {
     if (error instanceof Response) return error;
-    return Response.json(
-      { error: error instanceof Error ? error.message : "Sync failed" },
+    const referenceId=`plaid_sync_${crypto.randomUUID()}`;console.error("PLAID_SYNC_FAILED",{referenceId,error,occurredAt:new Date().toISOString()});return Response.json(
+      { error: `The provider synchronization could not be completed. Reference ${referenceId}.`, referenceId },
       { status: 502 },
     );
   }

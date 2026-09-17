@@ -1,5 +1,5 @@
 "use client";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useConfirm } from "./confirmation-modal";
 type Item = {
   id: string;
@@ -56,6 +56,7 @@ export default function MarketWatchlist({
     [status, setStatus] = useState("Loading secure watchlist…"),
     [feed, setFeed] = useState("unavailable"),
     notified = useRef(new Set<string>());
+  const displayItems=useMemo(()=>{const bySymbol=new Map<string,Item>();for(const item of items){const existing=bySymbol.get(item.symbol);if(!existing){bySymbol.set(item.symbol,item);continue}bySymbol.set(item.symbol,{...existing,purpose:existing.purpose===item.purpose?existing.purpose:`${existing.purpose} + ${item.purpose}`,target_price:existing.target_price??item.target_price,invalidation_price:existing.invalidation_price??item.invalidation_price,notes:existing.notes||item.notes})}return[...bySymbol.values()]},[items]);
   const headers = useCallback(
     () => ({
       "Content-Type": "application/json",
@@ -140,13 +141,13 @@ export default function MarketWatchlist({
     setInvalidation("");
     await load();
   };
-  const remove = async (id: string) => {
+  const remove = async (id: string, symbolToRemove: string) => {
     const item=items.find(value=>value.id===id);
     if(!await confirmAction({title:`Remove ${item?.symbol||"symbol"} from watchlist?`,description:"Its saved price levels and monitoring context will be removed. No holding or transaction is affected.",confirmLabel:"Remove from watchlist",variant:"warning",context:item?.symbol?<strong>{item.symbol} · {item.purpose}</strong>:undefined}))return;
     await fetch("/api/watchlist", {
       method: "DELETE",
       headers: headers(),
-      body: JSON.stringify({ id }),
+      body: JSON.stringify({ id, symbol: symbolToRemove }),
     });
     await load();
   };
@@ -212,7 +213,7 @@ export default function MarketWatchlist({
         </button>
       </div>
       <div className="watch-grid">
-        {items.map((item) => {
+        {displayItems.map((item) => {
           const quote = quotes[item.symbol],
             price = quote?.price,
             targetHit =
@@ -257,7 +258,7 @@ export default function MarketWatchlist({
                 <button onClick={() => onOpen(item.symbol)}>
                   Analyze chart
                 </button>
-                <button onClick={() => remove(item.id)}>Remove</button>
+                <button onClick={() => remove(item.id,item.symbol)}>Remove</button>
               </footer>
             </article>
           );

@@ -24,7 +24,12 @@
     "test:ai-decision": "node scripts/ai-decision-engine-check.mjs",
     "db:migrate": "node scripts/run-migrations.mjs",
     "test:intelligence-loop": "node scripts/continuous-intelligence-loop-check.mjs",
-    "test:kids-planning": "node scripts/kids-planning-check.mjs"
+    "test:kids-planning": "node scripts/kids-planning-check.mjs",
+    "test:system-capabilities": "node scripts/system-capability-check.mjs",
+    "test:foundation-audit": "node scripts/foundation-audit-check.mjs",
+    "test:account-candidates": "node scripts/account-candidate-ranking-check.mjs",
+    "test:account-goals": "node scripts/account-goal-profile-check.mjs",
+    "test:critical-workflows": "node scripts/critical-workflows-check.mjs"
   },
   "dependencies": {
     "@aws-sdk/client-secrets-manager": "^3.1125.0",

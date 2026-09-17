@@ -6,7 +6,7 @@ const [workspace,styles,confirmation]=await Promise.all([
   readFile(new URL("../app/confirmation-modal.tsx",import.meta.url),"utf8"),
 ]);
 const checks=[
-  ["five mobile destinations",workspace.includes('label:"Today"')&&workspace.includes('label:"Portfolio"')&&workspace.includes('label:"Markets"')&&workspace.includes('label:"Finance"')&&workspace.includes("<span>Alerts</span>")],
+  ["five mobile destinations",/["']Today["']/.test(workspace)&&/["']Portfolio["']/.test(workspace)&&/["']Markets["']/.test(workspace)&&/["']Finance["']/.test(workspace)&&workspace.includes("<span>Alerts</span>")],
   ["permission-aware secondary drawer",workspace.includes("visibleNavigationGroups.map")&&workspace.includes('id="workspace-navigation"')],
   ["safe-area bottom navigation",styles.includes("--ns-bottom-nav-h")&&styles.includes("var(--ns-safe-bottom,0px)")],
   ["mobile content clearance",styles.includes("padding-bottom:calc(var(--ns-bottom-nav-h)")],

@@ -1,43 +1,1271 @@
 "use client";
-import{useEffect,useMemo,useState}from"react";
+import { useEffect, useMemo, useState } from "react";
 
-type Holding=Record<string,any>;
-type Action={rank:number;priority:string;action:string;symbol:string|null;companyName?:string|null;quantity:string;amountCents:string;priceCondition:string;when:string;why:string;capitalSource:string;lifecycle:string};
-type Guidance={accountName:string;goalName:string;goalTargetCents:string|null;horizonMonths:number;onTrack:boolean;availableCashPlan:{cashCents:string;monthlyContributionCents:string;safeInvestmentCapacityCents:string;untouchedCashCents:string};today:Action[];queue:Action[]};
-type Portfolio={totalValueCents:string;healthScore:number;categories:Array<{category:string;currentBps:number;targetBps:number;gapCents:string;status:string}>;holdings:Array<{symbol:string;weightBps:number;unrealizedPnlCents:string|null;action:string;suggestedQuantity:string}>;projections:{bearCents:string;baseCents:string;bullCents:string};goalProgressBps:number|null};
-type Clock={status:string;configured?:boolean;isOpen?:boolean;nextOpen?:string;nextClose?:string;error?:string};
-type Intelligence={opportunities:Array<Record<string,any>>;changes:Array<Record<string,any>>;events:Array<Record<string,any>>;history:Array<Record<string,any>>;predictions:Array<Record<string,any>>};
-type Performance={benchmark:string;method:string;periods:Array<{period:string;status:string;portfolioReturn:number|null;benchmarkReturn:number|null;alpha:number|null;observations:number}>};
-const money=(cents:unknown,digits=0)=>Number.isFinite(Number(cents))?`$${(Number(cents)/100).toLocaleString(undefined,{minimumFractionDigits:digits,maximumFractionDigits:digits})}`:"—";
-const label=(value:string)=>value.replaceAll("_"," ");
-const authHeaders=(token:string)=>{const householdId=typeof window!=="undefined"?localStorage.getItem("northstar-household-id"):null;return{...(token?{Authorization:`Bearer ${token}`}:{}) ,...(householdId?{"X-Household-ID":householdId}:{})}};
+type Holding = Record<string, any>;
+type Action = {
+  rank: number;
+  priority: string;
+  action: string;
+  symbol: string | null;
+  companyName?: string | null;
+  quantity: string;
+  amountCents: string;
+  priceCondition: string;
+  when: string;
+  why: string;
+  capitalSource: string;
+  lifecycle: string;
+};
+type Guidance = {
+  accountName: string;
+  goalName: string;
+  goalTargetCents: string | null;
+  horizonMonths: number;
+  onTrack: boolean;
+  availableCashPlan: {
+    cashCents: string;
+    monthlyContributionCents: string;
+    safeInvestmentCapacityCents: string;
+    untouchedCashCents: string;
+  };
+  today: Action[];
+  queue: Action[];
+};
+type Portfolio = {
+  totalValueCents: string;
+  healthScore: number;
+  categories: Array<{
+    category: string;
+    currentBps: number;
+    targetBps: number;
+    gapCents: string;
+    status: string;
+  }>;
+  holdings: Array<{
+    symbol: string;
+    weightBps: number;
+    unrealizedPnlCents: string | null;
+    action: string;
+    suggestedQuantity: string;
+  }>;
+  projections: { bearCents: string; baseCents: string; bullCents: string };
+  goalProgressBps: number | null;
+};
+type Clock = {
+  status: string;
+  configured?: boolean;
+  isOpen?: boolean;
+  nextOpen?: string;
+  nextClose?: string;
+  error?: string;
+};
+type Intelligence = {
+  opportunities: Array<Record<string, any>>;
+  changes: Array<Record<string, any>>;
+  events: Array<Record<string, any>>;
+  history: Array<Record<string, any>>;
+  predictions: Array<Record<string, any>>;
+};
+type Performance = {
+  benchmark: string;
+  method: string;
+  periods: Array<{
+    period: string;
+    status: string;
+    portfolioReturn: number | null;
+    benchmarkReturn: number | null;
+    alpha: number | null;
+    observations: number;
+  }>;
+};
+const money = (cents: unknown, digits = 0) =>
+  Number.isFinite(Number(cents))
+    ? `$${(Number(cents) / 100).toLocaleString(undefined, { minimumFractionDigits: digits, maximumFractionDigits: digits })}`
+    : "—";
+const label = (value: string) => value.replaceAll("_", " ");
+const authHeaders = (token: string) => {
+  const householdId =
+    typeof window !== "undefined"
+      ? localStorage.getItem("northstar-household-id")
+      : null;
+  return {
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    ...(householdId ? { "X-Household-ID": householdId } : {}),
+  };
+};
 
-export default function InvestmentCommandCenter({accountId,accessToken,holdings,transactions,netWorth,investmentValue,householdCash,totalDebt,monthlyIncome,monthlySpending,onNavigate}:{accountId:string;accessToken:string;holdings:Holding[];transactions:Array<Record<string,any>>;netWorth:number;investmentValue:number;householdCash:number;totalDebt:number;monthlyIncome:number;monthlySpending:number;onNavigate:(page:string)=>void}){
- const[guidance,setGuidance]=useState<Guidance|null>(null),[portfolio,setPortfolio]=useState<Portfolio|null>(null),[clock,setClock]=useState<Clock>({status:"loading"}),[quotes,setQuotes]=useState<Record<string,{last:number|null;previousClose:number|null;change:number|null;changePct:number|null;bid:number|null;ask:number|null;freshness?:string}>>({}),[macro,setMacro]=useState<Array<{id:string;value:number|null;date:string|null}>>([]),[intelligence,setIntelligence]=useState<Intelligence>({opportunities:[],changes:[],events:[],history:[],predictions:[]}),[performance,setPerformance]=useState<Performance|null>(null),[density,setDensity]=useState<"simple"|"pro">("simple"),[error,setError]=useState("");
- useEffect(()=>{const saved=localStorage.getItem("northstar-dashboard-density");if(saved==="pro")setDensity("pro")},[]);
- useEffect(()=>{let active=true;setError("");const headers=authHeaders(accessToken),symbols=[...new Set(["SPY","QQQ",...holdings.map(item=>String(item.ticker||"").toUpperCase()).filter(Boolean)])];Promise.all([accountId?fetch(`/api/action-guidance?accountId=${encodeURIComponent(accountId)}`,{cache:"no-store",headers}).then(async r=>{const b=await r.json();if(!r.ok)throw new Error(b.error||"Guidance unavailable");return b}):Promise.resolve(null),fetch("/api/market/clock",{cache:"no-store"}).then(r=>r.json()),fetch(`/api/market/quotes?symbols=${encodeURIComponent(symbols.join(","))}`,{cache:"no-store"}).then(r=>r.ok?r.json():{quotes:{}}),fetch("/api/market/macro",{cache:"no-store"}).then(r=>r.json()).catch(()=>({series:[]})),accountId?fetch(`/api/dashboard/intelligence?accountId=${encodeURIComponent(accountId)}`,{cache:"no-store",headers}).then(r=>r.ok?r.json():{opportunities:[],changes:[],events:[],history:[],predictions:[]}):Promise.resolve({opportunities:[],changes:[],events:[],history:[],predictions:[]})]).then(([g,c,q,m,i])=>{if(!active)return;if(g){setGuidance(g.guidance);setPortfolio(g.portfolio)}setClock(c);setQuotes(q.quotes||{});setMacro(m.series||[]);setIntelligence(i)}).catch(reason=>{if(active)setError(reason instanceof Error?reason.message:"Command center unavailable")});return()=>{active=false}},[accountId,accessToken,holdings]);
- useEffect(()=>{if(!accountId){setPerformance(null);return}let active=true;fetch(`/api/portfolio/performance?accountId=${encodeURIComponent(accountId)}`,{cache:"no-store",headers:authHeaders(accessToken)}).then(async response=>{const body=await response.json();if(active&&response.ok)setPerformance(body)}).catch(()=>{});return()=>{active=false}},[accountId,accessToken]);
- const now=new Date(),target=clock.isOpen?clock.nextClose:clock.nextOpen,remaining=target?Math.max(0,Date.parse(target)-now.getTime()):0,hours=Math.floor(remaining/3600000),minutes=Math.floor(remaining%3600000/60000),marketLabel=clock.status!=="connected"?(clock.configured?"PROVIDER TEMPORARILY UNAVAILABLE":"SETUP REQUIRED"):clock.isOpen?`OPEN · CLOSES IN ${hours}H ${minutes}M`:`CLOSED · OPENS IN ${hours}H ${minutes}M`,et=new Intl.DateTimeFormat("en-US",{timeZone:"America/New_York",hour:"numeric",minute:"2-digit",timeZoneName:"short"}).format(now),local=new Intl.DateTimeFormat("en-US",{hour:"numeric",minute:"2-digit",timeZoneName:"short"}).format(now);
- const incomeGap=monthlyIncome-monthlySpending,emergencyMonths=monthlySpending>0?householdCash/monthlySpending:null,financialHealth=Math.max(0,Math.min(100,Math.round(50+(incomeGap>0?20:-20)+(totalDebt===0?15:-10)+(emergencyMonths!==null?Math.min(15,emergencyMonths*3):0)))),actions=guidance?.today||[],actionBySymbol=new Map((guidance?.queue||[]).filter(a=>a.symbol).map(a=>[a.symbol!,a])),portfolioRows=new Map((portfolio?.holdings||[]).map(h=>[h.symbol,h])),vix=macro.find(item=>item.id==="VIXCLS"),tenYear=macro.find(item=>item.id==="DGS10"),spy=quotes.SPY,qqq=quotes.QQQ,dayPnl=holdings.reduce((sum,item)=>{const quote=quotes[String(item.ticker||"").toUpperCase()],quantity=Number(item.quantity||0);return sum+(quote?.change!=null&&quote.freshness!=="STALE"?quote.change*quantity:0)},0),dayPnlAvailable=holdings.some(item=>{const quote=quotes[String(item.ticker||"").toUpperCase()];return quote?.change!=null&&quote.freshness!=="STALE"});
- const risks=useMemo(()=>{const result:Array<{tone:string;title:string;action:string}>=[];(portfolio?.categories||[]).filter(row=>row.status==="OVERWEIGHT").forEach(row=>result.push({tone:"caution",title:`${label(row.category)} ${(row.currentBps/100).toFixed(1)}% vs ${(row.targetBps/100).toFixed(1)}% target`,action:"Direct new contributions elsewhere before considering a sale."}));for(const row of portfolio?.holdings||[])if(row.weightBps>1000)result.push({tone:"danger",title:`${row.symbol} is ${(row.weightBps/100).toFixed(1)}% of this account`,action:"Do not add; review concentration, taxes, and thesis before reducing."});if(totalDebt>0)result.push({tone:"danger",title:`Household debt ${money(totalDebt*100)}`,action:"Confirm interest rates and protect household cash before aggressive investing."});if(emergencyMonths!==null&&emergencyMonths<6)result.push({tone:"caution",title:`Emergency cash covers ${emergencyMonths.toFixed(1)} months`,action:"Build toward the configured reserve before funding optional purchases."});return result.slice(0,5)},[portfolio,totalDebt,emergencyMonths]);
- const spendingWatch=useMemo(()=>{const now=Date.now(),currentStart=now-31*86400000,priorStart=now-183*86400000,isTransfer=(item:Record<string,any>)=>/transfer|internal/i.test(`${item.category||""} ${item.description||""}`),outflows=transactions.filter(item=>item.direction==="outflow"&&!isTransfer(item)&&!item.excluded);const group=(items:Array<Record<string,any>>):Map<string,number>=>{const map=new Map<string,number>();for(const item of items){const category=String(item.category||"Other").trim()||"Other";map.set(category,(map.get(category)||0)+Math.abs(Number(item.amount_cents||0))/100)}return map};const current=group(outflows.filter(item=>Date.parse(String(item.posted_at||""))>=currentStart)),prior=group(outflows.filter(item=>{const at=Date.parse(String(item.posted_at||""));return at>=priorStart&&at<currentStart})),insights=[]as Array<{category:string;change:number;current:number;message:string}>;for(const[category,currentValue]of current.entries()){const monthlyPrior=(prior.get(category)||0)/5;if(monthlyPrior<=0)continue;const change=(currentValue-monthlyPrior)/monthlyPrior*100;if(Math.abs(change)>=20)insights.push({category,change,current:currentValue,message:change>0?`Review ${category}; spending is materially above its five-month baseline.`:`${category} is below its recent monthly baseline.`})}return insights.sort((a,b)=>Math.abs(b.change)-Math.abs(a.change)).slice(0,3)},[transactions]);
- const wealthPath=useMemo(()=>{const current=Number(portfolio?.totalValueCents||0)/100,target=Math.max(1,Number(guidance?.goalTargetCents||100000000)/100),months=Math.max(1,guidance?.horizonMonths||120),monthly=Number(guidance?.availableCashPlan.monthlyContributionCents||0)/100,future=(annual:number)=>{const rate=annual/12;return current*Math.pow(1+rate,months)+monthly*(rate?((Math.pow(1+rate,months)-1)/rate):months)},required=(annual:number)=>{const rate=annual/12,growth=Math.pow(1+rate,months),annuity=rate?((growth-1)/rate):months;return Math.max(0,(target-current*growth)/annuity)},scenarios=[{name:"Conservative",rate:.04,value:future(.04)},{name:"Base",rate:.07,value:future(.07)},{name:"Strong",rate:.1,value:future(.1)},{name:"Stretch",rate:.13,value:future(.13)}],base=scenarios[1].value,requiredMonthly=required(.07),score=Math.max(0,Math.min(100,Math.round(base/target*100))),gap=Math.max(0,target-base),extra=Math.max(0,requiredMonthly-monthly),lever=incomeGap<0?"Restore positive household cash flow before increasing investment risk.":totalDebt>0?"Compare debt APR with expected returns; expensive debt may be the strongest lever.":extra>0?`Increase the monthly contribution by about $${extra.toLocaleString(undefined,{maximumFractionDigits:0})}, extend the horizon, or reduce the goal.`:"Maintain contributions, diversification, fees, and risk discipline.";return{current,target,months,monthly,scenarios,base,requiredMonthly,score,gap,lever}},[portfolio?.totalValueCents,guidance?.goalTargetCents,guidance?.horizonMonths,guidance?.availableCashPlan.monthlyContributionCents,incomeGap,totalDebt]);
- const setMode=(mode:"simple"|"pro")=>{setDensity(mode);localStorage.setItem("northstar-dashboard-density",mode)};
- return <div className={`command-center ${density}`}>
-  <section className="command-market-bar"><div><i/><b>U.S. MARKET {marketLabel}</b><span>Local {local} · Market {et}</span></div><span><small>S&amp;P 500 PROXY · SPY</small><b>{spy?.last?`$${spy.last.toFixed(2)} · ${spy.changePct!=null?`${spy.changePct>=0?"+":""}${spy.changePct.toFixed(2)}%`:"—"}`:"Unavailable"}</b></span><span><small>NASDAQ-100 PROXY · QQQ</small><b>{qqq?.last?`$${qqq.last.toFixed(2)} · ${qqq.changePct!=null?`${qqq.changePct>=0?"+":""}${qqq.changePct.toFixed(2)}%`:"—"}`:"Unavailable"}</b></span><span><small>VIX</small><b>{vix?.value?.toFixed(2)||"—"}</b></span><span><small>10Y YIELD</small><b>{tenYear?.value?.toFixed(2)||"—"}%</b></span><span><small>REGIME</small><b>{vix?.value==null?"Needs data":vix.value>=25?"Risk-off":vix.value<=17?"Constructive":"Mixed"}</b></span></section>
-  <div className="command-heading"><div><span>INVESTMENT COMMAND CENTER</span><h2>What matters and what to do next</h2><p>One account-aware decision queue. Suggestions only; you confirm every transaction.</p></div><div className="density-toggle" aria-label="Dashboard density"><button className={density==="simple"?"active":""} onClick={()=>setMode("simple")}>Simple</button><button className={density==="pro"?"active":""} onClick={()=>setMode("pro")}>Pro</button></div></div>
-  {error&&<div className="command-error">{error}</div>}
-  <section className="command-metrics" aria-label="Financial summary"><article><small>NET WORTH</small><strong>{money(netWorth*100)}</strong><span>Assets minus debt</span></article><article><small>INVESTMENTS</small><strong>{money(investmentValue*100)}</strong><span>Current holding value</span></article><article><small>TODAY’S P&amp;L</small><strong className={dayPnl>=0?"positive":"negative"}>{dayPnlAvailable?`${dayPnl>=0?"+":"−"}$${Math.abs(dayPnl).toLocaleString(undefined,{maximumFractionDigits:2})}`:"—"}</strong><span>{dayPnlAvailable?"Fresh/delayed quote change vs prior close":"Needs fresh prior-close marks"}</span></article><article><small>INVESTMENT CASH</small><strong>{money(guidance?.availableCashPlan.cashCents||0)}</strong><span>{money(guidance?.availableCashPlan.safeInvestmentCapacityCents||0)} safe capacity</span></article><article><small>HOUSEHOLD CASH</small><strong>{money(householdCash*100)}</strong><span>{emergencyMonths===null?"Reserve needs spending data":`${emergencyMonths.toFixed(1)} months coverage`}</span></article><article><small>TOTAL DEBT</small><strong>{money(totalDebt*100)}</strong><span>{totalDebt>0?"Review rate and payment priority":"No connected debt"}</span></article><article><small>PORTFOLIO HEALTH</small><strong>{portfolio?.healthScore??"—"}<em>/100</em></strong><span>Allocation and concentration</span></article><article><small>FINANCIAL HEALTH</small><strong>{financialHealth}<em>/100</em></strong><span>Cash flow, reserve, and debt</span></article></section>
-  <section className="wealth-goal-card command-panel"><header><div><span>10-YEAR WEALTH GOAL · CORE + ALPHA</span><h3>{money(wealthPath.target*100)} target · {wealthPath.months} months remaining</h3><p>Long-term compounding is the primary engine. Swing capital and risk remain separate.</p></div><strong>{wealthPath.score}<small>/100 on-track score</small></strong></header><div className="wealth-headline"><article><small>CURRENT ACCOUNT</small><b>{money(wealthPath.current*100)}</b></article><article><small>BASE PROJECTION</small><b>{money(wealthPath.base*100)}</b></article><article><small>GAP TO GOAL</small><b className={wealthPath.gap>0?"negative":"positive"}>{money(wealthPath.gap*100)}</b></article><article><small>CURRENT MONTHLY</small><b>{money(wealthPath.monthly*100)}</b></article><article><small>REQUIRED MONTHLY · BASE</small><b>{money(wealthPath.requiredMonthly*100)}</b></article></div><div className="wealth-scenarios">{wealthPath.scenarios.map(scenario=><span key={scenario.name}><small>{scenario.name.toUpperCase()} · {(scenario.rate*100).toFixed(0)}%</small><b>{money(scenario.value*100)}</b></span>)}</div><footer><b>Next best realistic lever:</b> {wealthPath.lever} Scenarios are planning ranges—not promised returns.</footer></section>
-  <section className="today-guidance command-panel"><header><div><span>TODAY’S GUIDANCE</span><h3>{guidance?.accountName||"Select an investment account"}</h3></div><button onClick={()=>onNavigate("Portfolio")}>Open full plan →</button></header>{actions.length?<ol>{actions.slice(0,density==="pro"?7:4).map(action=><li key={`${action.rank}-${action.symbol}-${action.action}`} className={`tone-${action.priority.toLowerCase()}`}><i>{action.rank}</i><div><strong>{action.symbol?`${action.symbol}${action.companyName&&action.companyName!==action.symbol?` · ${action.companyName}`:""} — `:""}{label(action.action)}{Number(action.quantity)>0?` ${action.quantity} share${Number(action.quantity)===1?"":"s"}`:""}</strong><p>{action.priceCondition}</p><small>{action.why}</small></div><em>{label(action.priority)}</em></li>)}</ol>:<p className="command-empty">No account action is justified yet. Complete the selected account settings and evidence checks.</p>}</section>
-  <div className="command-grid"><section className="allocation-command command-panel"><header><div><span>PORTFOLIO COMMAND CENTER</span><h3>Current allocation → required action</h3></div><b>{portfolio?.healthScore??"—"}/100</b></header><div>{portfolio?.categories.map(row=><article key={row.category} className={row.status.toLowerCase()}><div><b>{label(row.category)}</b><small>{(row.currentBps/100).toFixed(1)}% current / {(row.targetBps/100).toFixed(1)}% target</small></div><meter min="0" max="100" value={row.currentBps/100}/><strong>{row.status==="UNDERWEIGHT"?`Add ${money(row.gapCents)}`:row.status==="OVERWEIGHT"?`Stop adding · ${money(Math.abs(Number(row.gapCents)))} over`:"Near target"}</strong></article>)||<p>Choose an account to calculate its allocation.</p>}</div></section>
-  <section className="cash-deployment command-panel"><header><div><span>CASH DEPLOYMENT</span><h3>What should available cash do?</h3></div></header><strong>{money(guidance?.availableCashPlan.safeInvestmentCapacityCents||0)}<small> safe to evaluate for investing</small></strong><ul>{actions.filter(a=>a.capitalSource&&a.action!=="HOLD").slice(0,3).map(a=><li key={`${a.rank}-${a.symbol}`}><b>{a.symbol||label(a.action)}</b><span>{a.capitalSource}</span></li>)}</ul><p>Keep {money(guidance?.availableCashPlan.untouchedCashCents||0)} untouched. Household reserves override optional buying.</p></section></div>
-  <section className="holdings-terminal command-panel"><header><div><span>HOLDINGS ACTION TABLE</span><h3>Every position, one next decision</h3></div><button onClick={()=>onNavigate("Portfolio")}>Full holding review →</button></header><div className="terminal-scroll"><table><thead><tr><th>Ticker</th><th>Current</th><th>Daily %</th><th>Shares</th><th>Average cost</th><th>Gain/loss</th><th>Portfolio</th><th>Thesis</th><th>AI action</th><th>Next trigger</th></tr></thead><tbody>{holdings.map(item=>{const symbol=String(item.ticker||"—").toUpperCase(),quantity=Number(item.quantity||0),value=Number(item.market_value_cents||0),cost=Number(item.cost_basis_cents||0),current=quantity>0?value/quantity:0,average=quantity>0?cost/quantity:0,pnl=cost>0?(value-cost)/cost*100:null,row=portfolioRows.get(symbol),action=actionBySymbol.get(symbol),quote=quotes[symbol];return <tr key={`${item.account_id}-${symbol}`}><td><b>{symbol}</b><small>{item.name}</small></td><td className="number">{quote?.last?`$${quote.last.toFixed(2)}`:money(current,2)}<small>{quote?.freshness||"stored"}</small></td><td className={`number ${quote?.changePct==null?"neutral":quote.changePct>=0?"positive":"negative"}`}>{quote?.changePct==null?"—":`${quote.changePct>=0?"+":""}${quote.changePct.toFixed(2)}%`}</td><td className="number">{quantity.toLocaleString()}</td><td className="number">{money(average,2)}</td><td className={`number ${pnl==null?"neutral":pnl>=0?"positive":"negative"}`}>{pnl==null?"—":`${pnl>=0?"+":""}${pnl.toFixed(1)}%`}</td><td className="number">{row?`${(row.weightBps/100).toFixed(1)}%`:"—"}</td><td>Not reviewed</td><td><b>{action?label(action.action):row?label(row.action):"HOLD"}</b></td><td>{action?.priceCondition||"Continue monitoring"}</td></tr>})}</tbody></table></div>{!holdings.length&&<p className="command-empty">No holdings are recorded for the selected account.</p>}</section>
-  <div className="command-grid"><section className="risk-radar command-panel"><header><div><span>RISK RADAR</span><h3>Risks that require attention</h3></div></header>{risks.length?<ul>{risks.map((risk,index)=><li className={risk.tone} key={index}><b>{risk.title}</b><span>{risk.action}</span></li>)}</ul>:<p className="command-empty">No material account or household risk is currently identified from available data.</p>}</section><section className="goal-progress command-panel"><header><div><span>GOAL PROGRESS</span><h3>{guidance?.goalName||"Account goal not configured"}</h3></div></header><div className="goal-score"><strong>{portfolio?.goalProgressBps==null?"—":`${Math.min(100,portfolio.goalProgressBps/100).toFixed(0)}%`}</strong><span>{guidance?.onTrack?"Base scenario on track":"Plan adjustment required"}</span></div><div className="goal-scenarios"><span><small>CONSERVATIVE</small><b>{money(portfolio?.projections.bearCents||0)}</b></span><span><small>BASE</small><b>{money(portfolio?.projections.baseCents||0)}</b></span><span><small>STRONG</small><b>{money(portfolio?.projections.bullCents||0)}</b></span></div><p>{guidance?.onTrack?"Keep contributions and allocation aligned; this remains a modeled scenario.":"Increase contributions, extend the horizon, or reduce the goal—do not force it by taking excessive risk."}</p></section></div>
-  <div className="command-grid intelligence-grid"><section className="opportunity-panel command-panel"><header><div><span>BEST OPPORTUNITIES NOW</span><h3>Ranked for this account</h3></div><button onClick={()=>onNavigate("Growth Finder")}>Research list →</button></header>{intelligence.opportunities.length?<ol>{intelligence.opportunities.map((item,index)=><li key={item.id}><i>{index+1}</i><div><b>{item.symbol}{item.name&&item.name!==item.symbol?` · ${item.name}`:""} · {label(item.action)}</b><span>{item.reason}</span><small>{item.entry_low_cents&&item.entry_high_cents?`${money(item.entry_low_cents,2)}–${money(item.entry_high_cents,2)}`:"No validated entry range"}</small></div><strong>{item.confidence}/100<small>{item.actionable?"evidence passed":"research only"}</small></strong></li>)}</ol>:<p className="command-empty">No current recommendation has been fully evaluated for this account.</p>}</section><section className="changes-panel command-panel"><header><div><span>WHAT CHANGED?</span><h3>Meaningful updates since your last review</h3></div></header>{intelligence.changes.length?<ul>{intelligence.changes.slice(0,5).map(item=><li key={item.id}><b>{item.title}</b><span>{item.explanation}</span><time>{new Date(item.created_at).toLocaleString()}</time></li>)}</ul>:<p className="command-empty">No material persisted changes in the last 30 days.</p>}</section></div>
-  <div className="command-grid intelligence-grid"><section className="events-panel command-panel"><header><div><span>UPCOMING ACTION TIMELINE</span><h3>Dates that require a review</h3></div></header>{intelligence.events.length?<ol>{intelligence.events.slice(0,6).map(item=><li key={item.id}><time>{new Date(item.expires_at).toLocaleDateString()}</time><div><b>{item.symbol||"Account"} · {label(item.action_type)}</b><span>{item.rationale}</span></div><em>{label(item.lifecycle)}</em></li>)}</ol>:<p className="command-empty">No planned-action review dates are scheduled. Company and macro event feeds will appear only when verified.</p>}</section><section className="history-panel command-panel"><header><div><span>DECISION HISTORY</span><h3>Suggestion → lifecycle</h3></div><button onClick={()=>onNavigate("Journal")}>Full history →</button></header>{intelligence.history.length?<ul>{intelligence.history.slice(0,6).map(item=><li key={item.id}><time>{new Date(item.created_at).toLocaleDateString()}</time><b>{item.symbol}{item.name&&item.name!==item.symbol?` · ${item.name}`:""} {label(item.action)} {Number(item.quantity)>0?item.quantity:""}</b><span>{label(item.lifecycle)} · {item.confidence}%</span></li>)}</ul>:<p className="command-empty">No persisted recommendations yet.</p>}</section></div>
-  <section className="performance-panel command-panel"><header><div><span>PERFORMANCE VS BENCHMARK</span><h3>Is account selection adding value?</h3></div><b>{performance?.benchmark||"Benchmark pending"}</b></header><div>{performance?.periods.map(period=><article key={period.period}><small>{period.period}</small>{period.status==="AVAILABLE"?<><strong className={(period.portfolioReturn||0)>=0?"positive":"negative"}>{((period.portfolioReturn||0)*100).toFixed(2)}%</strong><span>vs {performance.benchmark} {period.benchmarkReturn==null?"unavailable":`${(period.benchmarkReturn*100).toFixed(2)}%`}</span><em className={(period.alpha||0)>=0?"positive":"negative"}>{period.alpha==null?"Alpha pending":`${period.alpha>=0?"+":""}${(period.alpha*100).toFixed(2)}% alpha`}</em></>:<><strong>—</strong><span>{period.observations} complete snapshot{period.observations===1?"":"s"}</span><em>More history required</em></>}</article>)||<p className="command-empty">Performance history has not loaded.</p>}</div><footer>{performance?.method||"Complete account snapshots are required; deposits must not be mistaken for investment returns."}</footer></section>
-  <div className="command-grid household-command-grid"><section className="household-snapshot command-panel"><header><div><span>HOUSEHOLD FINANCIAL SNAPSHOT</span><h3>Can the household safely invest more?</h3></div><button onClick={()=>onNavigate("Household")}>Open household →</button></header><div><article><small>MONTHLY INCOME</small><b>{money(monthlyIncome*100)}</b></article><article><small>MONTHLY SPENDING + DEBT</small><b>{money(monthlySpending*100)}</b></article><article><small>FREE CASH FLOW</small><b className={incomeGap>=0?"positive":"negative"}>{incomeGap>=0?"+":"−"}{money(Math.abs(incomeGap)*100)}</b></article><article><small>EMERGENCY FUND</small><b>{emergencyMonths===null?"Needs data":`${emergencyMonths.toFixed(1)} months`}</b></article><article><small>SAFE INVESTMENT CAPACITY</small><b>{money(guidance?.availableCashPlan.safeInvestmentCapacityCents||0)}</b></article></div><p>{totalDebt>0||emergencyMonths!==null&&emergencyMonths<6?"Household safety overrides aggressive portfolio actions. Protect reserves and review expensive debt first.":"No household safety block is currently detected from synchronized data."}</p></section><section className="spending-watch command-panel"><header><div><span>SPENDING WATCH</span><h3>Only material changes</h3></div><button onClick={()=>onNavigate("Bills & cards")}>Spending details →</button></header>{spendingWatch.length?<ul>{spendingWatch.map(item=><li key={item.category} className={item.change>0?"increase":"decrease"}><b>{item.category}</b><strong>{item.change>=0?"+":""}{item.change.toFixed(0)}%</strong><span>{item.message} Current 31 days: {money(item.current*100)}.</span></li>)}</ul>:<p className="command-empty">No category moved at least 20% versus its five-month monthly baseline, or more history is required.</p>}</section></div>
-  {density==="pro"&&<section className="prediction-list command-panel"><header><div><span>PREDICTION SUMMARY</span><h3>Only positions requiring stored forecast attention</h3></div><button onClick={()=>onNavigate("Professional Charts")}>Open charts →</button></header>{intelligence.predictions.length?<div>{intelligence.predictions.map(item=><article key={item.id}><b>{item.symbol}{item.name&&item.name!==item.symbol?` · ${item.name}`:""}</b><span>{label(item.horizon)} base scenario</span><strong>{item.lower_cents&&item.upper_cents?`${money(item.lower_cents,2)}–${money(item.upper_cents,2)}`:money(item.base_price_cents,2)}</strong><em>{item.confidence}% confidence</em></article>)}</div>:<p className="command-empty">No current saved predictions for this account.</p>}</section>}
- </div>
+export default function InvestmentCommandCenter({
+  accountId,
+  accessToken,
+  holdings,
+  transactions,
+  netWorth,
+  investmentValue,
+  householdCash,
+  totalDebt,
+  monthlyIncome,
+  monthlySpending,
+  onNavigate,
+}: {
+  accountId: string;
+  accessToken: string;
+  holdings: Holding[];
+  transactions: Array<Record<string, any>>;
+  netWorth: number;
+  investmentValue: number;
+  householdCash: number;
+  totalDebt: number;
+  monthlyIncome: number;
+  monthlySpending: number;
+  onNavigate: (page: string) => void;
+}) {
+  const [guidance, setGuidance] = useState<Guidance | null>(null),
+    [portfolio, setPortfolio] = useState<Portfolio | null>(null),
+    [clock, setClock] = useState<Clock>({ status: "loading" }),
+    [quotes, setQuotes] = useState<
+      Record<
+        string,
+        {
+          last: number | null;
+          previousClose: number | null;
+          change: number | null;
+          changePct: number | null;
+          bid: number | null;
+          ask: number | null;
+          freshness?: string;
+        }
+      >
+    >({}),
+    [macro, setMacro] = useState<
+      Array<{ id: string; value: number | null; date: string | null }>
+    >([]),
+    [intelligence, setIntelligence] = useState<Intelligence>({
+      opportunities: [],
+      changes: [],
+      events: [],
+      history: [],
+      predictions: [],
+    }),
+    [performance, setPerformance] = useState<Performance | null>(null),
+    [density, setDensity] = useState<"simple" | "pro">("simple"),
+    [error, setError] = useState("");
+  useEffect(() => {
+    const saved = localStorage.getItem("northstar-dashboard-density");
+    if (saved === "pro") setDensity("pro");
+  }, []);
+  useEffect(() => {
+    let active = true;
+    setError("");
+    const headers = authHeaders(accessToken),
+      symbols = [
+        ...new Set([
+          "SPY",
+          "QQQ",
+          ...holdings
+            .map((item) => String(item.ticker || "").toUpperCase())
+            .filter(Boolean),
+        ]),
+      ];
+    Promise.all([
+      accountId
+        ? fetch(
+            `/api/action-guidance?accountId=${encodeURIComponent(accountId)}`,
+            { cache: "no-store", headers },
+          ).then(async (r) => {
+            const b = await r.json();
+            if (!r.ok) throw new Error(b.error || "Guidance unavailable");
+            return b;
+          })
+        : Promise.resolve(null),
+      fetch("/api/market/clock", { cache: "no-store" }).then((r) => r.json()),
+      fetch(
+        `/api/market/quotes?symbols=${encodeURIComponent(symbols.join(","))}`,
+        { cache: "no-store" },
+      ).then((r) => (r.ok ? r.json() : { quotes: {} })),
+      fetch("/api/market/macro", { cache: "no-store" })
+        .then((r) => r.json())
+        .catch(() => ({ series: [] })),
+      accountId
+        ? fetch(
+            `/api/dashboard/intelligence?accountId=${encodeURIComponent(accountId)}`,
+            { cache: "no-store", headers },
+          ).then((r) =>
+            r.ok
+              ? r.json()
+              : {
+                  opportunities: [],
+                  changes: [],
+                  events: [],
+                  history: [],
+                  predictions: [],
+                },
+          )
+        : Promise.resolve({
+            opportunities: [],
+            changes: [],
+            events: [],
+            history: [],
+            predictions: [],
+          }),
+    ])
+      .then(([g, c, q, m, i]) => {
+        if (!active) return;
+        if (g) {
+          setGuidance(g.guidance);
+          setPortfolio(g.portfolio);
+        }
+        setClock(c);
+        setQuotes(q.quotes || {});
+        setMacro(m.series || []);
+        setIntelligence(i);
+      })
+      .catch((reason) => {
+        if (active)
+          setError(
+            reason instanceof Error
+              ? reason.message
+              : "Command center unavailable",
+          );
+      });
+    return () => {
+      active = false;
+    };
+  }, [accountId, accessToken, holdings]);
+  useEffect(() => {
+    if (!accountId) {
+      setPerformance(null);
+      return;
+    }
+    let active = true;
+    fetch(
+      `/api/portfolio/performance?accountId=${encodeURIComponent(accountId)}`,
+      { cache: "no-store", headers: authHeaders(accessToken) },
+    )
+      .then(async (response) => {
+        const body = await response.json();
+        if (active && response.ok) setPerformance(body);
+      })
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, [accountId, accessToken]);
+  const now = new Date(),
+    target = clock.isOpen ? clock.nextClose : clock.nextOpen,
+    remaining = target ? Math.max(0, Date.parse(target) - now.getTime()) : 0,
+    hours = Math.floor(remaining / 3600000),
+    minutes = Math.floor((remaining % 3600000) / 60000),
+    marketLabel =
+      clock.status !== "connected"
+        ? clock.configured
+          ? "PROVIDER TEMPORARILY UNAVAILABLE"
+          : "SETUP REQUIRED"
+        : clock.isOpen
+          ? `OPEN · CLOSES IN ${hours}H ${minutes}M`
+          : `CLOSED · OPENS IN ${hours}H ${minutes}M`,
+    et = new Intl.DateTimeFormat("en-US", {
+      timeZone: "America/New_York",
+      hour: "numeric",
+      minute: "2-digit",
+      timeZoneName: "short",
+    }).format(now),
+    local = new Intl.DateTimeFormat("en-US", {
+      hour: "numeric",
+      minute: "2-digit",
+      timeZoneName: "short",
+    }).format(now);
+  const incomeGap = monthlyIncome - monthlySpending,
+    emergencyMonths =
+      monthlySpending > 0 ? householdCash / monthlySpending : null,
+    financialHealth = Math.max(
+      0,
+      Math.min(
+        100,
+        Math.round(
+          50 +
+            (incomeGap > 0 ? 20 : -20) +
+            (totalDebt === 0 ? 15 : -10) +
+            (emergencyMonths !== null ? Math.min(15, emergencyMonths * 3) : 0),
+        ),
+      ),
+    ),
+    actions = guidance?.today || [],
+    actionBySymbol = new Map(
+      (guidance?.queue || [])
+        .filter((a) => a.symbol)
+        .map((a) => [a.symbol!, a]),
+    ),
+    portfolioRows = new Map(
+      (portfolio?.holdings || []).map((h) => [h.symbol, h]),
+    ),
+    vix = macro.find((item) => item.id === "VIXCLS"),
+    tenYear = macro.find((item) => item.id === "DGS10"),
+    spy = quotes.SPY,
+    qqq = quotes.QQQ,
+    dayPnl = holdings.reduce((sum, item) => {
+      const quote = quotes[String(item.ticker || "").toUpperCase()],
+        quantity = Number(item.quantity || 0);
+      return (
+        sum +
+        (quote?.change != null && quote.freshness !== "STALE"
+          ? quote.change * quantity
+          : 0)
+      );
+    }, 0),
+    dayPnlAvailable = holdings.some((item) => {
+      const quote = quotes[String(item.ticker || "").toUpperCase()];
+      return quote?.change != null && quote.freshness !== "STALE";
+    });
+  const risks = useMemo(() => {
+    const result: Array<{ tone: string; title: string; action: string }> = [];
+    (portfolio?.categories || [])
+      .filter((row) => row.status === "OVERWEIGHT")
+      .forEach((row) =>
+        result.push({
+          tone: "caution",
+          title: `${label(row.category)} ${(row.currentBps / 100).toFixed(1)}% vs ${(row.targetBps / 100).toFixed(1)}% target`,
+          action:
+            "Direct new contributions elsewhere before considering a sale.",
+        }),
+      );
+    for (const row of portfolio?.holdings || [])
+      if (row.weightBps > 1000)
+        result.push({
+          tone: "danger",
+          title: `${row.symbol} is ${(row.weightBps / 100).toFixed(1)}% of this account`,
+          action:
+            "Do not add; review concentration, taxes, and thesis before reducing.",
+        });
+    if (totalDebt > 0)
+      result.push({
+        tone: "danger",
+        title: `Household debt ${money(totalDebt * 100)}`,
+        action:
+          "Confirm interest rates and protect household cash before aggressive investing.",
+      });
+    if (emergencyMonths !== null && emergencyMonths < 6)
+      result.push({
+        tone: "caution",
+        title: `Emergency cash covers ${emergencyMonths.toFixed(1)} months`,
+        action:
+          "Build toward the configured reserve before funding optional purchases.",
+      });
+    return result.slice(0, 5);
+  }, [portfolio, totalDebt, emergencyMonths]);
+  const spendingWatch = useMemo(() => {
+    const now = Date.now(),
+      currentStart = now - 31 * 86400000,
+      priorStart = now - 183 * 86400000,
+      isTransfer = (item: Record<string, any>) =>
+        /transfer|internal/i.test(
+          `${item.category || ""} ${item.description || ""}`,
+        ),
+      outflows = transactions.filter(
+        (item) =>
+          item.direction === "outflow" && !isTransfer(item) && !item.excluded,
+      );
+    const group = (items: Array<Record<string, any>>): Map<string, number> => {
+      const map = new Map<string, number>();
+      for (const item of items) {
+        const category = String(item.category || "Other").trim() || "Other";
+        map.set(
+          category,
+          (map.get(category) || 0) +
+            Math.abs(Number(item.amount_cents || 0)) / 100,
+        );
+      }
+      return map;
+    };
+    const current = group(
+        outflows.filter(
+          (item) => Date.parse(String(item.posted_at || "")) >= currentStart,
+        ),
+      ),
+      prior = group(
+        outflows.filter((item) => {
+          const at = Date.parse(String(item.posted_at || ""));
+          return at >= priorStart && at < currentStart;
+        }),
+      ),
+      insights = [] as Array<{
+        category: string;
+        change: number;
+        current: number;
+        message: string;
+      }>;
+    for (const [category, currentValue] of current.entries()) {
+      const monthlyPrior = (prior.get(category) || 0) / 5;
+      if (monthlyPrior <= 0) continue;
+      const change = ((currentValue - monthlyPrior) / monthlyPrior) * 100;
+      if (Math.abs(change) >= 20)
+        insights.push({
+          category,
+          change,
+          current: currentValue,
+          message:
+            change > 0
+              ? `Review ${category}; spending is materially above its five-month baseline.`
+              : `${category} is below its recent monthly baseline.`,
+        });
+    }
+    return insights
+      .sort((a, b) => Math.abs(b.change) - Math.abs(a.change))
+      .slice(0, 3);
+  }, [transactions]);
+  const wealthPath = useMemo(() => {
+    const current = Number(portfolio?.totalValueCents || 0) / 100,
+      target = Math.max(
+        1,
+        Number(guidance?.goalTargetCents || 100000000) / 100,
+      ),
+      months = Math.max(1, guidance?.horizonMonths || 120),
+      monthly =
+        Number(guidance?.availableCashPlan.monthlyContributionCents || 0) / 100,
+      future = (annual: number) => {
+        const rate = annual / 12;
+        return (
+          current * Math.pow(1 + rate, months) +
+          monthly * (rate ? (Math.pow(1 + rate, months) - 1) / rate : months)
+        );
+      },
+      required = (annual: number) => {
+        const rate = annual / 12,
+          growth = Math.pow(1 + rate, months),
+          annuity = rate ? (growth - 1) / rate : months;
+        return Math.max(0, (target - current * growth) / annuity);
+      },
+      scenarios = [
+        { name: "Conservative", rate: 0.04, value: future(0.04) },
+        { name: "Base", rate: 0.07, value: future(0.07) },
+        { name: "Strong", rate: 0.1, value: future(0.1) },
+        { name: "Stretch", rate: 0.13, value: future(0.13) },
+      ],
+      base = scenarios[1].value,
+      requiredMonthly = required(0.07),
+      score = Math.max(0, Math.min(100, Math.round((base / target) * 100))),
+      gap = Math.max(0, target - base),
+      extra = Math.max(0, requiredMonthly - monthly),
+      lever =
+        incomeGap < 0
+          ? "Restore positive household cash flow before increasing investment risk."
+          : totalDebt > 0
+            ? "Compare debt APR with expected returns; expensive debt may be the strongest lever."
+            : extra > 0
+              ? `Increase the monthly contribution by about $${extra.toLocaleString(undefined, { maximumFractionDigits: 0 })}, extend the horizon, or reduce the goal.`
+              : "Maintain contributions, diversification, fees, and risk discipline.";
+    return {
+      current,
+      target,
+      months,
+      monthly,
+      scenarios,
+      base,
+      requiredMonthly,
+      score,
+      gap,
+      lever,
+    };
+  }, [
+    portfolio?.totalValueCents,
+    guidance?.goalTargetCents,
+    guidance?.horizonMonths,
+    guidance?.availableCashPlan.monthlyContributionCents,
+    incomeGap,
+    totalDebt,
+  ]);
+  const setMode = (mode: "simple" | "pro") => {
+    setDensity(mode);
+    localStorage.setItem("northstar-dashboard-density", mode);
+  };
+  return (
+    <div className={`command-center ${density}`}>
+      <section className="command-market-bar">
+        <div>
+          <i />
+          <b>U.S. MARKET {marketLabel}</b>
+          <span>
+            Local {local} · Market {et}
+          </span>
+        </div>
+        <span>
+          <small>S&amp;P 500 PROXY · SPY</small>
+          <b>
+            {spy?.last
+              ? `$${spy.last.toFixed(2)} · ${spy.changePct != null ? `${spy.changePct >= 0 ? "+" : ""}${spy.changePct.toFixed(2)}%` : "—"}`
+              : "Unavailable"}
+          </b>
+        </span>
+        <span>
+          <small>NASDAQ-100 PROXY · QQQ</small>
+          <b>
+            {qqq?.last
+              ? `$${qqq.last.toFixed(2)} · ${qqq.changePct != null ? `${qqq.changePct >= 0 ? "+" : ""}${qqq.changePct.toFixed(2)}%` : "—"}`
+              : "Unavailable"}
+          </b>
+        </span>
+        <span>
+          <small>VIX</small>
+          <b>{vix?.value?.toFixed(2) || "—"}</b>
+        </span>
+        <span>
+          <small>10Y YIELD</small>
+          <b>{tenYear?.value?.toFixed(2) || "—"}%</b>
+        </span>
+        <span>
+          <small>REGIME</small>
+          <b>
+            {vix?.value == null
+              ? "Needs data"
+              : vix.value >= 25
+                ? "Risk-off"
+                : vix.value <= 17
+                  ? "Constructive"
+                  : "Mixed"}
+          </b>
+        </span>
+      </section>
+      <div className="command-heading">
+        <div>
+          <span>INVESTMENT COMMAND CENTER</span>
+          <h2>What matters and what to do next</h2>
+          <p>
+            One account-aware decision queue. Suggestions only; you confirm
+            every transaction.
+          </p>
+        </div>
+        <div className="density-toggle" aria-label="Dashboard density">
+          <button
+            className={density === "simple" ? "active" : ""}
+            onClick={() => setMode("simple")}
+          >
+            Simple
+          </button>
+          <button
+            className={density === "pro" ? "active" : ""}
+            onClick={() => setMode("pro")}
+          >
+            Pro
+          </button>
+        </div>
+      </div>
+      {error && <div className="command-error">{error}</div>}
+      <section className="command-metrics" aria-label="Financial summary">
+        <article>
+          <small>NET WORTH</small>
+          <strong>{money(netWorth * 100)}</strong>
+          <span>Assets minus debt</span>
+        </article>
+        <article>
+          <small>INVESTMENTS</small>
+          <strong>{money(investmentValue * 100)}</strong>
+          <span>Current holding value</span>
+        </article>
+        <article>
+          <small>TODAY’S P&amp;L</small>
+          <strong className={dayPnl >= 0 ? "positive" : "negative"}>
+            {dayPnlAvailable
+              ? `${dayPnl >= 0 ? "+" : "−"}$${Math.abs(dayPnl).toLocaleString(undefined, { maximumFractionDigits: 2 })}`
+              : "—"}
+          </strong>
+          <span>
+            {dayPnlAvailable
+              ? "Fresh/delayed quote change vs prior close"
+              : "Needs fresh prior-close marks"}
+          </span>
+        </article>
+        <article>
+          <small>INVESTMENT CASH</small>
+          <strong>{money(guidance?.availableCashPlan.cashCents || 0)}</strong>
+          <span>
+            {money(
+              guidance?.availableCashPlan.safeInvestmentCapacityCents || 0,
+            )}{" "}
+            safe capacity
+          </span>
+        </article>
+        <article>
+          <small>HOUSEHOLD CASH</small>
+          <strong>{money(householdCash * 100)}</strong>
+          <span>
+            {emergencyMonths === null
+              ? "Reserve needs spending data"
+              : `${emergencyMonths.toFixed(1)} months coverage`}
+          </span>
+        </article>
+        <article>
+          <small>TOTAL DEBT</small>
+          <strong>{money(totalDebt * 100)}</strong>
+          <span>
+            {totalDebt > 0
+              ? "Review rate and payment priority"
+              : "No connected debt"}
+          </span>
+        </article>
+        <article>
+          <small>PORTFOLIO HEALTH</small>
+          <strong>
+            {portfolio?.healthScore ?? "—"}
+            <em>/100</em>
+          </strong>
+          <span>Allocation and concentration</span>
+        </article>
+        <article>
+          <small>FINANCIAL HEALTH</small>
+          <strong>
+            {financialHealth}
+            <em>/100</em>
+          </strong>
+          <span>Cash flow, reserve, and debt</span>
+        </article>
+      </section>
+      <section className="wealth-goal-card command-panel">
+        <header>
+          <div>
+            <span>10-YEAR WEALTH GOAL · CORE + ALPHA</span>
+            <h3>
+              {money(wealthPath.target * 100)} target · {wealthPath.months}{" "}
+              months remaining
+            </h3>
+            <p>
+              Long-term compounding is the primary engine. Swing capital and
+              risk remain separate.
+            </p>
+          </div>
+          <strong>
+            {wealthPath.score}
+            <small>/100 on-track score</small>
+          </strong>
+        </header>
+        <div className="wealth-headline">
+          <article>
+            <small>CURRENT ACCOUNT</small>
+            <b>{money(wealthPath.current * 100)}</b>
+          </article>
+          <article>
+            <small>BASE PROJECTION</small>
+            <b>{money(wealthPath.base * 100)}</b>
+          </article>
+          <article>
+            <small>GAP TO GOAL</small>
+            <b className={wealthPath.gap > 0 ? "negative" : "positive"}>
+              {money(wealthPath.gap * 100)}
+            </b>
+          </article>
+          <article>
+            <small>CURRENT MONTHLY</small>
+            <b>{money(wealthPath.monthly * 100)}</b>
+          </article>
+          <article>
+            <small>REQUIRED MONTHLY · BASE</small>
+            <b>{money(wealthPath.requiredMonthly * 100)}</b>
+          </article>
+        </div>
+        <div className="wealth-scenarios">
+          {wealthPath.scenarios.map((scenario) => (
+            <span key={scenario.name}>
+              <small>
+                {scenario.name.toUpperCase()} ·{" "}
+                {(scenario.rate * 100).toFixed(0)}%
+              </small>
+              <b>{money(scenario.value * 100)}</b>
+            </span>
+          ))}
+        </div>
+        <footer>
+          <b>Next best realistic lever:</b> {wealthPath.lever} Scenarios are
+          planning ranges—not promised returns.
+        </footer>
+      </section>
+      <section className="today-guidance command-panel">
+        <header>
+          <div>
+            <span>TODAY’S GUIDANCE</span>
+            <h3>{guidance?.accountName || "Select an investment account"}</h3>
+          </div>
+          <button onClick={() => onNavigate("Portfolio")}>
+            Open full plan →
+          </button>
+        </header>
+        <div className="action-status-guide">
+          <span><b>ACTION NOW</b> Stored thesis/fundamental, price-trigger, risk, account-fit and confidence gates passed. Verify the live quote; Northstar never executes.</span>
+          <span><b>PREPARE ORDER</b> Research is constructive, but a stated price, volume, trend, market/sector, event or confidence condition is incomplete.</span>
+          <span><b>WATCH</b> A setup is developing, but evidence remains incomplete or conflicting. Do not trade yet.</span>
+          <span><b>HOLD / NO ACTION</b> The thesis is acceptable or the expected advantage is too small to justify cost and timing risk.</span>
+          <span><b>SELL / TRIM REVIEW</b> Recheck thesis, concentration, valuation, taxes and exit evidence. A label alone never authorizes a sale.</span>
+        </div>
+        {actions.length ? (
+          <ol>
+            {actions.slice(0, density === "pro" ? 7 : 4).map((action) => (
+              <li
+                key={`${action.rank}-${action.symbol}-${action.action}`}
+                className={`tone-${action.priority.toLowerCase()}`}
+              >
+                <i>{action.rank}</i>
+                <div>
+                  <strong>
+                    {action.symbol
+                      ? `${action.symbol}${action.companyName && action.companyName !== action.symbol ? ` · ${action.companyName}` : ""} — `
+                      : ""}
+                    {label(action.action)}
+                    {Number(action.quantity) > 0
+                      ? ` ${action.quantity} share${Number(action.quantity) === 1 ? "" : "s"}`
+                      : ""}
+                  </strong>
+                  <p>{action.priceCondition}</p>
+                  <small>{action.why}</small>
+                </div>
+                <em>{label(action.priority)}</em>
+              </li>
+            ))}
+          </ol>
+        ) : (
+          <p className="command-empty">
+            No account action is justified yet. Complete the selected account
+            settings and evidence checks.
+          </p>
+        )}
+      </section>
+      <div className="command-grid">
+        <section className="allocation-command command-panel">
+          <header>
+            <div>
+              <span>PORTFOLIO COMMAND CENTER</span>
+              <h3>Current allocation → required action</h3>
+            </div>
+            <b>{portfolio?.healthScore ?? "—"}/100</b>
+          </header>
+          <div>
+            {portfolio?.categories.map((row) => (
+              <article key={row.category} className={row.status.toLowerCase()}>
+                <div>
+                  <b>{label(row.category)}</b>
+                  <small>
+                    {(row.currentBps / 100).toFixed(1)}% current /{" "}
+                    {(row.targetBps / 100).toFixed(1)}% target
+                  </small>
+                </div>
+                <meter min="0" max="100" value={row.currentBps / 100} />
+                <strong>
+                  {row.status === "UNDERWEIGHT"
+                    ? `Add ${money(row.gapCents)}`
+                    : row.status === "OVERWEIGHT"
+                      ? `Stop adding · ${money(Math.abs(Number(row.gapCents)))} over`
+                      : "Near target"}
+                </strong>
+              </article>
+            )) || <p>Choose an account to calculate its allocation.</p>}
+          </div>
+        </section>
+        <section className="cash-deployment command-panel">
+          <header>
+            <div>
+              <span>CASH DEPLOYMENT</span>
+              <h3>What should available cash do?</h3>
+            </div>
+          </header>
+          <strong>
+            {money(
+              guidance?.availableCashPlan.safeInvestmentCapacityCents || 0,
+            )}
+            <small> maximum safe capacity to evaluate—not an automatic amount to invest</small>
+          </strong>
+          <div className="cash-explanation">
+            <span><b>1. Protect</b> Keep {money(guidance?.availableCashPlan.untouchedCashCents || 0)} untouched for reserves and household safety.</span>
+            <span><b>2. Wait</b> Keep cash unallocated while candidates remain WATCH, HOLD, or PREPARE ORDER.</span>
+            <span><b>3. Deploy</b> Use only the calculated amount for an ACTION NOW whose price, thesis/fundamentals, trend, volume, market/sector, event-risk and confidence gates passed.</span>
+            <span><b>4. Recalculate</b> Shares are capped by price, stop distance, trade-risk limit, ticker/sector concentration, liquidity and remaining cash.</span>
+          </div>
+          <ul>
+            {actions
+              .filter((a) => a.capitalSource && a.action !== "HOLD")
+              .slice(0, 3)
+              .map((a) => (
+                <li key={`${a.rank}-${a.symbol}`}>
+                  <b>{a.symbol || label(a.action)}</b>
+                  <span>{a.capitalSource}</span>
+                </li>
+              ))}
+          </ul>
+          <p>
+            Keep {money(guidance?.availableCashPlan.untouchedCashCents || 0)}{" "}
+            untouched. Household reserves override optional buying.
+          </p>
+        </section>
+      </div>
+      <section className="holdings-terminal command-panel">
+        <header>
+          <div>
+            <span>HOLDINGS ACTION TABLE</span>
+            <h3>Every position, one next decision</h3>
+          </div>
+          <button onClick={() => onNavigate("Portfolio")}>
+            Full holding review →
+          </button>
+        </header>
+        <div className="terminal-scroll">
+          <table>
+            <thead>
+              <tr>
+                <th>Ticker</th>
+                <th>Current</th>
+                <th>Daily %</th>
+                <th>Shares</th>
+                <th>Average cost</th>
+                <th>Gain/loss</th>
+                <th>Portfolio</th>
+                <th>Thesis</th>
+                <th>AI action</th>
+                <th>Next trigger</th>
+              </tr>
+            </thead>
+            <tbody>
+              {holdings.map((item) => {
+                const symbol = String(item.ticker || "—").toUpperCase(),
+                  quantity = Number(item.quantity || 0),
+                  value = Number(item.market_value_cents || 0),
+                  cost = Number(item.cost_basis_cents || 0),
+                  current = quantity > 0 ? value / quantity : 0,
+                  average = quantity > 0 ? cost / quantity : 0,
+                  pnl = cost > 0 ? ((value - cost) / cost) * 100 : null,
+                  row = portfolioRows.get(symbol),
+                  action = actionBySymbol.get(symbol),
+                  quote = quotes[symbol];
+                return (
+                  <tr key={`${item.account_id}-${symbol}`}>
+                    <td>
+                      <b>{symbol}</b>
+                      <small>{item.name}</small>
+                    </td>
+                    <td className="number">
+                      {quote?.last
+                        ? `$${quote.last.toFixed(2)}`
+                        : money(current, 2)}
+                      <small>{quote?.freshness || "stored"}</small>
+                    </td>
+                    <td
+                      className={`number ${quote?.changePct == null ? "neutral" : quote.changePct >= 0 ? "positive" : "negative"}`}
+                    >
+                      {quote?.changePct == null
+                        ? "—"
+                        : `${quote.changePct >= 0 ? "+" : ""}${quote.changePct.toFixed(2)}%`}
+                    </td>
+                    <td className="number">{quantity.toLocaleString()}</td>
+                    <td className="number">{money(average, 2)}</td>
+                    <td
+                      className={`number ${pnl == null ? "neutral" : pnl >= 0 ? "positive" : "negative"}`}
+                    >
+                      {pnl == null
+                        ? "—"
+                        : `${pnl >= 0 ? "+" : ""}${pnl.toFixed(1)}%`}
+                    </td>
+                    <td className="number">
+                      {row ? `${(row.weightBps / 100).toFixed(1)}%` : "—"}
+                    </td>
+                    <td>Not reviewed</td>
+                    <td>
+                      <b>
+                        {action
+                          ? label(action.action)
+                          : row
+                            ? label(row.action)
+                            : "HOLD"}
+                      </b>
+                    </td>
+                    <td>{action?.priceCondition || "Continue monitoring"}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+        {!holdings.length && (
+          <p className="command-empty">
+            No holdings are recorded for the selected account.
+          </p>
+        )}
+      </section>
+      <div className="command-grid">
+        <section className="risk-radar command-panel">
+          <header>
+            <div>
+              <span>RISK RADAR</span>
+              <h3>Risks that require attention</h3>
+            </div>
+          </header>
+          {risks.length ? (
+            <ul>
+              {risks.map((risk, index) => (
+                <li className={risk.tone} key={index}>
+                  <b>{risk.title}</b>
+                  <span>{risk.action}</span>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="command-empty">
+              No material account or household risk is currently identified from
+              available data.
+            </p>
+          )}
+        </section>
+        <section className="goal-progress-panel command-panel">
+          <header>
+            <div>
+              <span>GOAL PROGRESS</span>
+              <h3>{guidance?.goalName || "Account goal not configured"}</h3>
+            </div>
+          </header>
+          <div className="goal-score">
+            <strong>
+              {portfolio?.goalProgressBps == null
+                ? "—"
+                : `${Math.min(100, portfolio.goalProgressBps / 100).toFixed(0)}%`}
+            </strong>
+            <span>
+              {guidance?.onTrack
+                ? "Base scenario on track"
+                : "Plan adjustment required"}
+            </span>
+          </div>
+          <div className="goal-scenarios">
+            <span>
+              <small>CONSERVATIVE</small>
+              <b>{money(portfolio?.projections.bearCents || 0)}</b>
+            </span>
+            <span>
+              <small>BASE</small>
+              <b>{money(portfolio?.projections.baseCents || 0)}</b>
+            </span>
+            <span>
+              <small>STRONG</small>
+              <b>{money(portfolio?.projections.bullCents || 0)}</b>
+            </span>
+          </div>
+          <p>
+            {guidance?.onTrack
+              ? "Keep contributions and allocation aligned; this remains a modeled scenario."
+              : "Increase contributions, extend the horizon, or reduce the goal—do not force it by taking excessive risk."}
+          </p>
+        </section>
+      </div>
+      <div className="command-grid intelligence-grid">
+        <section className="opportunity-panel command-panel">
+          <header>
+            <div>
+              <span>BEST OPPORTUNITIES NOW</span>
+              <h3>Ranked for this account</h3>
+            </div>
+            <button onClick={() => onNavigate("Growth Finder")}>
+              Research list →
+            </button>
+          </header>
+          {intelligence.opportunities.length ? (
+            <ol>
+              {intelligence.opportunities.map((item, index) => (
+                <li key={item.id}>
+                  <i>{index + 1}</i>
+                  <div>
+                    <b>
+                      {item.symbol}
+                      {item.name && item.name !== item.symbol
+                        ? ` · ${item.name}`
+                        : ""}{" "}
+                      · {label(item.action)}
+                    </b>
+                    <span>{item.reason}</span>
+                    <small>
+                      {item.entry_low_cents && item.entry_high_cents
+                        ? `${money(item.entry_low_cents, 2)}–${money(item.entry_high_cents, 2)}`
+                        : "No validated entry range"}
+                    </small>
+                  </div>
+                  <strong>
+                    {item.confidence}/100
+                    <small>
+                      {item.actionable ? "evidence passed" : "research only"}
+                    </small>
+                  </strong>
+                </li>
+              ))}
+            </ol>
+          ) : (
+            <p className="command-empty">
+              No current recommendation has been fully evaluated for this
+              account.
+            </p>
+          )}
+        </section>
+        <section className="changes-panel command-panel">
+          <header>
+            <div>
+              <span>WHAT CHANGED?</span>
+              <h3>Meaningful updates since your last review</h3>
+            </div>
+          </header>
+          {intelligence.changes.length ? (
+            <ul>
+              {intelligence.changes.slice(0, 5).map((item) => (
+                <li key={item.id}>
+                  <b>{item.title}</b>
+                  <span>{item.explanation}</span>
+                  <time>{new Date(item.created_at).toLocaleString()}</time>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="command-empty">
+              No material persisted changes in the last 30 days.
+            </p>
+          )}
+        </section>
+      </div>
+      <div className="command-grid intelligence-grid">
+        <section className="events-panel command-panel">
+          <header>
+            <div>
+              <span>UPCOMING ACTION TIMELINE</span>
+              <h3>Dates that require a review</h3>
+            </div>
+          </header>
+          {intelligence.events.length ? (
+            <ol>
+              {intelligence.events.slice(0, 6).map((item) => (
+                <li key={item.id}>
+                  <time>{new Date(item.expires_at).toLocaleDateString()}</time>
+                  <div>
+                    <b>
+                      {item.symbol || "Account"} · {label(item.action_type)}
+                    </b>
+                    <span>{item.rationale}</span>
+                  </div>
+                  <em>{label(item.lifecycle)}</em>
+                </li>
+              ))}
+            </ol>
+          ) : (
+            <p className="command-empty">
+              No planned-action review dates are scheduled. Company and macro
+              event feeds will appear only when verified.
+            </p>
+          )}
+        </section>
+        <section className="history-panel command-panel">
+          <header>
+            <div>
+              <span>DECISION HISTORY</span>
+              <h3>Suggestion → lifecycle</h3>
+            </div>
+            <button onClick={() => onNavigate("Journal")}>
+              Full history →
+            </button>
+          </header>
+          {intelligence.history.length ? (
+            <ul>
+              {intelligence.history.slice(0, 6).map((item) => (
+                <li key={item.id}>
+                  <time>{new Date(item.created_at).toLocaleDateString()}</time>
+                  <b>
+                    {item.symbol}
+                    {item.name && item.name !== item.symbol
+                      ? ` · ${item.name}`
+                      : ""}{" "}
+                    {label(item.action)}{" "}
+                    {Number(item.quantity) > 0 ? item.quantity : ""}
+                  </b>
+                  <span>
+                    {label(item.lifecycle)} · {item.confidence}%
+                  </span>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="command-empty">No persisted recommendations yet.</p>
+          )}
+        </section>
+      </div>
+      <section className="performance-panel command-panel">
+        <header>
+          <div>
+            <span>PERFORMANCE VS BENCHMARK</span>
+            <h3>Is account selection adding value?</h3>
+          </div>
+          <b>{performance?.benchmark || "Benchmark pending"}</b>
+        </header>
+        <div>
+          {performance?.periods.map((period) => (
+            <article key={period.period}>
+              <small>{period.period}</small>
+              {period.status === "AVAILABLE" ? (
+                <>
+                  <strong
+                    className={
+                      (period.portfolioReturn || 0) >= 0
+                        ? "positive"
+                        : "negative"
+                    }
+                  >
+                    {((period.portfolioReturn || 0) * 100).toFixed(2)}%
+                  </strong>
+                  <span>
+                    vs {performance.benchmark}{" "}
+                    {period.benchmarkReturn == null
+                      ? "unavailable"
+                      : `${(period.benchmarkReturn * 100).toFixed(2)}%`}
+                  </span>
+                  <em
+                    className={
+                      (period.alpha || 0) >= 0 ? "positive" : "negative"
+                    }
+                  >
+                    {period.alpha == null
+                      ? "Alpha pending"
+                      : `${period.alpha >= 0 ? "+" : ""}${(period.alpha * 100).toFixed(2)}% alpha`}
+                  </em>
+                </>
+              ) : (
+                <>
+                  <strong>—</strong>
+                  <span>
+                    {period.observations} complete snapshot
+                    {period.observations === 1 ? "" : "s"}
+                  </span>
+                  <em>More history required</em>
+                </>
+              )}
+            </article>
+          )) || (
+            <p className="command-empty">Performance history has not loaded.</p>
+          )}
+        </div>
+        <footer>
+          {performance?.method ||
+            "Complete account snapshots are required; deposits must not be mistaken for investment returns."}
+        </footer>
+      </section>
+      <div className="command-grid household-command-grid">
+        <section className="household-snapshot command-panel">
+          <header>
+            <div>
+              <span>HOUSEHOLD FINANCIAL SNAPSHOT</span>
+              <h3>Can the household safely invest more?</h3>
+            </div>
+            <button onClick={() => onNavigate("Household")}>
+              Open household →
+            </button>
+          </header>
+          <div>
+            <article>
+              <small>MONTHLY INCOME</small>
+              <b>{money(monthlyIncome * 100)}</b>
+            </article>
+            <article>
+              <small>MONTHLY SPENDING + DEBT</small>
+              <b>{money(monthlySpending * 100)}</b>
+            </article>
+            <article>
+              <small>FREE CASH FLOW</small>
+              <b className={incomeGap >= 0 ? "positive" : "negative"}>
+                {incomeGap >= 0 ? "+" : "−"}
+                {money(Math.abs(incomeGap) * 100)}
+              </b>
+            </article>
+            <article>
+              <small>EMERGENCY FUND</small>
+              <b>
+                {emergencyMonths === null
+                  ? "Needs data"
+                  : `${emergencyMonths.toFixed(1)} months`}
+              </b>
+            </article>
+            <article>
+              <small>SAFE INVESTMENT CAPACITY</small>
+              <b>
+                {money(
+                  guidance?.availableCashPlan.safeInvestmentCapacityCents || 0,
+                )}
+              </b>
+            </article>
+          </div>
+          <p>
+            {totalDebt > 0 || (emergencyMonths !== null && emergencyMonths < 6)
+              ? "Household safety overrides aggressive portfolio actions. Protect reserves and review expensive debt first."
+              : "No household safety block is currently detected from synchronized data."}
+          </p>
+        </section>
+        <section className="spending-watch command-panel">
+          <header>
+            <div>
+              <span>SPENDING WATCH</span>
+              <h3>Only material changes</h3>
+            </div>
+            <button onClick={() => onNavigate("Bills & cards")}>
+              Spending details →
+            </button>
+          </header>
+          {spendingWatch.length ? (
+            <ul>
+              {spendingWatch.map((item) => (
+                <li
+                  key={item.category}
+                  className={item.change > 0 ? "increase" : "decrease"}
+                >
+                  <b>{item.category}</b>
+                  <strong>
+                    {item.change >= 0 ? "+" : ""}
+                    {item.change.toFixed(0)}%
+                  </strong>
+                  <span>
+                    {item.message} Current 31 days: {money(item.current * 100)}.
+                  </span>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="command-empty">
+              No category moved at least 20% versus its five-month monthly
+              baseline, or more history is required.
+            </p>
+          )}
+        </section>
+      </div>
+      {density === "pro" && (
+        <section className="prediction-list command-panel">
+          <header>
+            <div>
+              <span>PREDICTION SUMMARY</span>
+              <h3>Only positions requiring stored forecast attention</h3>
+            </div>
+            <button onClick={() => onNavigate("Professional Charts")}>
+              Open charts →
+            </button>
+          </header>
+          {intelligence.predictions.length ? (
+            <div>
+              {intelligence.predictions.map((item) => (
+                <article key={item.id}>
+                  <b>
+                    {item.symbol}
+                    {item.name && item.name !== item.symbol
+                      ? ` · ${item.name}`
+                      : ""}
+                  </b>
+                  <span>{label(item.horizon)} base scenario</span>
+                  <strong>
+                    {item.lower_cents && item.upper_cents
+                      ? `${money(item.lower_cents, 2)}–${money(item.upper_cents, 2)}`
+                      : money(item.base_price_cents, 2)}
+                  </strong>
+                  <em>{item.confidence}% confidence</em>
+                </article>
+              ))}
+            </div>
+          ) : (
+            <p className="command-empty">
+              No current saved predictions for this account.
+            </p>
+          )}
+        </section>
+      )}
+    </div>
+  );
 }

@@ -1,24 +1,410 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
-import {useCallback,useEffect,useMemo,useRef,useState} from "react";
-type Row=Record<string,any>;
-const sections=["DISCOVERED_TODAY","RESEARCH_NOW","EARLY_WATCH","POSSIBLE_BUY_SETUP","REJECTED"] as const;
-const labels:Record<string,string>={DISCOVERED_TODAY:"Discovered today",EARLY_WATCH:"Early watch",RESEARCH_NOW:"Research now",POSSIBLE_BUY_SETUP:"Possible buy setup",REJECTED:"Rejected / why"};
-const scoreLabels:[string,string][]=[["business_quality","Business quality"],["growth_acceleration","Growth acceleration"],["catalyst","Catalyst"],["valuation","Valuation"],["technical_setup","Technical setup"],["risk","Risk"],["discovery_confidence","Discovery confidence"]];
-const fmt=(v:unknown,digits=1)=>Number.isFinite(Number(v))?Number(v).toLocaleString(undefined,{maximumFractionDigits:digits}):"—";
-const category=(value:unknown)=>String(value||"UNCLASSIFIED").replaceAll("_"," ");
-export default function NewCandidateDiscovery({onOpen}:{onOpen:(symbol:string)=>void}){const[rows,setRows]=useState<Row[]>([]),[run,setRun]=useState<Row|null>(null),[loading,setLoading]=useState(true),[scanning,setScanning]=useState(false),[error,setError]=useState(""),[search,setSearch]=useState(""),[strategy,setStrategy]=useState("ALL"),[sector,setSector]=useState("ALL"),[marketCap,setMarketCap]=useState("ALL"),[ipoAge,setIpoAge]=useState("ALL"),[minimumGrowth,setMinimumGrowth]=useState(0),[minimumConfidence,setMinimumConfidence]=useState(0),[discoveredWithin,setDiscoveredWithin]=useState("ALL"),[sort,setSort]=useState("NEWEST"),[expanded,setExpanded]=useState<string|null>(null),[history,setHistory]=useState<Row[]>([]),[scanMeta,setScanMeta]=useState<Row|null>(null),[nearMisses,setNearMisses]=useState<Row[]>([]),[scanMessage,setScanMessage]=useState(""),autoScanStarted=useRef(false);
- const load=useCallback(async()=>{setLoading(true);setError("");try{const response=await fetch(`/api/market/candidates/discovery?search=${encodeURIComponent(search)}&strategy=${strategy}`,{cache:"no-store"}),data=await response.json();if(!response.ok)throw new Error(data.error||"Discovery results unavailable");setRows(data.candidates||[]);setRun(data.run||null);setScanMeta(data.scan||null);setNearMisses(data.nearMisses||[])}catch(e){setError(e instanceof Error?e.message:"Discovery results unavailable")}finally{setLoading(false)}},[search,strategy]);
- useEffect(()=>{const timer=setTimeout(load,250);return()=>clearTimeout(timer)},[load]);
- useEffect(()=>{if(loading||error||rows.length||autoScanStarted.current||search.trim()||strategy!=="ALL"||run?.status==="RUNNING")return;autoScanStarted.current=true;setScanning(true);fetch("/api/market/candidates/discovery",{method:"POST",headers:{"Content-Type":"application/json"}}).then(async response=>{const data=await response.json();if(!response.ok)throw new Error(data.error||"Discovery scan failed");setScanMessage(data.status==="ALREADY_QUEUED"?"A market scan is already queued.":"Market scan queued. The server worker will process it even if this page closes.");await load()}).catch(e=>setError(e instanceof Error?e.message:"Discovery scan failed")).finally(()=>setScanning(false))},[loading,error,rows.length,run?.status,search,strategy,load]);
- const scan=async()=>{setScanning(true);setError("");try{const response=await fetch("/api/market/candidates/discovery",{method:"POST",headers:{"Content-Type":"application/json"}}),data=await response.json();if(!response.ok)throw new Error(data.error||"Discovery scan failed");setScanMessage(data.status==="ALREADY_QUEUED"?"A market scan is already queued.":"Market scan queued. The server worker will process it even if this page closes.");await load()}catch(e){setError(e instanceof Error?e.message:"Discovery scan failed")}finally{setScanning(false)}};
- const toggle=async(symbol:string)=>{if(expanded===symbol){setExpanded(null);return}setExpanded(symbol);setHistory([]);const response=await fetch(`/api/market-discovery?symbol=${encodeURIComponent(symbol)}`,{cache:"no-store"});if(response.ok)setHistory((await response.json()).history||[])};
- const sectors=useMemo(()=>[...new Set(rows.map(row=>String(row.sector||row.industry||"").trim()).filter(Boolean))].sort(),[rows]);
- const visible=useMemo(()=>{const now=Date.now(),cap=(row:Row)=>Number(row.metrics?.marketCap||0),ageDays=(value:unknown)=>value?Math.max(0,(now-new Date(String(value)).getTime())/86400000):Infinity,filtered=rows.filter(row=>(sector==="ALL"||row.sector===sector||row.industry===sector)&&(strategy==="ALL"||row.strategy_fit===strategy||row.strategy_fit==="BOTH")&&Number(row.growth_acceleration)>=minimumGrowth&&Number(row.discovery_confidence)>=minimumConfidence&&(marketCap==="ALL"||(marketCap==="SMALL"&&cap(row)>0&&cap(row)<2000)||(marketCap==="MID"&&cap(row)>=2000&&cap(row)<10000)||(marketCap==="LARGE"&&cap(row)>=10000))&&(ipoAge==="ALL"||(ipoAge==="24M"&&ageDays(row.ipo_date)<=730)||(ipoAge==="12M"&&ageDays(row.ipo_date)<=365)||(ipoAge==="ESTABLISHED"&&!row.ipo_date))&&(discoveredWithin==="ALL"||ageDays(row.first_detected_at)<=Number(discoveredWithin)));return filtered.sort((a,b)=>sort==="CONFIDENCE"?Number(b.discovery_confidence)-Number(a.discovery_confidence):sort==="GROWTH"?Number(b.growth_acceleration)-Number(a.growth_acceleration):sort==="VALUATION"?Number(b.valuation)-Number(a.valuation):sort==="SETUP"?Number(b.technical_setup)-Number(a.technical_setup):new Date(b.first_detected_at).getTime()-new Date(a.first_detected_at).getTime())},[rows,sector,strategy,minimumGrowth,minimumConfidence,marketCap,ipoAge,discoveredWithin,sort]);
- const grouped=useMemo(()=>Object.fromEntries(sections.map(section=>[section,visible.filter(row=>row.status===section)])),[visible]);
- return <section className="discovery-engine new-candidates-page" data-candidate-count={rows.length}> <header className="discovery-hero"><div><span>MARKET-WIDE · PORTFOLIO-INDEPENDENT</span><h2>New Candidate Discovery</h2><p>Find accelerating U.S. businesses before they become portfolio holdings or watchlist names. Recent IPOs are evaluated with lower confidence—not automatically excluded.</p></div><button onClick={scan} disabled={scanning}>{scanning?"Scanning market…":"Run market-wide scan"}</button></header>
- {scanMessage&&<div className="discovery-queue-status" role="status"><b>{scanMessage}</b><span>Results refresh from persisted storage; delivery does not depend on this browser tab.</span></div>}<div className="discovery-controls"><label>Search the discovery ledger<input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Ticker or company"/></label><label>Strategy fit<select value={strategy} onChange={e=>setStrategy(e.target.value)}><option value="ALL">Swing + 5–7 Year</option><option value="SWING">Swing</option><option value="LONG_TERM">5–7 Year</option></select></label><div><b>{run?.status||"No completed scan"}</b><small>{run?.completed_at?`Last market scan ${new Date(run.completed_at).toLocaleString()}`:"Waiting for the first persisted market scan"}</small><small>{run?`${fmt(run.universe_size,0)} in universe · ${fmt(run.screened_count,0)} evaluated · ${fmt(run.candidates_created,0)} candidates`:"Independent of portfolios and watchlists"}</small></div></div>
- <div className="discovery-filter-grid"><label>Sector<select value={sector} onChange={e=>setSector(e.target.value)}><option value="ALL">All sectors</option>{sectors.map(value=><option key={value}>{value}</option>)}</select></label><label>Market cap<select value={marketCap} onChange={e=>setMarketCap(e.target.value)}><option value="ALL">All sizes</option><option value="SMALL">Small (&lt; $2B)</option><option value="MID">Mid ($2B–$10B)</option><option value="LARGE">Large ($10B+)</option></select></label><label>IPO age<select value={ipoAge} onChange={e=>setIpoAge(e.target.value)}><option value="ALL">Any listing age</option><option value="12M">Public ≤ 12 months</option><option value="24M">Public ≤ 24 months</option><option value="ESTABLISHED">Established listing</option></select></label><label>Growth acceleration<select value={minimumGrowth} onChange={e=>setMinimumGrowth(Number(e.target.value))}><option value="0">Any score</option><option value="50">50+</option><option value="65">65+</option><option value="80">80+</option></select></label><label>Confidence<select value={minimumConfidence} onChange={e=>setMinimumConfidence(Number(e.target.value))}><option value="0">Any confidence</option><option value="50">50+</option><option value="65">65+</option><option value="75">75+</option></select></label><label>Discovered<select value={discoveredWithin} onChange={e=>setDiscoveredWithin(e.target.value)}><option value="ALL">Any date</option><option value="1">Today</option><option value="7">Past 7 days</option><option value="30">Past 30 days</option></select></label><label>Sort<select value={sort} onChange={e=>setSort(e.target.value)}><option value="NEWEST">Newest</option><option value="CONFIDENCE">Highest Confidence</option><option value="GROWTH">Growth Acceleration</option><option value="VALUATION">Best Valuation</option><option value="SETUP">Strongest Setup</option></select></label></div>
- {run&&<details className="discovery-operations"><summary>Market coverage, diversity, and provider diagnostics</summary><div><span><small>Full configured universe</small><b>{fmt(run.universe_size,0)}</b></span><span><small>Rotating batch evaluated</small><b>{fmt(run.screened_count,0)}</b></span><span><small>Fundamentals available</small><b>{fmt(run.coverage?.companiesWithFundamentals,0)}</b></span><span><small>Recent IPOs scanned</small><b>{fmt(run.coverage?.recentIpos,0)}</b></span><span><small>Accepted / rejected</small><b>{fmt(run.candidates_created,0)} / {fmt(run.rejected_count,0)}</b></span><span><small>AI analysis failures</small><b>{fmt(run.ai_analysis_failures,0)}</b></span></div>{run.coverage?.capBuckets&&<p><b>Market-cap coverage:</b> {Object.entries(run.coverage.capBuckets).map(([key,value])=>`${key} ${value}`).join(" · ")}</p>}{run.coverage?.categories&&<p><b>Independent buckets represented:</b> {Object.entries(run.coverage.categories).map(([key,value])=>`${category(key)} ${value}`).join(" · ")}</p>}{run.concentration_warning&&<p className="scan-provider-error"><b>{run.concentration_warning}</b></p>}{run.error_code&&<p>Candidate scan unavailable — {run.error_code} · failed {new Date(run.completed_at||run.started_at).toLocaleString()}</p>}</details>}
- {error&&<div className="discovery-error"><b>Candidate discovery unavailable</b><span>{error}</span>{scanMeta?.lastSuccessfulScan&&<small>Last successful scan: {new Date(scanMeta.lastSuccessfulScan).toLocaleString()}</small>}</div>}\n {!loading&&scanMeta&&<section className="discovery-scan-status"><header><div><span>SERVER SCAN STATUS</span><h3>{scanMeta.status==="NEVER_RUN"?"Candidate discovery has not run yet":scanMeta.status==="FAILED"?"Latest scan failed":`${fmt(rows.filter(row=>row.status!=="REJECTED").length,0)} persisted candidates available`}</h3></div><button onClick={scan} disabled={scanning}>{scanning?"Queueing…":scanMeta.status==="NEVER_RUN"?"Run Scan":"Refresh Scan"}</button></header><div><span><small>Last successful scan</small><b>{scanMeta.lastSuccessfulScan?new Date(scanMeta.lastSuccessfulScan).toLocaleString():"Never"}</b></span><span><small>Universe scanned</small><b>{fmt(scanMeta.universeSize,0)}</b></span><span><small>Companies evaluated</small><b>{fmt(scanMeta.companiesEvaluated,0)}</b></span><span><small>Accepted / rejected</small><b>{fmt(scanMeta.candidatesAccepted,0)} / {fmt(scanMeta.candidatesRejected,0)}</b></span><span><small>Minimum confidence</small><b>{fmt(scanMeta.minimumConfidence,0)}%</b></span></div>{scanMeta.providerErrors?.length>0&&<p className="scan-provider-error">Market provider error: {typeof scanMeta.providerErrors==="string"?scanMeta.providerErrors:JSON.stringify(scanMeta.providerErrors)}</p>}{scanMeta.aiAnalysisFailures>0&&<p className="scan-ai-error">AI analysis failures: {scanMeta.aiAnalysisFailures}</p>}</section>}
- {!loading&&rows.filter(row=>row.status!=="REJECTED").length===0&&nearMisses.length>0&&<section className="discovery-near-misses"><header><span>TOP NEAR MISSES</span><h3>No company currently passes the configured quality threshold.</h3><p>These companies were retained for auditability and show why they were rejected.</p></header>{nearMisses.map(row=><article key={`near_${row.symbol}`}><b>{row.symbol} · {row.company_name}</b><span>{row.rejected_reason||"Confidence or independent evidence remained below the acceptance threshold."}</span><em>{fmt(row.discovery_confidence,0)}% confidence</em></article>)}</section>}\n {loading?<div className="discovery-skeleton" aria-label="Loading market discoveries">{Array.from({length:5},(_,i)=><i key={i}/>)}</div>:rows.length===0?<div className="discovery-empty"><b>{scanMeta?.status==="NEVER_RUN"?"Candidate discovery has not run yet":"No company currently passes the configured quality threshold."}</b><span>{scanMeta?.status==="NEVER_RUN"?"Run the server-side market scan to create the first persisted discovery ledger.":"The completed scan returned no stored records for these filters. Northstar will not fabricate candidates."}</span><button onClick={scan} disabled={scanning}>{scanning?"Queueing scan…":"Run Scan"}</button></div>:sections.map(section=>grouped[section].length?<section className={`discovery-section status-${section.toLowerCase()}`} key={section}><header><div><span>{String(grouped[section].length).padStart(2,"0")}</span><h3>{labels[section]}</h3></div><p>{section==="REJECTED"?"Candidates retained for auditability, with the failed risk or evidence test shown.":section==="POSSIBLE_BUY_SETUP"?"Research candidates with aligned evidence—not automatic trade orders.":"Evidence-ranked candidates awaiting the next confirmation step."}</p></header><div className="discovery-list">{grouped[section].map((row:Row)=><article key={row.symbol} className={expanded===row.symbol?"expanded":""}><button className="candidate-summary" onClick={()=>toggle(row.symbol)}><span className="candidate-symbol">{row.symbol}<small>{row.exchange||"U.S."}</small></span><span className="candidate-name"><b>{row.company_name}</b><small>{category(row.discovery_category)} · {row.sector||row.industry||"Sector pending"} · {row.ipo_date?`Recent IPO · ${new Date(row.ipo_date).toLocaleDateString()}`:"Established public listing"} · {row.strategy_fit.replace("_"," / ")}</small></span><span className="candidate-market"><b>${fmt(row.metrics?.price,2)}</b><small className={Number(row.metrics?.dayChange)>=0?"positive":"negative"}>{Number(row.metrics?.dayChange)>=0?"+":""}{fmt(row.metrics?.dayChange,2)}% today</small></span><span className="candidate-reason"><b>{row.why_found}</b><small>{(row.changed_recently||[]).slice(0,2).join(" · ")||"Provider-backed quantitative evidence"}</small></span><span className="candidate-confidence"><b>{row.discovery_confidence}</b><small>confidence</small></span><i>{expanded===row.symbol?"−":"+"}</i></button>{expanded===row.symbol&&<div className="candidate-detail"><div className="score-strip">{scoreLabels.map(([key,label])=><div className={key==="risk"?"risk-score":""} key={key}><small>{label}</small><b>{row[key]}<em>/100</em></b><span><i style={{width:`${row[key]}%`}}/></span></div>)}</div><div className="candidate-evidence"><section><h4>Why did Northstar discover this?</h4><p><b>{category(row.discovery_category)}</b> · Company quality {fmt(row.scores?.businessQuality,0)}/100 · Entry attractiveness {fmt(row.scores?.entryAttractiveness,0)}/100 · Hotness/crowding risk {fmt(row.hotness_crowding,0)}/100.</p><h4>Why is this not already hot?</h4><p>{row.underfollowed_reason||"No underfollowed claim was made; the evidence bucket qualified independently of popularity."}</p><h4>What changed recently</h4>{row.changed_recently?.length?<ul>{row.changed_recently.map((x:string,i:number)=><li key={i}>{x}</li>)}</ul>:<p>No material text signal passed the inflection phrase filter; ranking comes from market/fundamental evidence.</p>}<h4>Key metrics</h4><dl><div><dt>Revenue growth</dt><dd>{fmt(row.metrics?.revenueGrowth)}%</dd></div><div><dt>EPS growth</dt><dd>{fmt(row.metrics?.epsGrowth)}%</dd></div><div><dt>Gross margin</dt><dd>{fmt(row.metrics?.grossMargin)}%</dd></div><div><dt>Relative volume</dt><dd>{fmt(row.metrics?.relativeVolume)}×</dd></div><div><dt>20-day return</dt><dd>{fmt(row.metrics?.return20)}%</dd></div><div><dt>Dollar volume</dt><dd>${fmt((row.metrics?.averageDollarVolume||0)/1e6)}M</dd></div></dl></section><section><h4>Valuation and technical context</h4><p>{row.valuation_data?.context}</p><dl><div><dt>Current price</dt><dd>${fmt(row.metrics?.price,2)}</dd></div><div><dt>Entry zone</dt><dd>${fmt(row.technical?.entryZoneLow,2)}–${fmt(row.technical?.entryZoneHigh,2)}</dd></div><div><dt>Invalidation</dt><dd>${fmt(row.technical?.invalidation,2)}</dd></div><div><dt>Forward P/E</dt><dd>{fmt(row.valuation_data?.forwardPE)}×</dd></div></dl><h4>Principal risks</h4>{row.risks?.length?<ul>{row.risks.map((x:string,i:number)=><li key={i}>{x}</li>)}</ul>:<p>No elevated modeled risk flag; SEC filings and company-specific risks still require review.</p>}{row.rejected_reason&&<p className="rejected-reason"><b>Rejected:</b> {row.rejected_reason}</p>}</section></div><div className="candidate-actions"><button onClick={()=>onOpen(row.symbol)}>Open full {row.symbol} research →</button><span>First detected {new Date(row.first_detected_at).toLocaleString()} · Latest evidence {new Date(row.source_as_of).toLocaleString()}</span></div><section className="thesis-history"><h4>Thesis evolution</h4>{history.length?<ol>{history.map(item=><li key={item.id}><time>{new Date(item.created_at).toLocaleString()}</time><b>{item.status.replaceAll("_"," ")} · {item.scores?.discoveryConfidence}% confidence</b><span>{item.thesis}</span></li>)}</ol>:<p>Loading immutable discovery history…</p>}</section></div>}</article>)}</div></section>:null)}
- <footer className="discovery-method"><b>How this differs from a watchlist screener</b><p>The engine starts with the active U.S. equity directory and a dedicated previous-24-month IPO universe, rotates through the broad market, then spends fundamental/news requests only on quantitative and event-driven finalists. A “possible buy setup” is a research state, never certainty or an order.</p></footer></section>}
+import { useCallback, useEffect, useMemo, useState } from "react";
+type Row = Record<string, any>;
+const order = [
+  "BUY_DECISION_READY",
+  "CONDITIONAL_BUY",
+  "GOOD_BUY_BUILD",
+  "WATCH_FOR_BETTER_ENTRY",
+  "EARLY_WATCH",
+  "REJECTED_NOT_SUITABLE",
+];
+const labels: Record<string, string> = {
+  BUY_DECISION_READY: "🟢 Buy now — full evidence passed",
+  CONDITIONAL_BUY: "🟡 Buy only when the trigger confirms",
+  GOOD_BUY_BUILD: "🔵 Good buy / build",
+  WATCH_FOR_BETTER_ENTRY: "🟡 Watch for better entry",
+  EARLY_WATCH: "🔵 Early watch",
+  REJECTED_NOT_SUITABLE: "🔻 Rejected / not suitable",
+};
+const fmt = (value: any, digits = 1) =>
+  Number.isFinite(Number(value))
+    ? Number(value).toLocaleString(undefined, { maximumFractionDigits: digits })
+    : "—";
+export default function NewCandidateDiscovery({
+  onOpen,
+  accountId,
+  accountName,
+  accountStrategy,
+}: {
+  onOpen: (symbol: string) => void;
+  accountId: string;
+  accountName: string;
+  accountStrategy: string;
+}) {
+  const [rows, setRows] = useState<Row[]>([]),
+    [scan, setScan] = useState<Row | null>(null),
+    [account, setAccount] = useState<Row | null>(null),
+    [lookup, setLookup] = useState<Row | null>(null),
+    [search, setSearch] = useState(""),
+    [submitted, setSubmitted] = useState(""),
+    [sort, setSort] = useState("ACCOUNT"),
+    [loading, setLoading] = useState(true),
+    [busy, setBusy] = useState(false),
+    [error, setError] = useState("");
+  const load = useCallback(
+    async (symbol = "") => {
+      setLoading(true);
+      setError("");
+      try {
+        const response = await fetch(
+            `/api/market/candidates/discovery?accountId=${encodeURIComponent(accountId)}&strategy=ALL&search=${encodeURIComponent(symbol)}`,
+            { cache: "no-store" },
+          ),
+          data = await response.json();
+        if (!response.ok)
+          throw new Error(data.error || "Candidate ranking unavailable");
+        setRows(data.candidates || []);
+        setScan(data.scan || null);
+        setAccount(data.account || null);
+        setLookup(data.lookup || null);
+      } catch (reason) {
+        setError(
+          reason instanceof Error
+            ? reason.message
+            : "Candidate ranking unavailable",
+        );
+      } finally {
+        setLoading(false);
+      }
+    },
+    [accountId],
+  );
+  useEffect(() => {
+    if (accountId) void load();
+  }, [load, accountId]);
+  const ranked = useMemo(
+    () =>
+      rows
+        .slice()
+        .sort((a, b) =>
+          sort === "CONFIDENCE"
+            ? Number(b.discovery_confidence) - Number(a.discovery_confidence)
+            : sort === "VALUE"
+              ? Number(b.valuation) - Number(a.valuation)
+              : sort === "GROWTH"
+                ? Number(b.growth_acceleration) - Number(a.growth_acceleration)
+                : sort === "SWING"
+                  ? Number(b.technical_setup) +
+                    Number(b.portfolio_fit) -
+                    Number(a.technical_setup) -
+                    Number(a.portfolio_fit)
+                  : sort === "LONG"
+                    ? Number(b.business_quality) +
+                      Number(b.valuation) +
+                      Number(b.portfolio_fit) -
+                      Number(a.business_quality) -
+                      Number(a.valuation) -
+                      Number(a.portfolio_fit)
+                    : sort === "UNDERFOLLOWED"
+                      ? Number(Boolean(b.underfollowed_reason)) -
+                        Number(Boolean(a.underfollowed_reason))
+                      : sort === "NEWEST"
+                        ? new Date(b.first_detected_at).getTime() -
+                          new Date(a.first_detected_at).getTime()
+                        : Number(b.account_rank_score) -
+                          Number(a.account_rank_score),
+        ),
+    [rows, sort],
+  );
+  const grouped = Object.fromEntries(
+    order.map((key) => [
+      key,
+      ranked.filter((row) => row.account_rank_label === key),
+    ]),
+  );
+  const queue = async () => {
+    setBusy(true);
+    try {
+      const response = await fetch("/api/market/candidates/discovery", {
+          method: "POST",
+        }),
+        data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Could not queue scan");
+      await load(submitted);
+    } catch (reason) {
+      setError(
+        reason instanceof Error ? reason.message : "Could not queue scan",
+      );
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <section className="account-candidate-ranking">
+      <header className="discovery-hero">
+        <div>
+          <span>ACCOUNT-SPECIFIC MARKET DISCOVERY · Top opportunity ranking</span>
+          <h2>Best opportunities for {account?.name || accountName}</h2>
+          <p>
+            {account?.strategy || accountStrategy} · ranked using candidate
+            evidence plus this account’s holdings, cash, concentration and risk
+            context.
+          </p>
+        </div>
+        <button disabled={busy} onClick={queue}>
+          {busy ? "Queueing…" : "Refresh market scan"}
+        </button>
+      </header>
+      <section className="candidate-coverage">
+        <span>
+          <small>Universe scanned</small>
+          <b>{fmt(scan?.universeSize, 0)}</b>
+        </span>
+        <span>
+          <small>Companies evaluated</small>
+          <b>{fmt(scan?.companiesEvaluated, 0)}</b>
+        </span>
+        <span>
+          <small>Accepted</small>
+          <b>{fmt(scan?.candidatesAccepted, 0)}</b>
+        </span>
+        <span>
+          <small>Rejected</small>
+          <b>{fmt(scan?.candidatesRejected, 0)}</b>
+        </span>
+        <span>
+          <small>Last scan</small>
+          <b>
+            {scan?.lastSuccessfulScan
+              ? new Date(scan.lastSuccessfulScan).toLocaleString()
+              : "Never"}
+          </b>
+        </span>
+        <span>
+          <small>Provider status</small>
+          <b>{scan?.errorCode ? "ERROR" : scan?.status || "UNKNOWN"}</b>
+        </span>
+      </section>
+      <div className="candidate-tools">
+        <form
+          onSubmit={(event) => {
+            event.preventDefault();
+            const symbol = search.trim().toUpperCase();
+            setSubmitted(symbol);
+            void load(symbol);
+          }}
+        >
+          <label>
+            Why is this not in the list?
+            <input
+              value={search}
+              onChange={(event) =>
+                setSearch(
+                  event.target.value
+                    .toUpperCase()
+                    .replace(/[^A-Z0-9.-]/g, "")
+                    .slice(0, 12),
+                )
+              }
+              placeholder="CIEN"
+            />
+          </label>
+          <button disabled={!search.trim()}>Explain ticker</button>
+        </form>
+        <label>
+          Sort
+          <select
+            value={sort}
+            onChange={(event) => setSort(event.target.value)}
+          >
+            <option value="ACCOUNT">Best for this account</option>
+            <option value="CONFIDENCE">Highest confidence</option>
+            <option value="VALUE">Best value</option>
+            <option value="GROWTH">Best growth</option>
+            <option value="SWING">Best swing</option>
+            <option value="LONG">Best long-term</option>
+            <option value="UNDERFOLLOWED">Most underfollowed</option>
+            <option value="NEWEST">Newest discovered</option>
+          </select>
+        </label>
+      </div>
+      {lookup && (
+        <section
+          className={`candidate-lookup lookup-${String(lookup.status).toLowerCase()}`}
+        >
+          <header>
+            <div>
+              <span>MANUAL TICKER EXPLANATION</span>
+              <h3>
+                {lookup.symbol} · {String(lookup.status).replaceAll("_", " ")}
+              </h3>
+            </div>
+            <strong>{lookup.scanned ? "Scanned: YES" : "Scanned: NO"}</strong>
+          </header>
+          {lookup.candidate ? (
+            <div className="lookup-scores">
+              {[
+                ["Fundamental quality", lookup.candidate.business_quality],
+                ["Growth", lookup.candidate.growth_acceleration],
+                ["Valuation", lookup.candidate.valuation],
+                ["Technical setup", lookup.candidate.technical_setup],
+                ["Portfolio fit", lookup.candidate.portfolio_fit],
+              ].map(([name, value]) => (
+                <span key={String(name)}>
+                  <small>{name}</small>
+                  <b>{fmt(value, 0)}</b>
+                </span>
+              ))}
+            </div>
+          ) : null}
+          <p>
+            <b>Why:</b> {lookup.reason}
+          </p>
+          <p>
+            <b>What would make it actionable:</b> {lookup.becomesActionable}
+          </p>
+          {lookup.candidate && (
+            <button onClick={() => onOpen(lookup.symbol)}>
+              Open complete analysis →
+            </button>
+          )}
+        </section>
+      )}
+      {error && (
+        <div className="discovery-error">
+          <b>Candidate ranking unavailable</b>
+          <span>{error}</span>
+        </div>
+      )}
+      {loading ? (
+        <div className="discovery-skeleton">
+          {Array.from({ length: 5 }, (_, index) => (
+            <i key={index} />
+          ))}
+        </div>
+      ) : rows.length === 0 && !lookup ? (
+        <div className="discovery-empty">
+          <b>No persisted candidate currently matches this account.</b>
+          <span>
+            The page will not invent results. Review scan coverage or queue a
+            fresh server scan.
+          </span>
+        </div>
+      ) : (
+        order.map((section) =>
+          grouped[section]?.length ? (
+            <section
+              className={`ranked-candidate-section rank-${section.toLowerCase()}`}
+              key={section}
+            >
+              <header>
+                <h3>{labels[section]}</h3>
+                <span>
+                  {grouped[section].length} candidate
+                  {grouped[section].length === 1 ? "" : "s"}
+                </span>
+              </header>
+              <div>
+                {grouped[section].map((row: Row) => (
+                  <article key={row.symbol}>
+                    <div className="candidate-rank">
+                      <b>#{row.account_rank}</b>
+                      <small>{row.account_rank_score}/100</small>
+                    </div>
+                    <div className="candidate-identity">
+                      <h4>
+                        {row.symbol} · {row.company_name}
+                      </h4>
+                      <span>
+                        {row.sector || row.industry || "Sector unavailable"} ·{" "}
+                        {String(
+                          row.discovery_category || "Research",
+                        ).replaceAll("_", " ")}
+                      </span>
+                      <strong>
+                        ${fmt(row.metrics?.price, 2)}{" "}
+                        <small>
+                          {row.metrics?.dayChange >= 0 ? "+" : ""}
+                          {fmt(row.metrics?.dayChange, 2)}%
+                        </small>
+                      </strong>
+                    </div>
+                    <section
+                      className={`candidate-decision decision-${String(row.ai_action).toLowerCase().replaceAll(" ", "-")}`}
+                    >
+                      <div>
+                        <small>Completed Northstar decision</small>
+                        <strong>{row.ai_action}</strong>
+                      </div>
+                      {(row.ai_action === "BUY NOW" ||
+                        row.ai_action === "BUY IF") && (
+                        <div className="candidate-order-math">
+                          <span>
+                            <b>{fmt(row.suggested_shares, 0)}</b> shares
+                          </span>
+                          <span>
+                            <b>${fmt(row.trigger_price, 2)}</b>{" "}
+                            {row.ai_action === "BUY IF"
+                              ? "trigger"
+                              : "current price"}
+                          </span>
+                          <span>
+                            <b>${fmt(row.estimated_cost, 2)}</b> estimated cost
+                          </span>
+                          <span>
+                            <b>${fmt(row.invalidation_price, 2)}</b>{" "}
+                            invalidation
+                          </span>
+                        </div>
+                      )}
+                      <p>{row.decision_condition}</p>
+                    </section>
+                    <dl>
+                      <div>
+                        <dt>Confidence</dt>
+                        <dd>{fmt(row.discovery_confidence, 0)}%</dd>
+                      </div>
+                      <div>
+                        <dt>Fundamental quality</dt>
+                        <dd>{fmt(row.business_quality, 0)}</dd>
+                      </div>
+                      <div>
+                        <dt>Valuation</dt>
+                        <dd>{fmt(row.valuation, 0)}</dd>
+                      </div>
+                      <div>
+                        <dt>Technical setup</dt>
+                        <dd>{fmt(row.technical_setup, 0)}</dd>
+                      </div>
+                      <div>
+                        <dt>Portfolio fit</dt>
+                        <dd>{fmt(row.portfolio_fit, 0)}</dd>
+                      </div>
+                      <div>
+                        <dt>Risk</dt>
+                        <dd>{fmt(row.risk, 0)}</dd>
+                      </div>
+                      <div>
+                        <dt>Entry attractiveness</dt>
+                        <dd>{fmt(row.entry_attractiveness, 0)}</dd>
+                      </div>
+                    </dl>
+                    <p>
+                      <b>Why it ranks here:</b> {row.why_ranked}
+                    </p>
+                    <p>
+                      <b>Why it could fail:</b> {row.why_fail}
+                    </p>
+                    <footer>
+                      <span>
+                        {row.account_strategy} · data{" "}
+                        {row.source_as_of
+                          ? new Date(row.source_as_of).toLocaleString()
+                          : "timestamp unavailable"}
+                      </span>
+                      <button onClick={() => onOpen(row.symbol)}>
+                        Analyze →
+                      </button>
+                    </footer>
+                  </article>
+                ))}
+              </div>
+            </section>
+          ) : null,
+        )
+      )}
+    </section>
+  );
+}

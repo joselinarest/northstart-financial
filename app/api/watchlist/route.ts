@@ -152,13 +152,11 @@ export async function POST(request: Request) {
 export async function DELETE(request: Request) {
   try {
     const { db, householdId } = await workspace(request),
-      body = (await request.json()) as { id?: string };
-    if (!body.id)
-      return Response.json({ error: "id required" }, { status: 400 });
-    await db
-      .prepare("DELETE FROM market_watchlist WHERE id=? AND household_id=?")
-      .bind(body.id, householdId)
-      .run();
+      body = (await request.json()) as { id?: string; symbol?: string };
+    if (!body.id&&!body.symbol)
+      return Response.json({ error: "id or symbol required" }, { status: 400 });
+    if(body.symbol)await db.prepare("DELETE FROM market_watchlist WHERE household_id=? AND symbol=?").bind(householdId,symbolOf(body.symbol)).run();
+    else await db.prepare("DELETE FROM market_watchlist WHERE id=? AND household_id=?").bind(body.id,householdId).run();
     return Response.json({ ok: true });
   } catch (error) {
     if (error instanceof Response) return error;
