@@ -999,4 +999,27 @@ export const migrations: readonly Migration[] = [
       `CREATE INDEX IF NOT EXISTS idx_discovery_category_confidence ON market_discovery_candidates(discovery_category,discovery_confidence DESC)`,
       `CREATE INDEX IF NOT EXISTS idx_discovery_cap_bucket ON market_discovery_candidates(cap_bucket,discovery_confidence DESC)`,
     ],
+  },
+  {
+    id: "0036_portfolio_builder_goals",
+    description: "Confirmed account-specific goal profiles, feasibility, construction, stress tests, and monitoring",
+    statements: [
+      `CREATE TABLE IF NOT EXISTS portfolio_goal_profiles (
+        id TEXT PRIMARY KEY, household_id TEXT NOT NULL REFERENCES households(id) ON DELETE CASCADE,
+        investment_account_id TEXT NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+        goal_name TEXT NOT NULL, beneficiary TEXT, strategy_type TEXT NOT NULL,
+        status TEXT NOT NULL DEFAULT 'DRAFT' CHECK(status IN ('DRAFT','CONFIRMED','ACTIVE','PAUSED','COMPLETED')),
+        target_amount_cents BIGINT NOT NULL, target_date DATE NOT NULL, current_capital_cents BIGINT NOT NULL DEFAULT 0,
+        monthly_contribution_cents BIGINT NOT NULL DEFAULT 0, annual_lump_sum_cents BIGINT NOT NULL DEFAULT 0,
+        risk_tolerance TEXT NOT NULL, risk_capacity TEXT NOT NULL, max_drawdown_bps INTEGER NOT NULL,
+        liquidity_needs_cents BIGINT NOT NULL DEFAULT 0, minimum_cash_reserve_cents BIGINT NOT NULL DEFAULT 0,
+        account_constraints_json JSONB NOT NULL DEFAULT '{}'::jsonb, assumptions_json JSONB NOT NULL,
+        allocation_json JSONB NOT NULL, securities_json JSONB NOT NULL, feasibility_json JSONB NOT NULL,
+        stress_tests_json JSONB NOT NULL, monitoring_json JSONB NOT NULL, source_description TEXT,
+        confirmed_at TIMESTAMPTZ, last_analyzed_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP, updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+      )`,
+      `CREATE INDEX IF NOT EXISTS idx_portfolio_goals_account ON portfolio_goal_profiles(investment_account_id,status,updated_at DESC)`,
+      `CREATE INDEX IF NOT EXISTS idx_portfolio_goals_household ON portfolio_goal_profiles(household_id,status,updated_at DESC)`,
+    ],
   },] as const;
