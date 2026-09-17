@@ -139,7 +139,8 @@ export async function POST(request: Request) {
   await db.prepare("UPDATE worker_heartbeats SET status='IDLE',jobs_succeeded=jobs_succeeded+?,jobs_failed=jobs_failed+?,metadata_json=?,heartbeat_at=CURRENT_TIMESTAMP WHERE worker_name='aws-market-worker'").bind(jobsCompleted,jobsFailed,JSON.stringify({minuteBucket,session,jobsProcessed:jobs.results.length})).run();
   const deliveries = await db.prepare(`WITH claimable AS (
       SELECT d.id FROM alert_deliveries d JOIN alerts a ON a.id=d.alert_id
-      WHERE d.available_at<=CURRENT_TIMESTAMP AND (
+      WHERE d.available_at<=CURRENT_TIMESTAMP
+        AND (SELECT COUNT(*) FROM notification_delivery_attempts ax WHERE ax.delivery_id=d.id)<5 AND (
         d.status='QUEUED' OR
         (d.status='FAILED' AND NOT EXISTS(SELECT 1 FROM notification_delivery_attempts x WHERE x.delivery_id=d.id AND x.next_retry_at>CURRENT_TIMESTAMP)) OR
         (d.status='SENT' AND d.attempted_at<CURRENT_TIMESTAMP-INTERVAL '5 minutes' AND EXISTS(
@@ -164,7 +165,10 @@ export async function POST(request: Request) {
         .bind(row.id)
         .first<{ count: string }>(),
       attempt = Number(prior?.count || 0) + 1;
-    if (attempt > 5) continue;
+    if (attempt > 5) {
+      await db.prepare("UPDATE alert_deliveries SET status='FAILED',error_code=COALESCE(error_code,'PERMANENT_RETRY_LIMIT') WHERE id=?").bind(row.id).run();
+      continue;
+    }
     const attemptId = id("delivery_attempt");
     await db.batch([
       db
