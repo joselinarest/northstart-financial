@@ -7245,6 +7245,50 @@ export function NorthstarWorkspace({
             </section>
           )}
           {tab === "Daily Action Plan" && (
+            <section className="options-advisor-entry card">
+              <header>
+                <div>
+                  <span>OPTIONS · CALLS AND PUTS</span>
+                  <h2>Account-specific options suggestions</h2>
+                  <p>
+                    Compare a defined-risk CALL and PUT using the selected account,
+                    current option-chain liquidity, Greeks, premium risk, and the
+                    underlying Swing thesis.
+                  </p>
+                </div>
+                <b>{swingAdvisorAccount ? swingAdvisorName : "ACCOUNT REQUIRED"}</b>
+              </header>
+              {swingAdvisorAccount ? (
+                <SwingOptionsAdvisor
+                  accountId={String(swingAdvisorAccount.id)}
+                  accountName={String(
+                    swingAdvisorAccount.nickname ||
+                      swingAdvisorAccount.official_name ||
+                      swingAdvisorAccount.name ||
+                      "Swing account",
+                  )}
+                  accessToken={accessToken}
+                  initialSymbol={String(
+                    swingAdvisorHoldings[0]?.ticker ||
+                      swingAdvisorHoldings[0]?.symbol ||
+                      "SPY",
+                  )}
+                />
+              ) : (
+                <div className="purpose-empty" id="options-advisor">
+                  <b>Select a Swing, Options, or Mixed investment account.</b>
+                  <span>
+                    The options advisor remains visible, but it cannot calculate a
+                    contract or premium risk without a specific eligible account.
+                  </span>
+                  <button onClick={() => navigate("Accounts")}>
+                    Configure an eligible account →
+                  </button>
+                </div>
+              )}
+            </section>
+          )}
+          {tab === "Daily Action Plan" && (
             <MarketSessionReport marketOpen={marketPhase === "open"} />
           )}
           {tab === "Daily Action Plan" && (
@@ -7339,14 +7383,8 @@ export function NorthstarWorkspace({
               }
             />
           )}
-          {tab === "Daily Action Plan" && swingAdvisorAccount && (
-            <SwingOptionsAdvisor
-              accountId={String(swingAdvisorAccount.id)}
-              accountName={String(swingAdvisorAccount.nickname || swingAdvisorAccount.official_name || swingAdvisorAccount.name || "Swing account")}
-              accessToken={accessToken}
-              initialSymbol={String(swingAdvisorHoldings[0]?.ticker || swingAdvisorHoldings[0]?.symbol || "SPY")}
-            />
-          )}
+
+
           {tab === "Daily Action Plan" && (
             <AutomaticMarketCopilot
               accessToken={accessToken}

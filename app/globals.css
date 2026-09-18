@@ -18380,3 +18380,5 @@ footer {
     grid-template-columns: repeat(2, 1fr);
   }
 }
+
+.options-advisor-entry{border:2px solid #18785b!important;background:#fff;overflow:hidden}.options-advisor-entry>header{display:flex;align-items:flex-start;justify-content:space-between;gap:18px;padding:16px 18px;background:#eaf6f1;border-bottom:1px solid #c9ddd4}.options-advisor-entry>header span{color:#08775a;font-size:.6rem;font-weight:900;letter-spacing:.11em}.options-advisor-entry>header h2{margin:4px 0;font:1.2rem Georgia}.options-advisor-entry>header p{max-width:850px;margin:0;color:#586d63;font-size:.65rem;line-height:1.45}.options-advisor-entry>header>b{flex:0 0 auto;padding:7px 10px;border-radius:99px;background:#17382d;color:#fff;font-size:.58rem}.options-advisor-entry>.option-contract-advisor{margin:0;border:0;border-radius:0}.options-advisor-entry .option-advisor-head h2{margin:5px 0;font:1.12rem Georgia}.options-advisor-entry>.purpose-empty{margin:16px}@media(max-width:650px){.options-advisor-entry>header{flex-direction:column;padding:14px}.options-advisor-entry>header>b{align-self:flex-start}.options-advisor-entry>.purpose-empty{margin:10px}}

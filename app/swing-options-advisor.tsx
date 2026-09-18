@@ -97,7 +97,7 @@ export default function SwingOptionsAdvisor({
     }
   };
 
-  return <section className="option-contract-advisor swing-options-advisor">
+  return <section id="options-advisor" className="option-contract-advisor swing-options-advisor">
     <div className="option-advisor-head">
       <div>
         <span>SWING ACCOUNT · CALL / PUT DECISION SUPPORT</span>

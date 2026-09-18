@@ -533,20 +533,38 @@ export default function InvestmentCommandCenter({
             every transaction.
           </p>
         </div>
-        <div className="density-toggle" aria-label="Dashboard density">
-          <button
-            className={density === "simple" ? "active" : ""}
-            onClick={() => setMode("simple")}
-          >
-            Simple
-          </button>
-          <button
-            className={density === "pro" ? "active" : ""}
-            onClick={() => setMode("pro")}
-          >
-            Pro
-          </button>
+        <div className="view-mode-control">
+          <span className="view-mode-label">VIEW</span>
+          <div className="density-toggle" aria-label="Investment analysis detail level">
+            <button
+              className={density === "simple" ? "active" : ""}
+              onClick={() => setMode("simple")}
+              aria-pressed={density === "simple"}
+            >
+              Simple
+            </button>
+            <button
+              className={density === "pro" ? "active" : ""}
+              onClick={() => setMode("pro")}
+              aria-pressed={density === "pro"}
+            >
+              Pro
+            </button>
+          </div>
+          <small>
+            {density === "simple"
+              ? "Essential decisions: what to do, why, cash, and risk."
+              : "Full research: holdings, allocation, evidence, events, history, and forecasts."}
+          </small>
         </div>
+      </div>
+      <div className={`view-mode-summary ${density}`} role="status">
+        <b>{density === "simple" ? "SIMPLE DECISION VIEW" : "PRO RESEARCH VIEW"}</b>
+        <span>
+          {density === "simple"
+            ? "Focused on today’s account-level actions and household safety. Switch to Pro for the complete analytical record."
+            : "Showing the complete account analysis, including every holding, allocation gaps, catalysts, audit history, and saved predictions."}
+        </span>
       </div>
       {error && <div className="command-error">{error}</div>}
       <section className="command-metrics" aria-label="Financial summary">
