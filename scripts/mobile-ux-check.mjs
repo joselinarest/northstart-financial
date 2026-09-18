@@ -1,9 +1,11 @@
 import {readFile} from "node:fs/promises";
 
-const [workspace,styles,confirmation]=await Promise.all([
+const [workspace,styles,confirmation,predictionStyles,responsiveStyles]=await Promise.all([
   readFile(new URL("../app/northstar-workspace.tsx",import.meta.url),"utf8"),
   readFile(new URL("../app/design-system.css",import.meta.url),"utf8"),
   readFile(new URL("../app/confirmation-modal.tsx",import.meta.url),"utf8"),
+  readFile(new URL("../app/professional-prediction-overlay.css",import.meta.url),"utf8"),
+  readFile(new URL("../app/responsive-mobile.css",import.meta.url),"utf8"),
 ]);
 const checks=[
   ["five mobile destinations",/["']Today["']/.test(workspace)&&/["']Portfolio["']/.test(workspace)&&/["']Markets["']/.test(workspace)&&/["']Finance["']/.test(workspace)&&workspace.includes("<span>Alerts</span>")],
@@ -15,6 +17,8 @@ const checks=[
   ["mobile bottom sheets",styles.includes(".confirmation-overlay{align-items:end")&&styles.includes(".header-notification-modal{height:100%")],
   ["focus-trapped confirmation",confirmation.includes('event.key!=="Tab"')&&confirmation.includes("trigger?.focus()")],
   ["no native confirmation",!workspace.includes("window.alert(")&&!workspace.includes("window.confirm(")&&!workspace.includes("window.prompt(")],
+  ["projected future candles",workspace.includes("prediction-candles")&&workspace.includes("PROJECTED CANDLES")],
+  ["mobile chart reserves forecast region",predictionStyles.includes("inset:18px 44% 0 32px!important")&&!responsiveStyles.includes(".candle-field{min-width:0!important;width:100%!important")],
 ];
 const failed=checks.filter(([,passed])=>!passed);
 if(failed.length){for(const[name]of failed)console.error(`FAIL: ${name}`);process.exit(1)}

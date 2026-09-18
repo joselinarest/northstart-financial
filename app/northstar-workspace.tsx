@@ -2197,7 +2197,7 @@ export function NorthstarWorkspace({
       low = Math.min(...all),
       high = Math.max(...all),
       span = Math.max(0.01, high - low),
-      x = (index: number) => 760 + (index / horizon) * 220,
+      x = (index: number) => 650 + (index / horizon) * 325,
       y = (value: number) => 18 + ((high - value) / span) * 267,
       path = points
         .map(
@@ -2216,10 +2216,27 @@ export function NorthstarWorkspace({
             (point) =>
               `${x(point.index).toFixed(1)},${y(point.low).toFixed(1)}`,
           ),
-      ].join(" ");
+      ].join(" "),
+      candles = points.slice(1).map((point, index) => {
+        const previous = points[index],
+          open = previous.mean,
+          close = point.mean,
+          range = atr * (0.22 + (point.index / horizon) * 0.18),
+          candleHigh = Math.max(open, close) + range,
+          candleLow = Math.min(open, close) - range;
+        return {
+          x: x(point.index),
+          openY: y(open),
+          closeY: y(close),
+          highY: y(candleHigh),
+          lowY: y(candleLow),
+          up: close >= open,
+        };
+      });
     return {
       path,
       band,
+      candles,
       current,
       final: points.at(-1)?.mean || current,
       low: points.at(-1)?.low || current,
@@ -9893,9 +9910,9 @@ export function NorthstarWorkspace({
                   >
                     <line
                       className="prediction-boundary"
-                      x1="760"
+                      x1="650"
                       y1="10"
-                      x2="760"
+                      x2="650"
                       y2="292"
                     />
                     {predictionBandVisible && (
@@ -9908,6 +9925,14 @@ export function NorthstarWorkspace({
                       className="prediction-path"
                       d={predictionOverlay.path}
                     />
+                    <g className="prediction-candles" aria-label="Modeled future candles">
+                      {predictionOverlay.candles.map((candle, index) => (
+                        <g className={candle.up ? "up" : "down"} key={`prediction-candle-${index}`}>
+                          <line x1={candle.x} x2={candle.x} y1={candle.highY} y2={candle.lowY} />
+                          <rect x={candle.x - 6} y={Math.min(candle.openY, candle.closeY)} width="12" height={Math.max(3, Math.abs(candle.closeY - candle.openY))} rx="1" />
+                        </g>
+                      ))}
+                    </g>
                     <circle
                       className="prediction-end"
                       cx="980"
@@ -9925,8 +9950,8 @@ export function NorthstarWorkspace({
                       r="5"
                       vectorEffect="non-scaling-stroke"
                     />
-                    <text className="prediction-label" x="770" y="28">
-                      AI PREDICTION — {predictionScenario} SCENARIO
+                    <text className="prediction-label" x="660" y="28">
+                      PROJECTED CANDLES — {predictionScenario} SCENARIO
                     </text>
                   </svg>
                 )}

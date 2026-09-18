@@ -41,7 +41,7 @@ html,body{max-width:100%;overflow-x:clip}.workspace-view,.workspace-view .shell,
   .workspace-view .quote-strip,.workspace-view .indicator-grid,.workspace-view .interpreter-verdict,.workspace-view .price-paths,.workspace-view .connection-summary,.workspace-view .spending-metrics{grid-template-columns:1fr!important}
   .workspace-view .chart-head,.workspace-view .screener-head,.workspace-view .accounts-head,.workspace-view .shortlist-head,.workspace-view .engine-head,.workspace-view .cycle-head{align-items:flex-start!important;flex-direction:column!important}
   .workspace-view .workspace-breadcrumb{gap:8px}.workspace-view .workspace-breadcrumb ol{width:100%}
-  .workspace-view .price-panel{min-height:330px;overflow:hidden}.workspace-view .candle-field{min-width:0!important;width:100%!important;transform:none!important}
+  .workspace-view .price-panel{min-height:330px;overflow:hidden}.workspace-view .candle-field{min-width:0;transform:none!important}.workspace-view .price-panel:not(.prediction-active) .candle-field{width:auto!important}
   .workspace-view .prediction-summary{max-width:min(250px,78vw)}
   .workspace-view .account-row{min-width:620px}
   .workspace-view .holdings-table article{grid-template-columns:1fr!important}
