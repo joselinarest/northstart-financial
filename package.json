@@ -22,6 +22,7 @@
     "test:mobile-ux": "node scripts/mobile-ux-check.mjs",
     "test:mobile-routes": "playwright test tests/mobile/mobile-routes.spec.ts",
     "test:ai-decision": "node scripts/ai-decision-engine-check.mjs",
+    "test:catalyst-gate": "node scripts/catalyst-entry-gate-check.mjs",
     "db:migrate": "node scripts/run-migrations.mjs",
     "test:intelligence-loop": "node scripts/continuous-intelligence-loop-check.mjs",
     "test:kids-planning": "node scripts/kids-planning-check.mjs",

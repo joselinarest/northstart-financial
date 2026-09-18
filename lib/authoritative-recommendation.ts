@@ -1,6 +1,7 @@
 import { id, type PostgresDatabase } from "@/lib/db";
 import { marketDataProvider } from "@/lib/providers/alpaca-market-data";
 import { loadRuntimeSecrets } from "@/lib/runtime-secrets";
+import { evaluateCatalystEntryGate, loadCatalystContext } from "@/lib/catalyst-entry-gate";
 
 type Json = Record<string, any>;
 const num = (value: unknown) =>
@@ -111,7 +112,7 @@ export async function authoritativeRecommendation(
   const priorNeedsRefresh =
     priorChecks?.freshness?.stale === true ||
     /DATA REFRESH REQUIRED/i.test(String(prior?.reason || "")) ||
-    (priorActionableBuy && priorAgeMs > 10 * 60_000);
+    (priorActionableBuy && (priorAgeMs > 10 * 60_000 || !priorChecks?.catalysts));
   if (prior && !input.force && !priorNeedsRefresh)
     return {
       recommendation: prior,
@@ -121,10 +122,11 @@ export async function authoritativeRecommendation(
   const market = marketDataProvider(),
     end = new Date(),
     start = new Date(Date.now() - 370 * 86400000).toISOString(),
-    [quoteSet, barsSet, fundamental] = await Promise.all([
+    [quoteSet, barsSet, fundamental, catalystContext] = await Promise.all([
       market.getQuotes([symbol]),
       market.getBars(symbol, { timeframe: "1Day", start, limit: 260 }),
       fundamentals(symbol),
+      loadCatalystContext(symbol),
     ]),
     quote = quoteSet.quotes[symbol],
     bars = barsSet.bars || [],
@@ -288,6 +290,7 @@ export async function authoritativeRecommendation(
       ...(currentPrice < sma20 ? ["Price is below SMA20"] : []),
       ...(adverseNews.length ? [`${adverseNews.length} recent adverse company-news item${adverseNews.length === 1 ? "" : "s"} require review`] : []),
     ],
+    catalystGate = evaluateCatalystEntryGate(catalystContext, { mode: "SHARES" }),
     technicalPositive =
       technicalState === "BULLISH" &&
       Number(relativeVolume || 0) >= 0.8 &&
@@ -364,11 +367,17 @@ export async function authoritativeRecommendation(
       technicalPositive &&
       fundamentalsPositive &&
       valuationAcceptable &&
+      catalystGate.pass &&
       !conflicts.length
     ) {
       action = "BUY";
       reason =
         "Swing setup has technical confirmation and no fundamental or valuation veto.";
+    } else if (!catalystGate.pass && technicalPositive && fundamentalsPositive && valuationAcceptable) {
+      action = "WAIT";
+      confidence = Math.min(confidence, 59);
+      reason = catalystGate.summary;
+      conflicts.push(...catalystGate.blockers);
     } else if (technicalState === "BEARISH") {
       action = "WAIT";
       reason = "Swing account: technical structure is bearish or unconfirmed.";
@@ -488,6 +497,7 @@ export async function authoritativeRecommendation(
         deteriorationReasons,
       },
       marketRegime: "NOT_AVAILABLE",
+      catalysts: { ...catalystGate, events: catalystContext.events },
       news: {
         state: fundamental.news.length ? "MIXED" : "UNAVAILABLE",
         items: fundamental.news.slice(0, 5).map((item: any) => ({
@@ -608,7 +618,7 @@ export async function authoritativeRecommendation(
         confidence,
         reason,
         JSON.stringify(checks),
-        !stale && ["BUY", "ACCUMULATE"].includes(action),
+        !stale && catalystGate.pass && ["BUY", "ACCUMULATE"].includes(action),
         modelVersion,
         marketAsOf,
         expiresAt.toISOString(),
