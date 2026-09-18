@@ -753,6 +753,7 @@ export default function AutomaticMarketCopilot({
         <div className="auto-error">
           <b>Live shortlist unavailable</b>
           <span>{data.error}</span>
+          <button type="button" onClick={() => setRefresh((value) => value + 1)} disabled={loading}>{loading ? "Retrying…" : "Retry live scan"}</button>
         </div>
       ) : (
         <>

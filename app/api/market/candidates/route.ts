@@ -21,6 +21,20 @@ const classifyLongTermCandidate=(symbol:string,marketCap:number|null)=>{
 };
 const avg=(values:number[])=>values.length?values.reduce((sum,value)=>sum+value,0)/values.length:0;
 const ema=(values:number[],period:number)=>{const k=2/(period+1);return values.reduce((value,close,index)=>index?close*k+value*(1-k):close,values[0]||0)};
+type CandidatePayload=Record<string,unknown>;
+const candidateCache=new Map<string,{savedAt:number;body:CandidatePayload}>();
+async function providerFetch(url:string,headers:Record<string,string>){
+ let lastError:unknown;
+ for(let attempt=0;attempt<2;attempt+=1){
+  try{
+   const response=await fetch(url,{headers,cache:"no-store",signal:AbortSignal.timeout(15000)});
+   if(response.ok||response.status<500)return response;
+   lastError=new Error("PROVIDER_"+response.status);
+  }catch(error){lastError=error}
+  if(attempt===0)await new Promise(resolve=>setTimeout(resolve,250));
+ }
+ throw lastError instanceof Error?lastError:new Error("MARKET_PROVIDER_UNAVAILABLE");
+}
 
 export async function GET(request:Request){
  await loadRuntimeSecrets();
@@ -28,9 +42,9 @@ export async function GET(request:Request){
   const key=process.env.ALPACA_API_KEY,secret=process.env.ALPACA_API_SECRET;
   if(!key||!secret)return Response.json({status:"not_configured",error:"Connect Alpaca market data to generate the automatic market shortlist."},{status:503});
   const start=new Date(Date.now()-360*86400000).toISOString(),feed=process.env.ALPACA_DATA_FEED||"iex";
-  const headers={"APCA-API-KEY-ID":key,"APCA-API-SECRET-KEY":secret},[response,snapshotResponse]=await Promise.all([fetch(`https://data.alpaca.markets/v2/stocks/bars?symbols=${universe.join(",")}&timeframe=1Day&start=${encodeURIComponent(start)}&limit=10000&adjustment=all&feed=${encodeURIComponent(feed)}`,{headers,cache:"no-store"}),fetch(`https://data.alpaca.markets/v2/stocks/snapshots?symbols=${universe.join(",")}&feed=${encodeURIComponent(feed)}`,{headers,cache:"no-store"})]);
-  if(!response.ok)return Response.json({status:"provider_error",error:"The automatic market scan could not load historical bars.",providerStatus:response.status},{status:502});
-  const data=await response.json() as {bars?:Record<string,AlpacaBar[]>},snapshots=snapshotResponse.ok?await snapshotResponse.json() as Record<string,AlpacaSnapshot>:{};
+  const headers={"APCA-API-KEY-ID":key,"APCA-API-SECRET-KEY":secret},cacheKey=strategy+":"+feed,cached=candidateCache.get(cacheKey);if(cached&&Date.now()-cached.savedAt<45000)return Response.json(cached.body,{headers:{"Cache-Control":"private, max-age=30"}});const barsUrl="https://data.alpaca.markets/v2/stocks/bars?symbols="+universe.join(",")+"&timeframe=1Day&start="+encodeURIComponent(start)+"&limit=10000&adjustment=all&feed="+encodeURIComponent(feed),snapshotsUrl="https://data.alpaca.markets/v2/stocks/snapshots?symbols="+universe.join(",")+"&feed="+encodeURIComponent(feed),[response,snapshotResponse]=await Promise.all([providerFetch(barsUrl,headers),providerFetch(snapshotsUrl,headers).catch(()=>null)]);
+  if(!response.ok){console.error("candidate.bars_provider_failed",{strategy,feed,status:response.status});if(cached)return Response.json({...cached.body,status:"stale_cache",warning:"Live historical bars are temporarily unavailable. Showing the last successful shortlist.",providerStatus:response.status},{headers:{"Cache-Control":"private, no-store"}});return Response.json({status:"provider_error",error:"Live historical bars are temporarily unavailable. Retry the scan.",providerStatus:response.status},{status:502});}
+  const data=await response.json() as {bars?:Record<string,AlpacaBar[]>},snapshots=snapshotResponse?.ok?await snapshotResponse.json() as Record<string,AlpacaSnapshot>:{};
   const technicalCandidates=Object.entries(data.bars||{}).flatMap(([symbol,bars])=>{
     if(bars.length<55)return[];const recent=bars.slice(-60),last=recent.at(-1)!,previous=recent.at(-2)!,closes=recent.map(x=>x.c),allCloses=bars.map(x=>x.c),volumes=recent.map(x=>x.v),sma20=avg(closes.slice(-20)),sma50=avg(closes.slice(-50)),sma100=allCloses.length>=100?avg(allCloses.slice(-100)):null,sma200=allCloses.length>=200?avg(allCloses.slice(-200)):null,ema20=ema(closes.slice(-40),20),avgVolume=avg(volumes.slice(-21,-1)),relVol=avgVolume?last.v/avgVolume:0;
     const changes=closes.slice(-15).map((value,index,array)=>index?value-array[index-1]:0).slice(1),gains=avg(changes.map(x=>Math.max(0,x))),losses=avg(changes.map(x=>Math.max(0,-x))),rsi=losses===0?100:100-(100/(1+gains/losses));
@@ -65,5 +79,5 @@ export async function GET(request:Request){
     candidates=candidates.map(candidate=>({...candidate,companyStage:fundSymbols.has(String(candidate.symbol))?"DIVERSIFIED EXCHANGE-TRADED FUND":"COMPANY STAGE DATA UNAVAILABLE",portfolioRole:fundSymbols.has(String(candidate.symbol))?"Core or diversifier":"Do not assign until fundamentals are connected",missingData:true}));
   }
   const freshCount=candidates.filter(item=>item.dataFreshness==="FRESH").length;
-  return Response.json({status:"connected",provider:"Alpaca",feed,strategy,asOf:new Date().toISOString(),universeSize:universe.length,freshCount,actionableMarketData:strategy==="long-term"||freshCount>0,method:strategy==="swing"?"Liquid securities ranked for swing timing using structure, EMA20/SMA50, RSI, relative volume, breakout state and invalidation.":"Separate long-term discovery universe ranked for liquid technical health and portfolio role. Individual-company candidates still require revenue, EPS, free-cash-flow, ROIC, debt, dilution, valuation, moat and filing validation before inclusion.",candidates},{headers:{"Cache-Control":"private, no-store"}});
+  const body={status:"connected",provider:"Alpaca",feed,strategy,asOf:new Date().toISOString(),universeSize:universe.length,freshCount,actionableMarketData:strategy==="long-term"||freshCount>0,method:strategy==="swing"?"Liquid securities ranked for swing timing using structure, EMA20/SMA50, RSI, relative volume, breakout state and invalidation.":"Separate long-term discovery universe ranked for liquid technical health and portfolio role. Individual-company candidates still require revenue, EPS, free-cash-flow, ROIC, debt, dilution, valuation, moat and filing validation before inclusion.",candidates};candidateCache.set(cacheKey,{savedAt:Date.now(),body});return Response.json(body,{headers:{"Cache-Control":"private, max-age=30"}});
 }
