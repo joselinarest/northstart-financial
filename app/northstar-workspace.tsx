@@ -9447,6 +9447,14 @@ export function NorthstarWorkspace({
                 <small>{feedNotice}</small>
               </div>
             </div>
+            <nav className="market-terminal-tabs" aria-label="Stock research workspace">
+              <a href="#market-quote">Quote</a>
+              <a href="#market-price-chart">Chart</a>
+              <a href="#market-advisor-decision">Advisor decision</a>
+              <a href="#market-flow">Flow</a>
+              <button type="button" onClick={() => navigate("Options Advisor")}>Options</button>
+              <button type="button" onClick={() => navigate("Market News")}>News &amp; catalysts</button>
+            </nav>
             <div className="chart-toolbar">
               <div className="chart-symbol-search">
                 <input
@@ -9559,7 +9567,7 @@ export function NorthstarWorkspace({
                 </select>
               </div>
             </div>
-            <div className="quote-strip">
+            <div className="quote-strip" id="market-quote">
               <span>
                 <small>LAST</small>
                 <b>
@@ -9647,7 +9655,10 @@ export function NorthstarWorkspace({
                 </b>
               </span>
             </div>
-            <FlowIntelligencePanel symbol={chartSymbol} />
+            <div id="market-flow" className="market-terminal-panel-anchor">
+              <FlowIntelligencePanel symbol={chartSymbol} />
+            </div>
+            <div id="market-advisor-decision" className="market-terminal-panel-anchor">
             <ChartDecisionWorkspace
               accountId={advisorAccountId}
               marketOpen={marketPhase === "open"}
@@ -9701,6 +9712,7 @@ export function NorthstarWorkspace({
                 chartQuote?.freshness === "DELAYED"
               }
             />
+            </div>
             <section className="ma-support-panel">
               <div>
                 <p>MOVING-AVERAGE SUPPORT MAP</p>
@@ -9896,7 +9908,7 @@ export function NorthstarWorkspace({
                 decision support, not an order or a prediction.
               </footer>
             </section>
-            <div className="chart-layout">
+            <div className="chart-layout" id="market-price-chart">
               <div
                 className={`price-panel ${predictionVisible ? "prediction-active" : ""}`}
               >
