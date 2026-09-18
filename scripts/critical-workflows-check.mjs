@@ -2,11 +2,12 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 
 const read = path => readFile(new URL(`../${path}`, import.meta.url), "utf8");
-const [workspace, connectionUi, styles, actionGuidance, linkToken, attempt, sync, refresh, webhook] = await Promise.all([
+const [workspace, connectionUi, styles, actionGuidance, marketCopilot, linkToken, attempt, sync, refresh, webhook] = await Promise.all([
   read("app/northstar-workspace.tsx"),
   read("app/investment-connection-flow.tsx"),
   read("app/globals.css"),
   read("app/action-guidance-panel.tsx"),
+  read("app/automatic-market-copilot.tsx"),
   read("app/api/connections/plaid/link-token/route.ts"),
   read("app/api/connections/plaid/attempt/route.ts"),
   read("app/api/connections/plaid/sync/route.ts"),
@@ -32,6 +33,10 @@ for (const label of ["Account:", "Entry / trigger", "Estimated proceeds", "Estim
 assert.doesNotMatch(actionGuidance, /after confirmation/);
 assert.match(styles, /recommendation-primary-facts/);
 assert.match(styles, /@media\s*\(max-width:\s*380px\).*recommendation-primary-facts/s);
+
+assert.match(marketCopilot, /NEXT MARKET OPEN · RANKED PREPARATION LIST/);
+assert.match(marketCopilot, /\/api\/market\/candidates\?strategy=/);
+assert.doesNotMatch(marketCopilot, /if \(marketPhase !== "open" && refresh === 0\)/, "Today must scan on initial load even when the market is closed");
 
 assert.match(connectionUi, /\+ Bank, Card or Loan/);
 assert.match(connectionUi, /\+ Investment Account/);

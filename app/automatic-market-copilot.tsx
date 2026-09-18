@@ -324,10 +324,6 @@ export default function AutomaticMarketCopilot({
     lastAlertKey.current="";
   }, [accountScope]);
   useEffect(() => {
-    if (marketPhase !== "open" && refresh === 0) {
-      setLoading(false);
-      return;
-    }
     let active = true;
     setLoading(true);
     fetch(
