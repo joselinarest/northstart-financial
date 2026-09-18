@@ -5258,7 +5258,7 @@ textarea {
 button {
   cursor: pointer;
 }
-header {
+.app-topbar {
   position: sticky;
   top: 0;
   z-index: 10;
