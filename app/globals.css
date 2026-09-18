@@ -18839,3 +18839,12 @@ footer {
   .kids-chart-rows summary { grid-template-columns:44px minmax(0,1fr) 42px; gap:6px; padding-inline:7px; }
   .kids-chart-rows details > div { grid-template-columns:repeat(2,minmax(0,1fr)); }
 }
+.manual-cash-editor{display:grid;gap:5px;margin-top:10px;padding:10px;border:1px solid var(--border,#cbd8d2);border-radius:9px;background:#f4f8f6}.manual-cash-editor b{font-size:12px}.manual-cash-editor small{font-weight:400;color:var(--muted,#61736c)}
+
+.chart-level-key{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:7px;padding:10px 12px;background:#0b1b15;border-top:1px solid #27483b;color:#dcebe4}
+.chart-level-key span{display:grid;grid-template-columns:10px 1fr auto;align-items:center;gap:7px;min-width:0;padding:7px 9px;border:1px solid #2b493e;border-radius:7px;background:#10271f;font-size:12px;font-weight:700}
+.chart-level-key span i{width:9px;height:9px;border-radius:50%;background:#35c98e}
+.chart-level-key span b{color:#fff;font-variant-numeric:tabular-nums;white-space:nowrap}
+.chart-level-key .support i{background:#62aee8}.chart-level-key .resistance i{background:#e5ad45}.chart-level-key .stop i{background:#f06d65}.chart-level-key .target i{background:#69d2a5}.chart-level-key .fib i{background:#9ce7c6}
+@media(max-width:700px){.chart-level-key{grid-template-columns:1fr 1fr;padding:8px}.chart-level-key span{grid-template-columns:9px 1fr;font-size:11px}.chart-level-key span b{grid-column:2;white-space:normal}.integrated-chart-canvas canvas{min-height:330px}}
+@media(max-width:390px){.chart-level-key{grid-template-columns:1fr}.chart-level-key span{grid-template-columns:9px 1fr auto}.chart-level-key span b{grid-column:auto;white-space:nowrap}}

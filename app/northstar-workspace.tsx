@@ -4083,13 +4083,14 @@ export function NorthstarWorkspace({
     accountId: string,
     nickname: string,
     investmentPurpose: string,
+    cashBalance?: number,
   ) => {
     setPlaidNotice("Saving investment account profile…");
     try {
       const response = await fetch("/api/connections/plaid", {
           method: "PATCH",
           headers: financeHeaders(),
-          body: JSON.stringify({ accountId, nickname, investmentPurpose }),
+          body: JSON.stringify({ accountId, nickname, investmentPurpose, cashBalance }),
         }),
         data = await apiPayload(response);
       if (!response.ok)

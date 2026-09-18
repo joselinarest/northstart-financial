@@ -56,11 +56,12 @@ export default function ChildAccountAttachment({ accessToken }: { accessToken?: 
       );
       setChildren(childRows);
       setAccounts(investmentRows);
-      const firstChild = childRows[0];
-      const firstGoal = firstChild?.goals?.[0];
-      setChildId((value) => value || firstChild?.id || "");
-      setGoalId((value) => value || firstGoal?.id || "");
-      setAccountId((value) => value || investmentRows[0]?.id || "");
+      const selectedChild = childRows.find((item: Row) => String(item.id) === childId) || childRows[0];
+      const selectedGoal = selectedChild?.goals?.find((item: Row) => String(item.id) === goalId) || selectedChild?.goals?.[0];
+      const savedLink = selectedChild?.accounts?.find((item: Row) => String(item.goal_id) === String(selectedGoal?.id));
+      setChildId(String(selectedChild?.id || ""));
+      setGoalId(String(selectedGoal?.id || ""));
+      setAccountId(String(savedLink?.account_id || ""));
       setStatus("");
     } catch (error) {
       setStatus(error instanceof Error ? error.message : "Child account attachment unavailable");
@@ -72,6 +73,7 @@ export default function ChildAccountAttachment({ accessToken }: { accessToken?: 
   const goals = child?.goals || [];
   const goal = goals.find((item: Row) => String(item.id) === goalId) || goals[0];
   const allocation = useMemo(() => (goal && child ? template(goal, child) : null), [goal, child]);
+  const savedLink = child?.accounts?.find((item: Row) => String(item.goal_id) === String(goal?.id));
 
   const attach = async () => {
     if (!goal?.id || !accountId) return;
@@ -103,6 +105,7 @@ export default function ChildAccountAttachment({ accessToken }: { accessToken?: 
       const result = await response.json();
       if (!response.ok) throw new Error(result.error || "Account could not be attached");
       setStatus(`✓ Account attached to ${child.nickname} · ${goal.name}. Recommendations recalculated.`);
+      window.dispatchEvent(new CustomEvent("northstar-kids-plan-updated"));
       await load();
     } catch (error) {
       setStatus(error instanceof Error ? error.message : "Account could not be attached");
@@ -118,11 +121,12 @@ export default function ChildAccountAttachment({ accessToken }: { accessToken?: 
     <section className="child-account-attachment">
       <header><span>ATTACH A CHILD INVESTMENT ACCOUNT</span><h2>Use one imported or manual portfolio for one specific child goal</h2></header>
       <div className="child-account-fields">
-        <label>Child<select value={child?.id || ""} onChange={(event) => { const id = event.target.value; const next = children.find((item) => String(item.id) === id); setChildId(id); setGoalId(next?.goals?.[0]?.id || ""); }}>{children.map((item) => <option key={item.id} value={item.id}>{item.nickname}</option>)}</select></label>
-        <label>Goal<select value={goal?.id || ""} onChange={(event) => setGoalId(event.target.value)}>{goals.map((item: Row) => <option key={item.id} value={item.id}>{item.name} · {String(item.goal_type).replaceAll("_", " ")}</option>)}</select></label>
+        <label>Child<select value={child?.id || ""} onChange={(event) => { const id = event.target.value; const next = children.find((item) => String(item.id) === id); const nextGoal = next?.goals?.[0]; const nextLink = next?.accounts?.find((item: Row) => String(item.goal_id) === String(nextGoal?.id)); setChildId(id); setGoalId(nextGoal?.id || ""); setAccountId(nextLink?.account_id || ""); }}>{children.map((item) => <option key={item.id} value={item.id}>{item.nickname}</option>)}</select></label>
+        <label>Goal<select value={goal?.id || ""} onChange={(event) => { const id=event.target.value; const nextLink=child?.accounts?.find((item: Row)=>String(item.goal_id)===id); setGoalId(id); setAccountId(nextLink?.account_id||""); }}>{goals.map((item: Row) => <option key={item.id} value={item.id}>{item.name} · {String(item.goal_type).replaceAll("_", " ")}</option>)}</select></label>
         <label>Imported or manual account<select value={accountId} onChange={(event) => setAccountId(event.target.value)}><option value="">Choose account…</option>{accounts.map((item) => <option key={item.id} value={item.id}>{item.nickname || item.name} · {item.subtype || item.type}</option>)}</select></label>
         <button type="button" disabled={busy || !goal?.id || !accountId} onClick={attach}>{busy ? "Attaching…" : "Attach to child goal"}</button>
       </div>
+      {savedLink && <p className="child-account-status"><b>Currently attached:</b> {savedLink.account_name} · {Number(savedLink.holding_count||0)} holding{Number(savedLink.holding_count||0)===1?"":"s"} · ${(Number(savedLink.effective_balance_cents||0)/100).toLocaleString(undefined,{maximumFractionDigits:2})}</p>}
       {allocation && <section className="child-template-preview"><div><small>Suggested portfolio template</small><b>{allocation.name}</b><span>{allocation.years} years until modeled goal</span></div><dl><div><dt>U.S. equity</dt><dd>{allocation.us}%</dd></div><div><dt>International</dt><dd>{allocation.international}%</dd></div><div><dt>Bonds</dt><dd>{allocation.bonds}%</dd></div><div><dt>Cash / stable</dt><dd>{allocation.cash}%</dd></div></dl><p>Suggestion only. Northstar recalculates using this child, goal date, linked balance, contributions and household affordability; it never places trades.</p></section>}
       {status && <p className="child-account-status">{status}</p>}
     </section>

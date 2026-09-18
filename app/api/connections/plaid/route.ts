@@ -1,5 +1,6 @@
 import { workspace } from "@/lib/db";
 import { decryptSecret } from "@/lib/crypto";
+import { reviewKidsPlans } from "@/lib/kids-planning";
 
 export const dynamic = "force-dynamic";
 
@@ -109,6 +110,7 @@ export async function PATCH(request: Request) {
         accountId?: string;
         nickname?: string;
         investmentPurpose?: string;
+        cashBalance?: number;
       };
     const purposes = [
       "Swing",
@@ -127,10 +129,10 @@ export async function PATCH(request: Request) {
       );
     const account = await db
       .prepare(
-        "SELECT a.id FROM accounts a JOIN entities e ON e.id=a.entity_id WHERE a.id=? AND e.household_id=?",
+        "SELECT a.id,a.connection_id FROM accounts a JOIN entities e ON e.id=a.entity_id WHERE a.id=? AND e.household_id=?",
       )
       .bind(body.accountId, householdId)
-      .first();
+      .first<Record<string, any>>();
     if (!account)
       return Response.json({ error: "Account not found" }, { status: 404 });
     await db
@@ -145,12 +147,22 @@ export async function PATCH(request: Request) {
         body.accountId,
       )
       .run();
+    if (body.cashBalance !== undefined) {
+      const cashBalance = Number(body.cashBalance);
+      if (account.connection_id)
+        return Response.json({ error: "Plaid cash is read-only and must be refreshed from the institution." }, { status: 400 });
+      if (!Number.isFinite(cashBalance) || cashBalance < 0)
+        return Response.json({ error: "Cash balance must be zero or greater" }, { status: 400 });
+      const cashCents = Math.round(cashBalance * 100);
+      await db.prepare(`UPDATE accounts a SET available_balance_cents=?,current_balance_cents=?+COALESCE((SELECT SUM(ROUND(h.quantity*COALESCE(h.price_cents,0))) FROM holdings h WHERE h.account_id=a.id),0),updated_at=CURRENT_TIMESTAMP WHERE a.id=? AND a.connection_id IS NULL`).bind(cashCents,cashCents,body.accountId).run();
+      await reviewKidsPlans(db, householdId, "ACCOUNT_CHANGED");
+    }
     const saved = await db
       .prepare(
         "SELECT id,nickname,investment_purpose,updated_at FROM accounts WHERE id=?",
       )
       .bind(body.accountId)
-      .first();
+      .first<Record<string, any>>();
     return Response.json({ ok: true, account: saved });
   } catch (error) {
     if (error instanceof Response) return error;
@@ -246,7 +258,7 @@ export async function POST(request: Request) {
           "SELECT a.id FROM accounts a JOIN entities e ON e.id=a.entity_id WHERE a.id=? AND e.household_id=? AND a.connection_id IS NULL AND a.type='investment'",
         )
         .bind(body.accountId, householdId)
-        .first();
+        .first<Record<string, any>>();
       if (!account)
         return Response.json(
           { error: "Manual investment account not found" },
@@ -289,6 +301,7 @@ export async function POST(request: Request) {
             JSON.stringify({ accountId: body.accountId, ticker, quantity }),
           ),
       ]);
+      await reviewKidsPlans(db, householdId, "ACCOUNT_CHANGED");
       return Response.json({ ok: true, ticker }, { status: 201 });
     }
     const alias = String(body.alias || "")
