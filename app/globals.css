@@ -8588,7 +8588,7 @@ aside > button,
 .manual-assessment {
   display: grid;
   grid-template-columns: 42px 1fr auto;
-  align-items: start;
+  align-items: flex-start;
   gap: 12px;
   margin: 0 20px 16px;
   padding: 14px;
@@ -12808,7 +12808,7 @@ footer {
 }
 .smart-portfolio-content {
   grid-template-columns: 170px minmax(250px, 0.8fr) minmax(320px, 1.2fr);
-  align-items: start;
+  align-items: flex-start;
 }
 .ideal-holdings-model {
   grid-column: 1/-1;
@@ -14411,7 +14411,7 @@ footer {
   height: auto !important;
   min-height: 0 !important;
   grid-template-columns: 190px 1fr 1fr;
-  align-items: start;
+  align-items: flex-start;
   gap: 7px 16px;
   padding: 14px 16px !important;
   border: 0 !important;
@@ -17273,7 +17273,74 @@ footer {
   gap: 4px;
   padding: 10px 0;
 }
-.goal-links {
+.kids-model-portfolio {
+  display: grid;
+  gap: 12px;
+  margin: 14px 0;
+  padding: 14px;
+  border: 1px solid #bdd6cc;
+  border-radius: 14px;
+  background: #f7fbf9;
+}
+.kids-model-portfolio > header {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: flex-start;
+}
+.kids-model-portfolio > header div,
+.kids-model-evidence p {
+  display: grid;
+  gap: 4px;
+}
+.kids-model-portfolio > header small,
+.kids-model-portfolio > header em {
+  color: #08785a;
+  font-size: 10px;
+  font-style: normal;
+  font-weight: 800;
+  letter-spacing: .08em;
+}
+.kids-model-assets {
+  display: grid;
+  grid-template-columns: repeat(3,minmax(0,1fr));
+  gap: 8px;
+}
+.kids-model-assets article {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 2px 8px;
+  padding: 10px;
+  border: 1px solid #d5e4de;
+  border-radius: 10px;
+  background: #fff;
+}
+.kids-model-assets strong {
+  grid-row: 1/3;
+  color: #08785a;
+  font-size: 20px;
+}
+.kids-model-assets span,
+.kids-model-evidence p {
+  color: #536760;
+  font-size: 11px;
+}
+.kids-model-evidence {
+  display: grid;
+  grid-template-columns: repeat(2,minmax(0,1fr));
+  gap: 8px 16px;
+}
+.kids-model-evidence p {
+  margin: 0;
+}
+.kids-model-evidence b {
+  color: #172a23;
+}
+@media (max-width: 700px) {
+  .kids-model-portfolio > header {display:grid}
+  .kids-model-assets,
+  .kids-model-evidence {grid-template-columns:1fr}
+}.goal-links {
   display: grid;
   gap: 9px;
   padding-top: 10px;
@@ -17284,6 +17351,23 @@ footer {
 }
 .goal-links small {
   color: #65766f;
+}
+.goal-contribution-history {
+  display: grid;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid #d6e4de;
+  border-radius: 10px;
+  background: #f5faf8;
+}
+.goal-contribution-history > span {
+  display: grid;
+  gap: 2px;
+  padding-top: 8px;
+  border-top: 1px solid #d6e4de;
+}
+.goal-contribution-history strong {
+  font-size: 14px;
 }
 .kids-forms {
   display: grid;
@@ -18067,7 +18151,7 @@ footer {
   display: grid;
   grid-template-columns: 58px minmax(0, 1fr);
   grid-auto-flow: row;
-  align-items: start;
+  align-items: flex-start;
   gap: 12px;
   padding: 13px;
   border: 1px solid #d1ddd7;
