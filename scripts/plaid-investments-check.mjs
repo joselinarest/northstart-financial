@@ -41,5 +41,6 @@ assert.match(accountProfile, /Delete manual account/);
 assert.match(accounts, /body\.accountId/);
 assert.match(accounts, /a\.connection_id IS NULL/);
 assert.match(accounts, /DELETE FROM investment_transactions WHERE account_id/);
+assert.match(accounts, /DELETE FROM holding_daily_snapshots WHERE account_id/);
 
 console.log("Plaid Investments consent, provider refresh, holdings reconciliation, paginated trades, webhook queue, history, diagnostics, recovery flow, additive manual accounts, deduplicated account identity, and purpose-scoped Tactical Swing, and confirmed manual-account deletion verified.");

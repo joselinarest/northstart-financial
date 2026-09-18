@@ -428,6 +428,9 @@ export async function DELETE(request: Request) {
         db
           .prepare("DELETE FROM investment_transactions WHERE account_id=?")
           .bind(body.accountId),
+        db
+          .prepare("DELETE FROM holding_daily_snapshots WHERE account_id=?")
+          .bind(body.accountId),
         db.prepare("DELETE FROM holdings WHERE account_id=?").bind(body.accountId),
         db.prepare("DELETE FROM transactions WHERE account_id=?").bind(body.accountId),
         db

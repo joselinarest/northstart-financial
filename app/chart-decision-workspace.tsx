@@ -278,6 +278,9 @@ export default function ChartDecisionWorkspace(props: Props) {
         </strong>
       </header>
       <IntegratedResearchChart
+        accountId={props.accountId}
+        accountValue={props.accountValue}
+        cashAvailable={props.cashAvailable}
         symbol={props.symbol}
         strategy={props.strategy}
         action={finalAction}

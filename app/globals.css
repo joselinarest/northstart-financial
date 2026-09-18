@@ -18767,3 +18767,75 @@ footer {
   .manual-account-actions { align-items: stretch; flex-direction: column; padding: 14px; }
   .manual-account-actions button { width: 100%; }
 }
+.kids-current-portfolio {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid #bfd5cc;
+  border-radius: 12px;
+  background: #fff;
+}
+.kids-current-portfolio > header { display:flex; align-items:flex-start; justify-content:space-between; gap:12px; }
+.kids-current-portfolio > header div { display:grid; gap:3px; }
+.kids-current-portfolio > header small { color:#08785a; font-size:10px; font-weight:900; letter-spacing:.08em; }
+.kids-current-portfolio > header em { padding:5px 8px; border-radius:999px; background:#e3f3ec; color:#136c54; font-size:10px; font-style:normal; font-weight:900; white-space:nowrap; }
+.kids-current-portfolio > p { margin:0; color:#52675f; font-size:12px; line-height:1.5; }
+.kids-portfolio-comparison { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; }
+.kids-portfolio-comparison article { display:grid; gap:8px; min-width:0; padding:10px; border:1px solid #d9e4df; border-left:4px solid #4e8e78; border-radius:9px; }
+.kids-portfolio-comparison article.is-review { border-left-color:#b55d3e; background:#fff9f5; }
+.kids-portfolio-comparison article.is-add { border-left-color:#2b73a8; background:#f6fbff; }
+.kids-portfolio-comparison article > div { display:grid; gap:2px; }
+.kids-portfolio-comparison article small { color:#64766f; overflow-wrap:anywhere; }
+.kids-portfolio-comparison dl { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:5px; margin:0; }
+.kids-portfolio-comparison dl div { display:grid; gap:2px; }
+.kids-portfolio-comparison dt { color:#6e7f78; font-size:9px; text-transform:uppercase; }
+.kids-portfolio-comparison dd { margin:0; color:#172a23; font-size:12px; font-weight:800; }
+.kids-portfolio-comparison article > strong { color:#276c57; font-size:10px; }
+.kids-portfolio-comparison article.is-review > strong { color:#9a452e; }
+.kids-portfolio-warnings { display:grid; gap:5px; }
+.kids-portfolio-warnings span { padding:8px 10px; border-radius:8px; background:#fff1e7; color:#82442f; font-size:11px; line-height:1.4; }
+.kids-portfolio-empty { padding:10px; border-radius:8px; background:#f0f5f3; }
+@media (max-width:700px) {
+  .kids-current-portfolio > header { display:grid; }
+  .kids-current-portfolio > header em { justify-self:start; }
+  .kids-portfolio-comparison { grid-template-columns:1fr; }
+  .kids-portfolio-comparison dl { grid-template-columns:repeat(2,minmax(0,1fr)); }
+}
+.kids-allocation-chart { display:grid; gap:12px; padding:14px; border-radius:12px; background:linear-gradient(145deg,#0c3e31,#145945); color:#fff; box-shadow:0 12px 28px rgba(10,55,43,.18); }
+.kids-allocation-chart > header { display:flex; align-items:flex-start; justify-content:space-between; gap:12px; }
+.kids-allocation-chart > header div { display:grid; gap:3px; }
+.kids-allocation-chart > header small { color:#6ed6b0; font-size:9px; font-weight:900; letter-spacing:.1em; }
+.kids-allocation-chart > header b { font-size:14px; }
+.kids-allocation-chart nav { display:flex; gap:4px; padding:3px; border:1px solid rgba(255,255,255,.18); border-radius:9px; }
+.kids-allocation-chart nav button { min-width:38px; min-height:32px; padding:0 8px; border:0; border-radius:6px; background:transparent; color:#b8d3ca; font-size:11px; font-weight:900; }
+.kids-allocation-chart nav button.active { background:#fff; color:#0b634b; }
+.kids-chart-legend { display:flex; flex-wrap:wrap; gap:12px; color:#c9ddd5; font-size:10px; }
+.kids-chart-legend span::before { display:inline-block; width:9px; height:9px; margin-right:5px; border-radius:3px; content:""; }
+.kids-chart-legend .current::before { background:#3ac498; }
+.kids-chart-legend .target::before { border:2px solid #f5c468; background:transparent; }
+.kids-chart-legend .projected::before { background:#77aef4; }
+.kids-chart-rows { display:grid; gap:6px; }
+.kids-chart-rows details { border:1px solid rgba(255,255,255,.12); border-radius:8px; background:rgba(255,255,255,.035); }
+.kids-chart-rows summary { display:grid; grid-template-columns:52px minmax(0,1fr) 46px; align-items:center; gap:8px; min-height:42px; padding:7px 9px; cursor:pointer; list-style:none; }
+.kids-chart-rows summary::-webkit-details-marker { display:none; }
+.kids-chart-rows summary > b { font-size:11px; }
+.kids-chart-rows summary > strong { color:#fff; font-size:11px; text-align:right; }
+.kids-chart-track { position:relative; height:18px; overflow:hidden; border-radius:5px; background:rgba(255,255,255,.1); }
+.kids-chart-track i { position:absolute; left:0; transition:width .35s ease,left .35s ease; }
+.kids-chart-track i.current { top:2px; height:6px; background:#3ac498; opacity:.95; }
+.kids-chart-track i.projected { bottom:2px; height:6px; background:#77aef4; opacity:.95; }
+.kids-chart-track i.target { z-index:2; top:0; width:2px; height:18px; background:#f5c468; transform:translateX(-1px); }
+.kids-chart-rows details > div { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:6px; padding:0 9px 9px; color:#bad2c9; font-size:9px; }
+.kids-chart-rows details > div span { display:grid; gap:2px; }
+.kids-chart-rows details > div b { color:#fff; font-size:11px; }
+.kids-allocation-chart footer { display:grid; gap:3px; padding-top:4px; border-top:1px solid rgba(255,255,255,.12); }
+.kids-allocation-chart footer b { color:#d9eee6; font-size:10px; }
+.kids-allocation-chart footer span { color:#9ebdb2; font-size:9px; line-height:1.45; }
+@media (max-width:700px) {
+  .kids-allocation-chart { margin-inline:-4px; padding:12px 10px; border-radius:10px; }
+  .kids-allocation-chart > header { display:grid; }
+  .kids-allocation-chart nav { width:100%; }
+  .kids-allocation-chart nav button { flex:1; min-height:38px; }
+  .kids-chart-rows summary { grid-template-columns:44px minmax(0,1fr) 42px; gap:6px; padding-inline:7px; }
+  .kids-chart-rows details > div { grid-template-columns:repeat(2,minmax(0,1fr)); }
+}
