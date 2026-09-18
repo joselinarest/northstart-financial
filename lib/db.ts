@@ -30,8 +30,8 @@ function pool() {
     const configuredMax=Number.parseInt(process.env.DATABASE_POOL_MAX||"1",10);
     // Serverless instances multiply this number. Keep production at one client;
     // local development may use two for parallel route work.
-    const hardLimit=local?2:1,max=Number.isFinite(configuredMax)?Math.min(hardLimit,Math.max(1,configuredMax)):1;
-    globalDatabase.northstarPool = new Pool({ connectionString: connectionUrl.toString(), max, min:0, idleTimeoutMillis: 1_000, connectionTimeoutMillis: 5_000, maxLifetimeSeconds:60, allowExitOnIdle:true, ssl: local || process.env.DATABASE_SSL === "disable" ? false : { ca:globalDatabase.northstarRdsCa, rejectUnauthorized:true } });
+    const development=process.env.NODE_ENV!=="production",hardLimit=development?2:1,max=Number.isFinite(configuredMax)?Math.min(hardLimit,Math.max(1,configuredMax)):1;
+    globalDatabase.northstarPool = new Pool({ connectionString: connectionUrl.toString(), max, min:0, idleTimeoutMillis: 1_000, connectionTimeoutMillis: development ? 15_000 : 5_000, maxLifetimeSeconds:60, allowExitOnIdle:true, ssl: local || process.env.DATABASE_SSL === "disable" ? false : { ca:globalDatabase.northstarRdsCa, rejectUnauthorized:true } });
     globalDatabase.northstarPool.on("error",error=>console.error("Idle PostgreSQL client error",error.message));
   }
   return globalDatabase.northstarPool;
@@ -84,7 +84,7 @@ export async function database() {
   // Development can legitimately connect to an AWS-hosted database, so the
   // application environment—not the database hostname—determines whether the
   // local dev server should apply pending migrations automatically.
-  const shouldMigrate=process.env.NODE_ENV!=="production"||process.env.AUTO_MIGRATE_DATABASE==="true";
+  const databaseIsLocal=/(?:localhost|127\.0\.0\.1)/.test(process.env.DATABASE_URL||""),shouldMigrate=process.env.AUTO_MIGRATE_DATABASE==="true"||(databaseIsLocal&&process.env.AUTO_MIGRATE_DATABASE!=="false");
   if(shouldMigrate&&(!globalDatabase.northstarSchemaReady||globalDatabase.northstarSchemaVersion!==schemaVersion))globalDatabase.northstarSchemaReady=(async()=>{const client=await pool().connect();try{await client.query("SELECT pg_advisory_lock(hashtext($1))",["northstar_schema_init"]);for(const statement of schemaStatements)await client.query(postgresSql(statement));await runMigrations(client);globalDatabase.northstarSchemaVersion=schemaVersion}finally{await client.query("SELECT pg_advisory_unlock(hashtext($1))",["northstar_schema_init"]).catch(()=>undefined);client.release()}})().catch(error=>{globalDatabase.northstarSchemaReady=undefined;throw error});
   if(globalDatabase.northstarSchemaReady)await globalDatabase.northstarSchemaReady;
   return new PostgresDatabase();
