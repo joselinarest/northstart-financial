@@ -623,9 +623,13 @@ export default function AutomaticMarketCopilot({
           {swingReady.length ? (
             <ol>
               {swingReady.map((item) => {
-                const riskPerShare = Math.max(
+                const triggerPrice = Math.max(item.price, item.resistance),
+                  triggerGapPct = item.price
+                    ? ((triggerPrice - item.price) / item.price) * 100
+                    : 0,
+                  riskPerShare = Math.max(
                     0.01,
-                    item.price - item.invalidation,
+                    triggerPrice - item.invalidation,
                   ),
                   shares = Math.max(
                     0,
@@ -633,8 +637,12 @@ export default function AutomaticMarketCopilot({
                       Math.min(perTradeRisk, remainingRisk) / riskPerShare,
                     ),
                   ),
-                  target1 = item.price + riskPerShare * 2,
-                  target2 = item.price + riskPerShare * 3;
+                  target1 = triggerPrice + riskPerShare * 2,
+                  target2 = triggerPrice + riskPerShare * 3,
+                  pullbackReference = Math.max(
+                    item.invalidation,
+                    item.ema20 || item.support,
+                  );
                 return (
                   <li key={item.symbol}>
                     <b>
@@ -644,15 +652,28 @@ export default function AutomaticMarketCopilot({
                         : "NO NEW POSITION"}
                     </b>
                     <span>
-                      Entry only after a 5m close above $
-                      {item.resistance.toFixed(2)} with RVOL ≥ 1.5
+                      Do not buy at ${item.price.toFixed(2)} yet. Breakout entry
+                      only after a 5m close above ${triggerPrice.toFixed(2)} with
+                      RVOL ≥ 1.5.
                     </span>
                     <dl>
                       <div>
-                        <dt>Preferred entry</dt>
+                        <dt>Current price</dt>
+                        <dd>${item.price.toFixed(2)}</dd>
+                      </div>
+                      <div>
+                        <dt>Confirmed breakout entry</dt>
                         <dd>
-                          ${item.resistance.toFixed(2)}–$
-                          {(item.resistance + riskPerShare * 0.15).toFixed(2)}
+                          ${triggerPrice.toFixed(2)}–$
+                          {(triggerPrice + riskPerShare * 0.15).toFixed(2)} · +
+                          {triggerGapPct.toFixed(2)}%
+                        </dd>
+                      </div>
+                      <div>
+                        <dt>Cheaper alternative</dt>
+                        <dd>
+                          Wait near ${pullbackReference.toFixed(2)} and require a
+                          bullish hold/reclaim; otherwise no trade
                         </dd>
                       </div>
                       <div>
@@ -674,9 +695,11 @@ export default function AutomaticMarketCopilot({
                       </div>
                     </dl>
                     <small>
-                      Valid for this session only · {item.score}% evidence score
-                      · wait if spread, QQQ direction, volume, or catalyst check
-                      fails.
+                      Why wait: ${triggerPrice.toFixed(2)} is confirmation, not
+                      a claim that a higher price is cheaper. Paying up is valid
+                      only if the breakout and volume reduce false-break risk.
+                      Never chase above the displayed entry range. Valid for
+                      this session only · {item.score}% evidence score.
                     </small>
                   </li>
                 );

@@ -29,8 +29,22 @@ assert.match(workspace, /localStorage\.setItem\("northstar-analysis-scope",\s*sc
 assert.match(workspace, /AccountScopeDashboard/);
 const swingPageList = workspace.match(/const swingDecisionTabs = \[([^\]]+)\]/)?.[1] || "";
 assert.doesNotMatch(swingPageList, /Daily Action Plan/, "Daily Action Plan must preserve the selected investment account instead of forcing the first Swing account");
+assert.doesNotMatch(swingPageList, /Options Advisor/, "Options must preserve the selected investment account instead of forcing the first Swing account");
 assert.match(workspace, /key=\{`today-guidance:\$\{advisorAccountId\}`\}/, "Daily guidance must remount for the selected investment account");
 assert.match(workspace, /initialStrategy=\{advisorStrategy\}/, "Daily recommendations must use the selected account strategy");
+const todayRender = workspace.slice(workspace.indexOf('className="daily-plan-intro card"'), workspace.indexOf('{tab === "Prepare Trade"', workspace.indexOf('className="daily-plan-intro card"')));
+assert.doesNotMatch(todayRender, /swingAdvisor(Account|Holdings|Name)/, "Today must never substitute a hard-coded Swing account");
+assert.match(todayRender, /key=\{`today-copilot:\$\{advisorAccountId\}:\$\{advisorStrategy\}`\}/, "Today candidate analysis must reset when the selected account changes");
+assert.match(todayRender, /key=\{`today-holdings:\$\{advisorAccountId\}:\$\{advisorStrategy\}`\}/, "Today holdings analysis must reset when the selected account changes");
+assert.match(workspace, /tab === "Options Advisor"[\s\S]*accountId=\{advisorAccountId\}/, "Options must analyze the globally selected investment account");
+assert.match(workspace, /analysisScope === ALL_ACCOUNTS_SCOPE[\s\S]*setAdvisorAccountId\(analysisScope\)/, "The visible account selector must drive the analysis account after reload");
+const portfolioStart = workspace.indexOf("<PortfolioBuilderWizard");
+const portfolioRender = workspace.slice(portfolioStart, workspace.indexOf('{tab === "Growth Finder"', portfolioStart));
+assert.match(portfolioRender, /key=\{`portfolio-plan:\$\{advisorAccountId\}:\$\{advisorStrategy\}`\}/, "Portfolio plan must reset when the selected account changes");
+assert.match(portfolioRender, /key=\{`portfolio-guidance:\$\{advisorAccountId\}:\$\{advisorStrategy\}`\}/, "Portfolio guidance must reset when the selected account changes");
+assert.match(portfolioRender, /key=\{`portfolio-holdings:\$\{advisorAccountId\}:\$\{advisorStrategy\}`\}/, "Portfolio holdings must reset when the selected account changes");
+assert.match(portfolioRender, /key=\{`portfolio-copilot:\$\{advisorAccountId\}:\$\{advisorStrategy\}`\}/, "Portfolio recommendations must reset when the selected account changes");
+assert.doesNotMatch(portfolioRender, /swingAdvisor(Account|Holdings|Name)/, "Portfolio must never substitute a hard-coded Swing account");
 
 for (const label of ["Account:", "Entry / trigger", "Estimated proceeds", "Estimated cost", "Cash", "Stop / invalidation", "Targets", "Confidence", "Confirmation required:", "ticker\/sector concentration", "liquidity"])
   assert.match(actionGuidance, new RegExp(label.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")), `Recommendation card is missing ${label}`);
@@ -41,6 +55,10 @@ assert.match(styles, /@media\s*\(max-width:\s*380px\).*recommendation-primary-fa
 assert.match(marketCopilot, /NEXT MARKET OPEN · RANKED PREPARATION LIST/);
 assert.match(marketCopilot, /\/api\/market\/candidates\?strategy=/);
 assert.doesNotMatch(marketCopilot, /if \(marketPhase !== "open" && refresh === 0\)/, "Today must scan on initial load even when the market is closed");
+assert.match(marketCopilot, /triggerPrice - item\.invalidation/, "Swing sizing must use the actual breakout entry rather than the cheaper current quote");
+assert.match(marketCopilot, /target1 = triggerPrice \+ riskPerShare \* 2/, "Swing targets must be measured from the displayed entry trigger");
+for (const label of ["Current price", "Confirmed breakout entry", "Cheaper alternative", "Why wait:", "Never chase above the displayed entry range"])
+  assert.match(marketCopilot, new RegExp(label), `Swing recommendation is missing ${label}`);
 
 assert.match(connectionUi, /\+ Bank, Card or Loan/);
 assert.match(connectionUi, /\+ Investment Account/);

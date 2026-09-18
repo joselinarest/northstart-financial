@@ -1,5 +1,5 @@
 /* Northstar PWA worker. Private financial pages and API payloads are never cached. */
-const VERSION = "northstar-pwa-v6";
+const VERSION = "northstar-pwa-v7";
 const STATIC_CACHE = `${VERSION}-static`;
 const OFFLINE_URL = "/offline";
 const PRECACHE = [OFFLINE_URL,"/manifest.webmanifest","/favicon.svg","/icons/northstar-192.png","/icons/northstar-512.png","/icons/northstar-maskable-192.png","/icons/northstar-maskable-512.png","/icons/apple-touch-icon.png"];
@@ -22,6 +22,6 @@ self.addEventListener("fetch", event => {
 self.addEventListener("push", event => {
   let data={};try{data=event.data?event.data.json():{}}catch{data={body:event.data?.text()}}
   const urgency=data.urgency||data.severity||"info";
-  event.waitUntil(Promise.all([self.registration.showNotification(data.title||"Northstar alert",{body:data.body||"A financial event needs your review.",icon:"/icons/northstar-192.png",badge:"/icons/northstar-badge-96.png",tag:data.tag||data.eventId||"northstar-financial-alert",renotify:urgency==="critical",requireInteraction:urgency==="critical",data:{url:data.url||"/workspace/settings#transaction-notifications"}}),self.navigator.setAppBadge?.()]));
+  event.waitUntil(Promise.all([self.registration.showNotification(data.title||"Northstar alert",{body:data.body||"A financial event needs your review.",icon:"/icons/northstar-192.png",badge:"/icons/northstar-badge-96.png",tag:data.tag||data.eventId||"northstar-financial-alert",renotify:urgency==="critical",requireInteraction:urgency==="critical",data:{url:data.url||"/workspace/settings#transaction-notifications",analysisUrl:data.analysisUrl||null,alertId:data.tag||data.eventId||null}}),self.navigator.setAppBadge?.()]));
 });
 self.addEventListener("notificationclick",event=>{event.notification.close();self.navigator.clearAppBadge?.();const target=new URL(event.notification.data?.url||"/workspace/dashboard",self.location.origin).href;event.waitUntil(self.clients.matchAll({type:"window",includeUncontrolled:true}).then(list=>{for(const client of list){if(new URL(client.url).origin===self.location.origin&&"focus" in client){client.postMessage({type:"NOTIFICATION_DEEP_LINK",url:target});return client.focus()}}return self.clients.openWindow(target)}))});

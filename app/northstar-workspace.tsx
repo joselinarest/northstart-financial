@@ -2516,6 +2516,18 @@ export function NorthstarWorkspace({
     }
   };
   useEffect(() => {
+    if (
+      analysisScope === ALL_ACCOUNTS_SCOPE ||
+      !investmentAccounts.some(
+        (account) => String(account.id) === analysisScope,
+      ) ||
+      advisorAccountId === analysisScope
+    )
+      return;
+    setAdvisorAccountId(analysisScope);
+    localStorage.setItem("northstar-advisor-account", analysisScope);
+  }, [analysisScope, investmentAccounts, advisorAccountId]);
+  useEffect(() => {
     const saved = localStorage.getItem("northstar-advisor-account");
     if (!advisorAccountId && investmentAccounts.length) {
       const next =
@@ -2719,7 +2731,7 @@ export function NorthstarWorkspace({
       localStorage.setItem("northstar-advisor-account", next);
     }
   }, [tab, financeDataReady, swingAccounts, analysisScope]);
-  const swingDecisionTabs = ["Options Advisor", "Prepare Trade"],
+  const swingDecisionTabs = ["Prepare Trade"],
     longTermInvestmentTabs = ["Growth Finder"],
     isPortfolioPage = tab === "Portfolio",
     isSwingDecisionPage = swingDecisionTabs.includes(tab),
@@ -6159,13 +6171,18 @@ export function NorthstarWorkspace({
           }
         >
           <i />
-          <span>
+          <span className="desktop-market-clock">
             {marketClockText}
             <small>
               {clockTargetLabel &&
                 ` · ${marketClock.isOpen ? "close" : "open"} ${clockTargetLabel}`}
             </small>
           </span>
+          <strong className="mobile-market-countdown">
+            {marketClock.status !== "connected"
+              ? "CLOCK SETUP"
+              : `${marketClock.isOpen ? "CLOSES" : "OPENS"} ${marketCountdown}`}
+          </strong>
         </div>
         <div className="head-actions">
           <HeaderMarketSearch
@@ -6714,14 +6731,14 @@ export function NorthstarWorkspace({
               </p>
               {tab === "Options Advisor" && (
                 <SwingOptionsAdvisor
-                  accountId={swingAdvisorAccount ? String(swingAdvisorAccount.id) : ""}
-                  accountName={swingAdvisorAccount ? swingAdvisorName : "No eligible account selected"}
-                  accountStatus={swingAdvisorAccount ? "ready" : financeDataReady ? plaidNotice || "No Swing, Options, or Mixed account was returned." : "Investment account synchronization is loading."}
+                  accountId={advisorAccountId}
+                  accountName={advisorAccount ? advisorAccountName : "No eligible account selected"}
+                  accountStatus={advisorAccount ? "ready" : financeDataReady ? plaidNotice || "No investment account was returned." : "Investment account synchronization is loading."}
                   accessToken={accessToken}
-                  initialSymbol={String(swingAdvisorHoldings[0]?.ticker || swingAdvisorHoldings[0]?.symbol || "SPY")}
+                  initialSymbol={String(advisorHoldings[0]?.ticker || advisorHoldings[0]?.symbol || "SPY")}
                   onConfigureAccount={() => navigate("Accounts")}
                   onRefreshAccounts={() => loadConnectedFinance(true)}
-                  universeSymbols={swingAdvisorHoldings.map(holding => String(holding.ticker || holding.symbol || "")).filter(Boolean)}
+                  universeSymbols={advisorHoldings.map(holding => String(holding.ticker || holding.symbol || "")).filter(Boolean)}
                 />
               )}
             </div>
@@ -6752,32 +6769,32 @@ export function NorthstarWorkspace({
                     underlying Swing thesis.
                   </p>
                 </div>
-                <b>{swingAdvisorAccount ? swingAdvisorName : "ACCOUNT REQUIRED"}</b>
+                <b>{advisorAccount ? advisorAccountName : "ACCOUNT REQUIRED"}</b>
               </header>
               <SwingOptionsAdvisor
-                accountId={swingAdvisorAccount ? String(swingAdvisorAccount.id) : ""}
+                accountId={advisorAccountId}
                 accountName={String(
-                  swingAdvisorAccount?.nickname ||
-                    swingAdvisorAccount?.official_name ||
-                    swingAdvisorAccount?.name ||
+                  advisorAccount?.nickname ||
+                    advisorAccount?.official_name ||
+                    advisorAccount?.name ||
                     "No eligible account selected",
                 )}
                 accountStatus={
-                  swingAdvisorAccount
+                  advisorAccount
                     ? "ready"
                     : financeDataReady
-                      ? plaidNotice || "No Swing, Options, or Mixed account was returned."
+                      ? plaidNotice || "No investment account was returned."
                       : "Investment account synchronization is still loading or timed out."
                 }
                 accessToken={accessToken}
                 initialSymbol={String(
-                  swingAdvisorHoldings[0]?.ticker ||
-                    swingAdvisorHoldings[0]?.symbol ||
+                  advisorHoldings[0]?.ticker ||
+                    advisorHoldings[0]?.symbol ||
                     "SPY",
                 )}
                 onConfigureAccount={() => navigate("Accounts")}
                 onRefreshAccounts={() => loadConnectedFinance(true)}
-                universeSymbols={swingAdvisorHoldings.map(holding => String(holding.ticker || holding.symbol || "")).filter(Boolean)}
+                universeSymbols={advisorHoldings.map(holding => String(holding.ticker || holding.symbol || "")).filter(Boolean)}
               />
             </section>
           )}          {isLongTermInvestmentPage && !longTermAccounts.length && (
@@ -7428,6 +7445,7 @@ export function NorthstarWorkspace({
 
           {tab === "Daily Action Plan" && (
             <AutomaticMarketCopilot
+              key={`today-copilot:${advisorAccountId}:${advisorStrategy}`}
               accessToken={accessToken}
               initialStrategy={advisorStrategy}
               marketPhase={marketPhase}
@@ -7454,9 +7472,7 @@ export function NorthstarWorkspace({
                       ? String(advisorAccount.id)
                       : null,
                     accountName: advisorAccountName,
-                    accountPurpose: String(
-                      advisorAccount?.investment_purpose || "Swing",
-                    ),
+                    accountPurpose: advisorPurpose,
                   }),
                 );
                 navigate("Prepare Trade");
@@ -7483,6 +7499,7 @@ export function NorthstarWorkspace({
                 </p>
               </header>
               <ConnectedHoldingsAnalysis
+                key={`today-holdings:${advisorAccountId}:${advisorStrategy}`}
                 marketOpen={marketPhase === "open"}
                 holdings={advisorHoldings}
                 mode={advisorStrategy === "swing" ? "swing" : "long-term"}
@@ -7709,6 +7726,7 @@ export function NorthstarWorkspace({
           )}
           {tab === "Prepare Trade" && advisorHoldings.length > 0 && (
             <ConnectedHoldingsAnalysis
+              key={`prepare-holdings:${advisorAccountId}:${advisorStrategy}`}
               marketOpen={marketPhase === "open"}
               holdings={advisorHoldings}
               mode={advisorStrategy}
@@ -8460,6 +8478,7 @@ export function NorthstarWorkspace({
             advisorAccount &&
             advisorStrategy === "long-term" && (
               <LongTermPortfolioPlan
+                key={`portfolio-plan:${advisorAccountId}:${advisorStrategy}`}
                 accountName={advisorAccountName}
                 accountType={advisorAccountType}
                 accountValue={connectedPortfolioAnalysis.total}
@@ -8489,6 +8508,7 @@ export function NorthstarWorkspace({
           >
             {tab === "Portfolio" && (
               <ActionGuidancePanel
+                key={`portfolio-guidance:${advisorAccountId}:${advisorStrategy}`}
                 accountId={advisorAccountId}
                 accessToken={accessToken}
                 mode={advisorStrategy === "swing" ? "today" : "month"}
@@ -8510,6 +8530,7 @@ export function NorthstarWorkspace({
                   </summary>
                   <div className="holding-accordion-body">
                     <ConnectedHoldingsAnalysis
+                      key={`portfolio-holdings:${advisorAccountId}:${advisorStrategy}`}
                       marketOpen={marketPhase === "open"}
                       holdings={advisorHoldings}
                       mode={advisorStrategy}
@@ -8611,6 +8632,7 @@ export function NorthstarWorkspace({
               </footer>
             </section>
             <PortfolioBalanceExplorer
+              key={`portfolio-balance-explorer:${advisorAccountId}:${portfolioGoal}`}
               rows={connectedPortfolioAnalysis.rows}
               holdings={connectedPortfolioAnalysis.concentration}
               candidates={advisorSuggestions}
@@ -9187,6 +9209,7 @@ export function NorthstarWorkspace({
                 </p>
               </header>
               <AutomaticMarketCopilot
+                key={`portfolio-copilot:${advisorAccountId}:${advisorStrategy}`}
                 accessToken={accessToken}
                 initialStrategy={advisorStrategy}
                 marketPhase={marketPhase}

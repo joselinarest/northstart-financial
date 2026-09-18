@@ -21,6 +21,7 @@ const checks=[
   ["projected future candles",workspace.includes("prediction-candles")&&workspace.includes("PROJECTED CANDLES")],
   ["mobile chart reserves forecast region",predictionStyles.includes("inset:18px 44% 0 32px!important")&&!responsiveStyles.includes(".candle-field{min-width:0!important;width:100%!important")],
   ["native mobile document scrolling",styles.includes("body:has(>.workspace-view){height:auto!important")&&styles.includes("overflow-y:visible!important")&&responsiveStyles.includes("overflow-y:visible")],
+  ["live mobile market countdown",workspace.includes('className="mobile-market-countdown"')&&/marketClock\.isOpen\s*\?\s*"CLOSES"\s*:\s*"OPENS"/.test(workspace)&&/mobile-market-countdown\{display:block!important/.test(styles)],
   ["single mobile account selector",layoutStyles.includes(".workspace-view .account-scope-switcher{display:none!important}")],
   ["no page-level horizontal scrolling",layoutStyles.includes("html,body,.workspace-view{overflow-x:clip}")],
 ];

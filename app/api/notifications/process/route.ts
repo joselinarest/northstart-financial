@@ -217,7 +217,8 @@ export async function POST(request: Request) {
               JSON.stringify({
                 title: row.title,
                 body: row.explanation,
-                url: evidence.deepLink || "/workspace/accounts",
+                url: `/workspace/market-news?alertId=${encodeURIComponent(String(row.alert_id))}`,
+                analysisUrl: evidence.deepLink || "/workspace/accounts",
                 tag: row.alert_id,
                 severity: String(row.severity||"info"),
                 eventId: evidence.eventId,
