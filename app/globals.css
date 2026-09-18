@@ -1830,7 +1830,78 @@
     grid-template-columns: 1fr;
   }
 }
-.account-holdings-group {
+/* Account profile layout: compact, readable, and account-purpose aware */
+.investment-account-profile {
+  margin: 12px 16px;
+  border-radius: 14px;
+  box-shadow: 0 8px 24px rgba(17,55,43,.06);
+}
+.investment-account-profile > header {
+  grid-template-columns: 34px minmax(0,1fr) auto auto;
+  gap: 12px;
+  min-height: 62px;
+  padding: 12px 16px;
+}
+.investment-account-profile > header b {font-size:14px}
+.investment-account-profile > header span {font-size:11px;line-height:1.4}
+.investment-account-profile > header em {font-size:10px;padding:6px 10px}
+.investment-account-profile > header strong {font-size:18px}
+.investment-account-settings {
+  grid-template-columns: minmax(0,1fr) minmax(0,1fr);
+  grid-template-areas: "name purpose" "coach save";
+  gap: 14px 18px;
+  align-items: stretch;
+  padding: 18px;
+}
+.investment-account-settings > label:nth-of-type(1) {grid-area:name}
+.investment-account-settings > label:nth-of-type(2) {grid-area:purpose}
+.investment-account-settings > div:nth-of-type(1) {grid-area:coach}
+.investment-account-settings > .account-profile-save {grid-area:save}
+.investment-account-settings label {font-size:12px}
+.investment-account-settings input,
+.investment-account-settings select {min-height:44px;height:44px;font-size:14px}
+.investment-account-settings > div {
+  padding: 12px;
+  border-radius: 10px;
+  background: #f5f9f7;
+}
+.investment-account-settings > div b {font-size:12px}
+.investment-account-settings > div p {font-size:12px!important;line-height:1.5}
+.account-profile-save {justify-content:center}
+.account-profile-save button {min-height:44px;height:auto;padding:10px 14px;font-size:13px;border-radius:9px}
+.account-profile-save small {font-size:11px;text-align:center}
+.plaid-account-identity {
+  display:grid;
+  grid-template-columns:auto minmax(0,1fr);
+  gap:4px 7px;
+  min-height:46px;
+  margin-top:4px;
+  padding:9px 10px;
+  font-size:11px!important;
+}
+.plaid-account-identity span {min-width:0;overflow-wrap:anywhere}
+.account-profile-tactical {
+  grid-template-columns:minmax(0,1fr) minmax(280px,360px);
+  gap:10px 20px;
+  padding:18px;
+}
+.account-profile-tactical > div {grid-row:1/4}
+.account-profile-tactical label,
+.account-profile-tactical button,
+.account-profile-tactical > small {grid-column:2}
+.account-profile-tactical > small {grid-row:auto}
+@media (max-width: 760px) {
+  .investment-account-profile {margin:8px 6px;border-radius:12px}
+  .investment-account-profile > header {grid-template-columns:34px minmax(0,1fr);padding:11px}
+  .investment-account-profile > header em,
+  .investment-account-profile > header strong {grid-column:2;align-items:flex-start}
+  .investment-account-settings {grid-template-columns:1fr;grid-template-areas:"name" "purpose" "coach" "save";padding:13px}
+  .account-profile-tactical {grid-template-columns:1fr;padding:14px}
+  .account-profile-tactical > div,
+  .account-profile-tactical label,
+  .account-profile-tactical button,
+  .account-profile-tactical > small {grid-column:1;grid-row:auto}
+}.account-holdings-group {
   margin: 18px 20px;
   border: 1px solid #bfcfc7;
   border-radius: 12px;
@@ -1883,11 +1954,153 @@
   border: 0;
   border-radius: 0;
 }
-.account-holdings-group + .account-holdings-group {
+.account-holdings-group + /* Account profile layout: compact, readable, and account-purpose aware */
+.investment-account-profile {
+  margin: 12px 16px;
+  border-radius: 14px;
+  box-shadow: 0 8px 24px rgba(17,55,43,.06);
+}
+.investment-account-profile > header {
+  grid-template-columns: 34px minmax(0,1fr) auto auto;
+  gap: 12px;
+  min-height: 62px;
+  padding: 12px 16px;
+}
+.investment-account-profile > header b {font-size:14px}
+.investment-account-profile > header span {font-size:11px;line-height:1.4}
+.investment-account-profile > header em {font-size:10px;padding:6px 10px}
+.investment-account-profile > header strong {font-size:18px}
+.investment-account-settings {
+  grid-template-columns: minmax(0,1fr) minmax(0,1fr);
+  grid-template-areas: "name purpose" "coach save";
+  gap: 14px 18px;
+  align-items: stretch;
+  padding: 18px;
+}
+.investment-account-settings > label:nth-of-type(1) {grid-area:name}
+.investment-account-settings > label:nth-of-type(2) {grid-area:purpose}
+.investment-account-settings > div:nth-of-type(1) {grid-area:coach}
+.investment-account-settings > .account-profile-save {grid-area:save}
+.investment-account-settings label {font-size:12px}
+.investment-account-settings input,
+.investment-account-settings select {min-height:44px;height:44px;font-size:14px}
+.investment-account-settings > div {
+  padding: 12px;
+  border-radius: 10px;
+  background: #f5f9f7;
+}
+.investment-account-settings > div b {font-size:12px}
+.investment-account-settings > div p {font-size:12px!important;line-height:1.5}
+.account-profile-save {justify-content:center}
+.account-profile-save button {min-height:44px;height:auto;padding:10px 14px;font-size:13px;border-radius:9px}
+.account-profile-save small {font-size:11px;text-align:center}
+.plaid-account-identity {
+  display:grid;
+  grid-template-columns:auto minmax(0,1fr);
+  gap:4px 7px;
+  min-height:46px;
+  margin-top:4px;
+  padding:9px 10px;
+  font-size:11px!important;
+}
+.plaid-account-identity span {min-width:0;overflow-wrap:anywhere}
+.account-profile-tactical {
+  grid-template-columns:minmax(0,1fr) minmax(280px,360px);
+  gap:10px 20px;
+  padding:18px;
+}
+.account-profile-tactical > div {grid-row:1/4}
+.account-profile-tactical label,
+.account-profile-tactical button,
+.account-profile-tactical > small {grid-column:2}
+.account-profile-tactical > small {grid-row:auto}
+@media (max-width: 760px) {
+  .investment-account-profile {margin:8px 6px;border-radius:12px}
+  .investment-account-profile > header {grid-template-columns:34px minmax(0,1fr);padding:11px}
+  .investment-account-profile > header em,
+  .investment-account-profile > header strong {grid-column:2;align-items:flex-start}
+  .investment-account-settings {grid-template-columns:1fr;grid-template-areas:"name" "purpose" "coach" "save";padding:13px}
+  .account-profile-tactical {grid-template-columns:1fr;padding:14px}
+  .account-profile-tactical > div,
+  .account-profile-tactical label,
+  .account-profile-tactical button,
+  .account-profile-tactical > small {grid-column:1;grid-row:auto}
+}.account-holdings-group {
   margin-top: 22px;
 }
 @media (max-width: 700px) {
-  .account-holdings-group {
+  /* Account profile layout: compact, readable, and account-purpose aware */
+.investment-account-profile {
+  margin: 12px 16px;
+  border-radius: 14px;
+  box-shadow: 0 8px 24px rgba(17,55,43,.06);
+}
+.investment-account-profile > header {
+  grid-template-columns: 34px minmax(0,1fr) auto auto;
+  gap: 12px;
+  min-height: 62px;
+  padding: 12px 16px;
+}
+.investment-account-profile > header b {font-size:14px}
+.investment-account-profile > header span {font-size:11px;line-height:1.4}
+.investment-account-profile > header em {font-size:10px;padding:6px 10px}
+.investment-account-profile > header strong {font-size:18px}
+.investment-account-settings {
+  grid-template-columns: minmax(0,1fr) minmax(0,1fr);
+  grid-template-areas: "name purpose" "coach save";
+  gap: 14px 18px;
+  align-items: stretch;
+  padding: 18px;
+}
+.investment-account-settings > label:nth-of-type(1) {grid-area:name}
+.investment-account-settings > label:nth-of-type(2) {grid-area:purpose}
+.investment-account-settings > div:nth-of-type(1) {grid-area:coach}
+.investment-account-settings > .account-profile-save {grid-area:save}
+.investment-account-settings label {font-size:12px}
+.investment-account-settings input,
+.investment-account-settings select {min-height:44px;height:44px;font-size:14px}
+.investment-account-settings > div {
+  padding: 12px;
+  border-radius: 10px;
+  background: #f5f9f7;
+}
+.investment-account-settings > div b {font-size:12px}
+.investment-account-settings > div p {font-size:12px!important;line-height:1.5}
+.account-profile-save {justify-content:center}
+.account-profile-save button {min-height:44px;height:auto;padding:10px 14px;font-size:13px;border-radius:9px}
+.account-profile-save small {font-size:11px;text-align:center}
+.plaid-account-identity {
+  display:grid;
+  grid-template-columns:auto minmax(0,1fr);
+  gap:4px 7px;
+  min-height:46px;
+  margin-top:4px;
+  padding:9px 10px;
+  font-size:11px!important;
+}
+.plaid-account-identity span {min-width:0;overflow-wrap:anywhere}
+.account-profile-tactical {
+  grid-template-columns:minmax(0,1fr) minmax(280px,360px);
+  gap:10px 20px;
+  padding:18px;
+}
+.account-profile-tactical > div {grid-row:1/4}
+.account-profile-tactical label,
+.account-profile-tactical button,
+.account-profile-tactical > small {grid-column:2}
+.account-profile-tactical > small {grid-row:auto}
+@media (max-width: 760px) {
+  .investment-account-profile {margin:8px 6px;border-radius:12px}
+  .investment-account-profile > header {grid-template-columns:34px minmax(0,1fr);padding:11px}
+  .investment-account-profile > header em,
+  .investment-account-profile > header strong {grid-column:2;align-items:flex-start}
+  .investment-account-settings {grid-template-columns:1fr;grid-template-areas:"name" "purpose" "coach" "save";padding:13px}
+  .account-profile-tactical {grid-template-columns:1fr;padding:14px}
+  .account-profile-tactical > div,
+  .account-profile-tactical label,
+  .account-profile-tactical button,
+  .account-profile-tactical > small {grid-column:1;grid-row:auto}
+}.account-holdings-group {
     margin: 14px 10px;
   }
   .account-holdings-group > header {
@@ -17352,7 +17565,58 @@ footer {
 .goal-links small {
   color: #65766f;
 }
-.goal-contribution-history {
+.kids-monthly-tracker {
+  display: grid;
+  gap: 10px;
+  margin-top: 8px;
+  padding: 12px;
+  border: 1px solid #b9d7cc;
+  border-radius: 12px;
+  background: #f1f8f5;
+}
+.kids-monthly-tracker > header div,
+.kids-monthly-tracker article > div {
+  display: grid;
+  gap: 3px;
+}
+.kids-monthly-tracker article {
+  display: grid;
+  grid-template-columns: minmax(180px,1fr) minmax(90px,.35fr) minmax(70px,.25fr) auto;
+  gap: 9px;
+  align-items: end;
+  padding: 11px;
+  border: 1px solid #d3e4dd;
+  border-radius: 10px;
+  background: #fff;
+}
+.kids-monthly-tracker label {
+  display: grid;
+  gap: 4px;
+  color: #536760;
+  font-size: 11px;
+  font-weight: 700;
+}
+.kids-monthly-tracker input {
+  width: 100%;
+  min-height: 40px;
+  padding: 7px;
+  border: 1px solid #bcd0c8;
+  border-radius: 8px;
+}
+.kids-monthly-tracker button.secondary {
+  background: #fff;
+  color: #08785a;
+}
+.kids-monthly-tracker article > strong {
+  align-self: center;
+  color: #08785a;
+  font-size: 12px;
+}
+@media (max-width: 700px) {
+  .kids-monthly-tracker article {grid-template-columns:1fr 1fr}
+  .kids-monthly-tracker article > div,
+  .kids-monthly-tracker article > strong {grid-column:1/-1}
+}.goal-contribution-history {
   display: grid;
   gap: 8px;
   padding: 12px;
@@ -18470,3 +18734,36 @@ footer {
 .option-ranking-summary{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:1px;background:#c9d9d2;border-block:1px solid #c9d9d2}.option-ranking-summary>*{padding:10px 12px;background:#f4f8f6}.option-ranking-summary b{color:#096f54;font-size:.62rem}.option-ranking-summary span{font-size:.65rem}.option-rejections{margin:12px 16px 16px;border:1px solid #e2c8a0;border-radius:9px;overflow:hidden}.option-rejections header{display:flex;justify-content:space-between;gap:10px;padding:11px 13px;background:#fff5e5;font-size:.64rem}.option-rejections article{display:grid;grid-template-columns:100px 1fr;gap:10px;padding:10px 13px;border-top:1px solid #eadfce}.option-rejections p{margin:0;color:#715f4c;font-size:.64rem}@media(max-width:650px){.option-ranking-summary{grid-template-columns:1fr 1fr}.option-rejections header{flex-direction:column}.option-rejections article{grid-template-columns:1fr}}
 
 .options-workspace-hero{display:grid!important;grid-template-columns:minmax(0,1fr)}.options-workspace-hero>div{max-width:none!important}.options-workspace-hero .swing-options-advisor{margin:20px 0 0!important;background:#fff;text-align:left}.options-workspace-hero .option-advisor-head{position:static;height:auto}.options-workspace-hero .option-fields{position:static}.options-workspace-hero+.options-advisor-route{display:none!important}
+
+.manual-account-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 16px 18px;
+  border-top: 1px solid #e2c8c2;
+  background: #fff8f6;
+}
+.manual-account-actions > div {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+.manual-account-actions b { color: #6f2720; font-size: 13px; }
+.manual-account-actions span { color: #735c57; font-size: 12px; line-height: 1.45; }
+.manual-account-actions button {
+  flex: none;
+  min-height: 42px;
+  padding: 10px 15px;
+  border: 1px solid #a94338;
+  border-radius: 9px;
+  background: #fff;
+  color: #8c2f27;
+  font-weight: 800;
+}
+.manual-account-actions button:hover { background: #8c2f27; color: #fff; }
+.manual-account-actions button:disabled { opacity: .6; cursor: wait; }
+@media (max-width: 600px) {
+  .manual-account-actions { align-items: stretch; flex-direction: column; padding: 14px; }
+  .manual-account-actions button { width: 100%; }
+}

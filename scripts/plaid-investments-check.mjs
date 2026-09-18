@@ -6,6 +6,8 @@ const sync = await readFile(new URL("../app/api/connections/plaid/sync/route.ts"
 const webhook = await readFile(new URL("../app/api/connections/plaid/webhook/route.ts", import.meta.url), "utf8");
 const refresh = await readFile(new URL("../app/api/connections/plaid/investments-refresh/route.ts", import.meta.url), "utf8");
 const migrations = await readFile(new URL("../db/migrations.ts", import.meta.url), "utf8");
+const accounts = await readFile(new URL("../app/api/connections/plaid/route.ts", import.meta.url), "utf8");
+const accountProfile = await readFile(new URL("../app/investment-account-profile.tsx", import.meta.url), "utf8");
 
 assert.match(link, /additional_consented_products:updateMode\?\["investments"\]/);
 assert.match(link, /user:\{client_user_id:userId\}/);
@@ -30,5 +32,14 @@ assert.match(sync, /investment_sync_history/);
 assert.match(sync, /holdingsClosed/);
 assert.match(migrations, /0021_plaid_investment_access/);
 assert.match(migrations, /0028_plaid_investment_reconciliation/);
+assert.match(accounts, /manual_account_\$\{crypto\.randomUUID\(\)\}/);
+assert.match(accounts, /raw\.connection_id[\s\S]*manual\|\$\{raw\.id\}/);
+assert.match(accountProfile, /cleanIdentity/);
+assert.match(accountProfile, /Swing\|Mixed/);
+assert.match(accountProfile, /onDeleteManual/);
+assert.match(accountProfile, /Delete manual account/);
+assert.match(accounts, /body\.accountId/);
+assert.match(accounts, /a\.connection_id IS NULL/);
+assert.match(accounts, /DELETE FROM investment_transactions WHERE account_id/);
 
-console.log("Plaid Investments consent, provider refresh, holdings reconciliation, paginated trades, webhook queue, history, diagnostics, and recovery flow verified.");
+console.log("Plaid Investments consent, provider refresh, holdings reconciliation, paginated trades, webhook queue, history, diagnostics, recovery flow, additive manual accounts, deduplicated account identity, and purpose-scoped Tactical Swing, and confirmed manual-account deletion verified.");

@@ -1031,4 +1031,21 @@ export const migrations: readonly Migration[] = [
       `CREATE TABLE IF NOT EXISTS long_term_portfolio_reviews (id TEXT PRIMARY KEY,account_id TEXT NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,household_id TEXT NOT NULL REFERENCES households(id) ON DELETE CASCADE,policy_json JSONB NOT NULL,metrics_json JSONB NOT NULL,overlap_json JSONB NOT NULL,actions_json JSONB NOT NULL,stress_tests_json JSONB NOT NULL,data_timestamp TIMESTAMPTZ NOT NULL,created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP)`,
       `CREATE INDEX IF NOT EXISTS idx_long_term_reviews_account ON long_term_portfolio_reviews(account_id,created_at DESC)`,
     ],
+  },  {
+    id: "0038_kids_monthly_contribution_reminders",
+    description: "Durable monthly child and Roth contribution schedules, completion tracking, and reminders",
+    statements: [
+      `CREATE TABLE IF NOT EXISTS child_contribution_schedules (
+        id TEXT PRIMARY KEY, household_id TEXT NOT NULL REFERENCES households(id) ON DELETE CASCADE,
+        child_id TEXT NOT NULL REFERENCES child_profiles(id) ON DELETE CASCADE,
+        goal_id TEXT NOT NULL REFERENCES child_goals(id) ON DELETE CASCADE,
+        account_id TEXT NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+        schedule_type TEXT NOT NULL CHECK(schedule_type IN ('KID_ACCOUNT','ROTH_IRA')),
+        amount_cents BIGINT NOT NULL CHECK(amount_cents > 0), day_of_month INTEGER NOT NULL DEFAULT 1 CHECK(day_of_month BETWEEN 1 AND 28),
+        active BOOLEAN NOT NULL DEFAULT TRUE, created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP, UNIQUE(goal_id,account_id)
+      )`,
+      `CREATE UNIQUE INDEX IF NOT EXISTS idx_child_monthly_expected ON child_contributions(goal_id,account_id,contribution_date) WHERE source='TRANSFER'`,
+      `CREATE INDEX IF NOT EXISTS idx_child_contribution_schedules_household ON child_contribution_schedules(household_id,active,day_of_month)`,
+    ],
   },] as const;

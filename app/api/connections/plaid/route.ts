@@ -33,15 +33,17 @@ export async function GET(request: Request) {
     const canonical = new Map<string, Record<string, any>>(),
       accountMap = new Map<string, string>();
     for (const raw of accounts.results as Array<Record<string, any>>) {
-      const key = [
-        raw.institution_name || "",
-        raw.official_name || raw.name || "",
-        raw.type || "",
-        raw.subtype || "",
-        raw.mask || "",
-      ]
-        .map((value) => String(value).trim().toLowerCase())
-        .join("|");
+      const key = raw.connection_id
+        ? [
+            raw.institution_name || "",
+            raw.official_name || raw.name || "",
+            raw.type || "",
+            raw.subtype || "",
+            raw.mask || "",
+          ]
+            .map((value) => String(value).trim().toLowerCase())
+            .join("|")
+        : `manual|${raw.id}`;
       const existing = canonical.get(key);
       if (existing) {
         accountMap.set(String(raw.id), String(existing.id));
@@ -390,9 +392,62 @@ export async function POST(request: Request) {
 export async function DELETE(request: Request) {
   try {
     const { db, householdId, userId, role } = await workspace(request),
-      body = (await request.json()) as { connectionId?: string };
+      body = (await request.json()) as {
+        connectionId?: string;
+        accountId?: string;
+      };
+
+    if (body.accountId) {
+      const account = await db
+        .prepare(
+          `SELECT a.id,COALESCE(NULLIF(a.nickname,''),NULLIF(a.name,''),'Manual investment account') account_name
+           FROM accounts a
+           JOIN entities e ON e.id=a.entity_id
+           WHERE a.id=? AND e.household_id=? AND a.type='investment' AND a.connection_id IS NULL`,
+        )
+        .bind(body.accountId, householdId)
+        .first<Record<string, string>>();
+      if (!account)
+        return Response.json(
+          { error: "Manual investment account not found. Plaid accounts must be disconnected from their institution card." },
+          { status: 404 },
+        );
+
+      await db.batch([
+        db
+          .prepare(
+            `DELETE FROM tax_lot_disposals
+             WHERE lot_id IN (SELECT id FROM tax_lots WHERE account_id=?)
+                OR sell_transaction_id IN (SELECT id FROM investment_transactions WHERE account_id=?)`,
+          )
+          .bind(body.accountId, body.accountId),
+        db.prepare("DELETE FROM tax_lots WHERE account_id=?").bind(body.accountId),
+        db
+          .prepare("UPDATE investment_transactions SET transfer_account_id=NULL WHERE transfer_account_id=?")
+          .bind(body.accountId),
+        db
+          .prepare("DELETE FROM investment_transactions WHERE account_id=?")
+          .bind(body.accountId),
+        db.prepare("DELETE FROM holdings WHERE account_id=?").bind(body.accountId),
+        db.prepare("DELETE FROM transactions WHERE account_id=?").bind(body.accountId),
+        db
+          .prepare(
+            "DELETE FROM accounts WHERE id=? AND connection_id IS NULL AND entity_id IN (SELECT id FROM entities WHERE household_id=?)",
+          )
+          .bind(body.accountId, householdId),
+      ]);
+      return Response.json({
+        ok: true,
+        accountId: account.id,
+        accountName: account.account_name,
+      });
+    }
+
     if (!body.connectionId)
-      return Response.json({ error: "connectionId required" }, { status: 400 });
+      return Response.json(
+        { error: "accountId or connectionId required" },
+        { status: 400 },
+      );
     const connection = await db
       .prepare(
         "SELECT id,institution_name,connected_by_user_id,encrypted_access_token FROM connections WHERE id=? AND household_id=? AND provider='plaid'",

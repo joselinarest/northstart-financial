@@ -4364,6 +4364,60 @@ export function NorthstarWorkspace({
       setPlaidBusy(false);
     }
   };
+  const removeManualInvestmentAccount = async (
+    account: Record<string, any>,
+  ): Promise<boolean> => {
+    const accountName = String(
+      account.nickname || account.name || "Manual investment account",
+    );
+    const accountHoldings = connectedFinance.holdings.filter(
+      (holding) => String(holding.account_id) === String(account.id),
+    );
+    if (
+      !(await confirmAction({
+        title: `Delete ${accountName}?`,
+        description:
+          "This permanently removes this manually entered account, its holdings, investment history, Kids/goal links, contribution schedule, and saved account settings. Plaid-connected accounts are not affected.",
+        confirmLabel: "Delete manual account",
+        variant: "critical",
+        context: (
+          <div>
+            <strong>{accountName}</strong>
+            <span>
+              {accountHoldings.length} holding
+              {accountHoldings.length === 1 ? "" : "s"}
+            </span>
+          </div>
+        ),
+        confirmationText: accountName,
+      }))
+    )
+      return false;
+    setPlaidBusy(true);
+    setPlaidNotice(`Deleting ${accountName}…`);
+    try {
+      const response = await fetch("/api/connections/plaid", {
+          method: "DELETE",
+          headers: financeHeaders(),
+          body: JSON.stringify({ accountId: account.id }),
+        }),
+        data = await apiPayload(response);
+      if (!response.ok)
+        throw new Error(data.error || "Unable to delete manual account");
+      setPlaidNotice(
+        `✓ ${data.accountName || accountName} was deleted. Plaid accounts were not changed.`,
+      );
+      await loadConnectedFinance();
+      return true;
+    } catch (error) {
+      setPlaidNotice(
+        error instanceof Error ? error.message : "Unable to delete manual account",
+      );
+      return false;
+    } finally {
+      setPlaidBusy(false);
+    }
+  };
   const plaidResumeStarted = useRef(false);
   const loadPlaidScript = async () => {
     if ((window as any).Plaid) return;
@@ -8325,6 +8379,7 @@ export function NorthstarWorkspace({
                     holdings={accountHoldings}
                     onSave={updateInvestmentAccount}
                     onAddHolding={addManualHolding}
+                    onDeleteManual={removeManualInvestmentAccount}
                   >
                     {accountHoldings.length ? (
                       <>
