@@ -82,6 +82,7 @@ export default function SwingOptionsAdvisor({
   const [results, setResults] = useState<OptionResult[]>([]);
   const [rejections, setRejections] = useState<Array<{ symbol: string; reason: string }>>([]);
   const autoScanKey = useRef("");
+  const [scanUniverse, setScanUniverse] = useState<string[]>([]);
   const headers = useMemo(() => ({
     "Content-Type": "application/json",
     ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
@@ -95,24 +96,61 @@ export default function SwingOptionsAdvisor({
     setNotice(`${automatic ? "Scanning" : "Analyzing"} ${unique.length} underlying${unique.length === 1 ? "" : "s"} and both CALL / PUT chains for ${accountName}…`);
     setResults([]); setRejections([]);
     try {
-      const settled = await Promise.allSettled(unique.flatMap(ticker => ["bullish", "bearish"].map(async outlook => {
-        const response = await fetch("/api/market/options", { method: "POST", headers, body: JSON.stringify({ accountId, symbol: ticker, outlook, maxRisk: settings?.maxRisk ?? maxRisk, targetDte: settings?.targetDte ?? targetDte }) });
-        const body = await response.json();
-        if (!response.ok) throw new Error(`${ticker} ${outlook === "bullish" ? "CALL" : "PUT"}: ${body.error || "option analysis failed"}`);
-        return body as OptionResult;
-      })));
-      const completed = settled.flatMap(item => item.status === "fulfilled" ? [item.value] : []).sort((a, b) => (b.decision.confidence + b.contract.score) - (a.decision.confidence + a.contract.score));
-      const rejected = settled.flatMap(item => item.status === "rejected" ? [{ symbol: item.reason instanceof Error ? item.reason.message.split(":")[0] : "Unknown", reason: item.reason instanceof Error ? item.reason.message : "Option analysis failed" }] : []);
-      setResults(completed); setRejections(rejected);
+      const response = await fetch("/api/market/options/scan", {
+        method: "POST",
+        headers,
+        signal: AbortSignal.timeout(30000),
+        body: JSON.stringify({ accountId, symbols: unique, maxRisk: settings?.maxRisk ?? maxRisk, targetDte: settings?.targetDte ?? targetDte }),
+      });
+      const body = await response.json();
+      if (!response.ok) throw new Error(body.error || "The options scan failed.");
+      const completed = (Array.isArray(body.results) ? body.results : []).sort((a: OptionResult, b: OptionResult) => (b.decision.confidence + b.contract.score) - (a.decision.confidence + a.contract.score)) as OptionResult[];
+      const rejected = Array.isArray(body.rejections) ? body.rejections : [];
+      setResults(completed);
+      setRejections(rejected);
       const actionable = completed.filter(item => item.status === "CANDIDATE" && item.decision.action === "BUY_IF").length;
-      setNotice(`Checked ${unique.length} stock${unique.length === 1 ? "" : "s"} in both directions. Found ${completed.length} contract${completed.length === 1 ? "" : "s"} worth reviewing; ${actionable} ${actionable === 1 ? "is" : "are"} ready only if the stated conditions occur. ${rejected.length} did not meet the safety rules. Same-day options are off.`);
+      setNotice("Checked " + unique.length + " stock" + (unique.length === 1 ? "" : "s") + " in both directions. Found " + completed.length + " contract" + (completed.length === 1 ? "" : "s") + " worth reviewing; " + actionable + " " + (actionable === 1 ? "is" : "are") + " ready only if the stated conditions occur. " + rejected.length + " did not meet the safety rules. Same-day options are off.");
+    } catch (error) {
+      const message = error instanceof DOMException && error.name === "TimeoutError"
+        ? "The scan took too long and was stopped. Your page is still usable; retry when market data is responding."
+        : error instanceof Error ? error.message : "The options scan failed.";
+      setResults([]);
+      setRejections([]);
+      setNotice(message);
     } finally { setLoading(false); }
   };
+
+  useEffect(() => {
+    let cancelled = false;
+    const holdings = [...new Set(universeSymbols.map(value => value.toUpperCase()).filter(Boolean))];
+    if (!accountId) { setScanUniverse(holdings.slice(0, 6)); return; }
+    void (async () => {
+      try {
+        const response = await fetch("/api/market/candidates/discovery?accountId=" + encodeURIComponent(accountId) + "&strategy=ALL", { headers, signal: AbortSignal.timeout(8000) });
+        const body = await response.json();
+        if (!response.ok) throw new Error(body.error || "Candidate discovery unavailable");
+        const discovered = (Array.isArray(body.candidates) ? body.candidates : [])
+          .filter((candidate: Record<string, unknown>) => candidate.status !== "REJECTED")
+          .map((candidate: Record<string, unknown>) => String(candidate.symbol || "").toUpperCase())
+          .filter(Boolean);
+        const mixed: string[] = [];
+        const limit = Math.max(holdings.length, discovered.length);
+        for (let index = 0; index < limit; index += 1) {
+          if (discovered[index]) mixed.push(discovered[index]);
+          if (holdings[index]) mixed.push(holdings[index]);
+        }
+        if (!cancelled) setScanUniverse([...new Set(mixed)].slice(0, 6));
+      } catch {
+        if (!cancelled) setScanUniverse(holdings.slice(0, 6));
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [accountId, headers, universeSymbols.join(",")]);
 
   const analyze = () => analyzeTickers([symbol]);
   const reset = async () => {
     const defaultSymbol = initialSymbol || universeSymbols[0] || "SPY";
-    const accountUniverse = [...new Set(universeSymbols.map(value => value.toUpperCase()).filter(Boolean))].slice(0, 6);
+    const accountUniverse = scanUniverse;
     setSymbol(defaultSymbol);
     setMaxRisk(500);
     setTargetDte(45);
@@ -120,12 +158,12 @@ export default function SwingOptionsAdvisor({
     await analyzeTickers(accountUniverse.length ? accountUniverse : [defaultSymbol], true, { maxRisk: 500, targetDte: 45 });
   };
   useEffect(() => {
-    const tickers = [...new Set(universeSymbols.map(value => value.toUpperCase()).filter(Boolean))].slice(0, 6);
+    const tickers = scanUniverse;
     const key = `${accountId}:${tickers.join(",")}`;
     if (!accountId || !tickers.length || autoScanKey.current === key) return;
     autoScanKey.current = key;
     void analyzeTickers(tickers, true);
-  }, [accountId, universeSymbols.join(",")]);
+  }, [accountId, scanUniverse.join(",")]);
   return <section id="options-advisor" className="option-contract-advisor swing-options-advisor">
     <div className="option-advisor-head">
       <div>
