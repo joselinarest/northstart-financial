@@ -30,6 +30,14 @@ type OptionResult = {
   };
   rationale: string[];
   warnings: string[];
+  catalystGate?: {
+    pass: boolean;
+    status: "CLEAR" | "BLOCKED" | "UNAVAILABLE";
+    summary: string;
+    blockers: string[];
+    confirmations: string[];
+    nextEvent?: { label: string; date?: string | null; daysAway?: number | null } | null;
+  };
   decision: {
     action: string;
     confidence: number;
@@ -181,32 +189,43 @@ export default function SwingOptionsAdvisor({
       <button type="button" disabled={loading || !accountId} onClick={analyze}>{loading ? "Checking options…" : "Find options"}</button><button type="button" className="secondary" disabled={loading} onClick={reset}>Reset</button>
     </div>
     {notice && <div className="option-notice">{notice}</div>}
-    {results.length > 0 && <div className="option-ranking-summary"><b>BEST OPTIONS SETUPS NOW</b><span>{results.filter(item => item.status === "CANDIDATE" && item.decision.action === "BUY_IF").length} actionable</span><b>WATCH / WAIT FOR TRIGGER</b><span>{results.filter(item => item.decision.action !== "BUY_IF").length} awaiting confirmation</span><b>NO TRADE / REJECTED</b><span>{rejections.length} rejected</span></div>}
-    {results.length > 0 && <div className="swing-option-results">{results.map(result => {
+    {results.length > 0 && <div className="option-ranking-summary" aria-label="Options scan summary"><span><b>{results.filter(item => item.status === "CANDIDATE" && item.decision.action === "BUY_IF").length}</b>Ready if trigger confirms</span><span><b>{results.filter(item => item.decision.action !== "BUY_IF").length}</b>Watch or wait</span><span><b>{rejections.length}</b>Rejected by safety rules</span></div>}
+    {results.length > 0 && <div className="swing-option-results">{results.map((result, rank) => {
       const actionable = result.status === "CANDIDATE" && !["WAIT", "NO_ACTION", "INSUFFICIENT_CONFIRMATION"].includes(result.decision.action);
+      const actionLabel = actionable ? `BUY 1 ${result.contract.type} IF` : result.catalystGate?.status === "BLOCKED" || result.catalystGate?.status === "UNAVAILABLE" ? "WAIT FOR CATALYST" : "NO OPTION TRADE";
       return <article className={`exact-contract option-recommendation ${actionable ? "candidate" : "no-trade"}`} key={result.contract.contractSymbol}>
-        <div className="contract-verdict">
-          <span>{actionable ? `${result.decision.action.replaceAll("_", " ")} · VERIFY BEFORE ACTING` : "NO OPTION TRADE · WAIT FOR CONFIRMATION"}</span>
-          <h3>{result.underlying} {result.contract.type} · {result.contract.contractSymbol}</h3>
-          <p>{result.contract.expiration} · {result.contract.dte} DTE · strike {money(result.contract.strike)} · underlying {money(result.underlyingPrice)}</p>
+        <div className="option-decision-hero">
+          <div><span>#{rank + 1} · {result.account.name}</span><strong>{actionLabel}</strong><h3>{result.underlying} {result.contract.type} · {money(result.contract.strike)} strike</h3><p>{result.contract.expiration} · {result.contract.dte} days remaining · underlying {money(result.underlyingPrice)}</p></div>
+          <b className={actionable ? "ready" : "wait"}>{result.decision.confidence}%<small>confidence</small></b>
         </div>
-        <div className="contract-metrics">
-          <span><small>Account</small><b>{result.account.name}</b><em>{result.account.strategy}</em></span>
-          <span><small>Suggested size</small><b>{actionable ? "1 contract" : "0 contracts"}</b><em>100-share multiplier</em></span>
-          <span><small>Limit / ask</small><b>{money(result.contract.ask)}</b><em>{money(result.contract.premium)} total premium</em></span>
-          <span><small>Maximum loss</small><b>{money(result.contract.maxLoss)}</b><em>100% of premium</em></span>
-          <span><small>Breakeven</small><b>{money(result.contract.breakeven)}</b><em>At expiration</em></span>
-          <span><small>Confidence</small><b>{result.decision.confidence}%</b><em>{result.decision.confidenceBand} · data {result.decision.dataQuality}/100</em></span>
-          <span><small>Delta / theta</small><b>{result.contract.delta == null ? "—" : result.contract.delta.toFixed(2)} / {result.contract.theta == null ? "—" : result.contract.theta.toFixed(2)}</b><em>Direction and daily decay</em></span>
-          <span><small>Liquidity</small><b>{result.contract.liquidityQuality}</b><em>{result.contract.spreadPct.toFixed(1)}% spread · volume {result.contract.volume}</em></span>
+        <div className="option-essential-facts">
+          <span><small>Contracts</small><b>{actionable ? "1" : "0"}</b><em>{actionable ? "Defined-risk position" : "No position yet"}</em></span>
+          <span><small>Entry premium</small><b>{money(result.contract.ask)}</b><em>{money(result.contract.premium)} total cost</em></span>
+          <span><small>Maximum loss</small><b>{money(result.contract.maxLoss)}</b><em>Premium at risk</em></span>
+          <span><small>Break-even</small><b>{money(result.contract.breakeven)}</b><em>At expiration</em></span>
         </div>
-        <div className="contract-explanation">
-          <section><b>Why this result?</b>{result.rationale.map(reason => <p key={reason}>{reason}</p>)}</section>
-          <section><b>Exact confirmation still required</b><p>{result.decision.interpretation}</p>{result.decision.whatWouldChange.map(item => <p key={item}>{item}</p>)}</section>
-          <section><b>Invalidation / do not enter</b><p>{result.decision.invalidation}</p><p>Do not enter if the live spread, premium, underlying thesis, earnings risk, or account buying power no longer matches this snapshot.</p></section>
-        </div>
-        <footer>Data {new Date(result.asOf).toLocaleString()} · Options may lose 100% of premium. Northstar never executes the trade.</footer>
+        <section className={`option-catalyst-gate ${result.catalystGate?.status?.toLowerCase() || "unavailable"}`}>
+          <div><small>CATALYST / EVENT GATE</small><b>{result.catalystGate?.status || "UNAVAILABLE"}</b></div>
+          <p>{result.catalystGate?.summary || "Current news and earnings coverage must load before an option entry can qualify."}</p>
+          {result.catalystGate?.nextEvent && <strong>{result.catalystGate.nextEvent.label}</strong>}
+        </section>
+        <section className="option-required-trigger"><small>EXACT ACTION CONDITION</small><b>{result.decision.interpretation}</b><p>{result.decision.invalidation}</p></section>
+        <details className="option-full-analysis">
+          <summary>Full contract analysis and Greeks</summary>
+          <div className="contract-metrics">
+            <span><small>Exact contract</small><b>{result.contract.contractSymbol}</b><em>{result.contract.expiration}</em></span>
+            <span><small>Bid / ask</small><b>{money(result.contract.bid)} / {money(result.contract.ask)}</b><em>{result.contract.spreadPct.toFixed(1)}% spread</em></span>
+            <span><small>Delta / theta</small><b>{result.contract.delta == null ? "—" : result.contract.delta.toFixed(2)} / {result.contract.theta == null ? "—" : result.contract.theta.toFixed(2)}</b><em>Direction / daily decay</em></span>
+            <span><small>IV / liquidity</small><b>{result.contract.iv == null ? "—" : `${(result.contract.iv * 100).toFixed(1)}%`} · {result.contract.liquidityQuality}</b><em>Volume {result.contract.volume}</em></span>
+            <span><small>Data quality</small><b>{result.decision.dataQuality}/100</b><em>{result.decision.confidenceBand}</em></span>
+          </div>
+          <div className="contract-explanation">
+            <section><b>Why this result?</b>{result.rationale.map(reason => <p key={reason}>{reason}</p>)}</section>
+            <section><b>What still must happen?</b>{result.decision.whatWouldChange.map(item => <p key={item}>{item}</p>)}</section>
+            <section><b>What can go wrong?</b>{result.warnings.map(item => <p key={item}>{item}</p>)}</section>
+          </div>
+        </details>
+        <footer>Data {new Date(result.asOf).toLocaleString()} · Analysis only; Northstar never sends an order.</footer>
       </article>;
-    })}</div>}
-    {rejections.length > 0 && <section className="option-rejections"><header><b>NO OPTION TRADE RIGHT NOW</b><span>Northstar checked both directions but did not find a contract that fits your budget and safety rules.</span></header>{rejections.map((item, index) => <article key={`${item.symbol}-${index}`}><b>{item.symbol}</b><p>{explainRejection(item.reason, maxRisk)}</p><details><summary>Technical reason</summary><p>{item.reason}</p></details></article>)}</section>}  </section>;
+    })}</div>}    {rejections.length > 0 && <section className="option-rejections"><header><b>NO OPTION TRADE RIGHT NOW</b><span>Northstar checked both directions but did not find a contract that fits your budget and safety rules.</span></header>{rejections.map((item, index) => <article key={`${item.symbol}-${index}`}><b>{item.symbol}</b><p>{explainRejection(item.reason, maxRisk)}</p><details><summary>Technical reason</summary><p>{item.reason}</p></details></article>)}</section>}  </section>;
 }
