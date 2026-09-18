@@ -23,6 +23,7 @@ import AccountScopeDashboard, {
   ALL_ACCOUNTS_SCOPE,
 } from "@/app/account-scope-dashboard";
 import { useConfirm } from "@/app/confirmation-modal";
+import SwingOptionsAdvisor from "@/app/swing-options-advisor";
 
 const AcademyLab = dynamic(() => import("@/app/academy-lab")),
   AdvancedStudyChart = dynamic(() => import("@/app/advanced-study-chart")),
@@ -40,7 +41,6 @@ const AcademyLab = dynamic(() => import("@/app/academy-lab")),
   ),
   DailyCloseReview = dynamic(() => import("@/app/daily-close-review")),
   TacticalRebuyPanel = dynamic(() => import("@/app/tactical-rebuy-panel")),
-  SwingOptionsAdvisor = dynamic(() => import("@/app/swing-options-advisor")),
   PaperTradingSimulator = dynamic(
     () => import("@/app/paper-trading-simulator"),
   ),
@@ -7272,34 +7272,30 @@ export function NorthstarWorkspace({
                 </div>
                 <b>{swingAdvisorAccount ? swingAdvisorName : "ACCOUNT REQUIRED"}</b>
               </header>
-              {swingAdvisorAccount ? (
-                <SwingOptionsAdvisor
-                  accountId={String(swingAdvisorAccount.id)}
-                  accountName={String(
-                    swingAdvisorAccount.nickname ||
-                      swingAdvisorAccount.official_name ||
-                      swingAdvisorAccount.name ||
-                      "Swing account",
-                  )}
-                  accessToken={accessToken}
-                  initialSymbol={String(
-                    swingAdvisorHoldings[0]?.ticker ||
-                      swingAdvisorHoldings[0]?.symbol ||
-                      "SPY",
-                  )}
-                />
-              ) : (
-                <div className="purpose-empty" id="options-advisor">
-                  <b>Select a Swing, Options, or Mixed investment account.</b>
-                  <span>
-                    The options advisor remains visible, but it cannot calculate a
-                    contract or premium risk without a specific eligible account.
-                  </span>
-                  <button onClick={() => navigate("Accounts")}>
-                    Configure an eligible account →
-                  </button>
-                </div>
-              )}
+              <SwingOptionsAdvisor
+                accountId={swingAdvisorAccount ? String(swingAdvisorAccount.id) : ""}
+                accountName={String(
+                  swingAdvisorAccount?.nickname ||
+                    swingAdvisorAccount?.official_name ||
+                    swingAdvisorAccount?.name ||
+                    "No eligible account selected",
+                )}
+                accountStatus={
+                  swingAdvisorAccount
+                    ? "ready"
+                    : financeDataReady
+                      ? plaidNotice || "No Swing, Options, or Mixed account was returned."
+                      : "Investment account synchronization is still loading or timed out."
+                }
+                accessToken={accessToken}
+                initialSymbol={String(
+                  swingAdvisorHoldings[0]?.ticker ||
+                    swingAdvisorHoldings[0]?.symbol ||
+                    "SPY",
+                )}
+                onConfigureAccount={() => navigate("Accounts")}
+                onRefreshAccounts={() => loadConnectedFinance(true)}
+              />
             </section>
           )}
           {tab === "Daily Action Plan" && (

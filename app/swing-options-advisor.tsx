@@ -52,11 +52,17 @@ export default function SwingOptionsAdvisor({
   accountName,
   accessToken,
   initialSymbol = "SPY",
+  accountStatus = "ready",
+  onConfigureAccount,
+  onRefreshAccounts,
 }: {
   accountId: string;
   accountName: string;
   accessToken?: string | null;
   initialSymbol?: string;
+  accountStatus?: string;
+  onConfigureAccount?: () => void;
+  onRefreshAccounts?: () => void;
 }) {
   const [symbol, setSymbol] = useState(initialSymbol);
   const [maxRisk, setMaxRisk] = useState(500);
@@ -71,6 +77,10 @@ export default function SwingOptionsAdvisor({
 
   const analyze = async () => {
     const ticker = symbol.trim().toUpperCase();
+    if (!accountId) {
+      setNotice(accountStatus || "Select a Swing, Options, or Mixed account first.");
+      return;
+    }
     if (!ticker) return;
     setLoading(true);
     setNotice(`Comparing a defined-risk CALL and PUT for ${ticker} in ${accountName}…`);
@@ -106,11 +116,12 @@ export default function SwingOptionsAdvisor({
       </div>
       <em>ANALYSIS ONLY · NO ORDER IS SENT</em>
     </div>
+    {!accountId && <div className="option-account-required" role="alert"><div><b>Investment account data is unavailable</b><span>{accountStatus}</span></div><div><button type="button" onClick={onRefreshAccounts}>Refresh accounts</button><button type="button" onClick={onConfigureAccount}>Open account settings</button></div></div>}
     <div className="option-fields">
       <label>Underlying ticker<input value={symbol} onChange={event => setSymbol(event.target.value.toUpperCase().replace(/[^A-Z.]/g, "").slice(0, 10))} /></label>
       <label>Expiration window<select value={targetDte} onChange={event => setTargetDte(Number(event.target.value))}><option value="21">About 21 DTE</option><option value="45">About 45 DTE</option><option value="60">About 60 DTE</option><option value="90">About 90 DTE</option></select></label>
       <label>Maximum premium risk<div className="money-input"><b>$</b><input type="number" min="50" step="50" value={maxRisk} onChange={event => setMaxRisk(Math.max(50, Number(event.target.value) || 50))} /></div></label>
-      <button type="button" disabled={loading} onClick={analyze}>{loading ? "Analyzing CALL + PUT…" : "Analyze CALL + PUT"}</button>
+      <button type="button" disabled={loading || !accountId} onClick={analyze}>{loading ? "Analyzing CALL + PUT…" : "Analyze CALL + PUT"}</button>
     </div>
     {notice && <div className="option-notice">{notice}</div>}
     {results.length > 0 && <div className="swing-option-results">{results.map(result => {
