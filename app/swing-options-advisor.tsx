@@ -47,6 +47,14 @@ const money = (value: number | null | undefined) =>
     ? "—"
     : new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(Number(value));
 
+const explainRejection = (reason: string, riskLimit: number) => {
+  const direction = reason.includes(" PUT") ? "PUT" : "CALL";
+  if (reason.includes("No contract passed expiration, quote, liquidity, and maximum-premium filters")) {
+    return `No ${direction} is recommended right now. The available contracts were outside the selected time window, did not have a reliable live price, were too difficult to trade at a fair price, or cost more than your $${riskLimit.toLocaleString()} limit.`;
+  }
+  return `No ${direction} is recommended right now. Northstar could not verify a contract that fits this account and the selected risk limit.`;
+};
+
 export default function SwingOptionsAdvisor({
   accountId,
   accountName,
@@ -97,11 +105,19 @@ export default function SwingOptionsAdvisor({
       const rejected = settled.flatMap(item => item.status === "rejected" ? [{ symbol: item.reason instanceof Error ? item.reason.message.split(":")[0] : "Unknown", reason: item.reason instanceof Error ? item.reason.message : "Option analysis failed" }] : []);
       setResults(completed); setRejections(rejected);
       const actionable = completed.filter(item => item.status === "CANDIDATE" && item.decision.action === "BUY_IF").length;
-      setNotice(`Scan complete · ${unique.length} securities · ${completed.length} exact contracts evaluated · ${actionable} actionable · ${rejected.length} rejected. 0DTE is excluded; minimum 14 DTE.`);
+      setNotice(`Checked ${unique.length} stock${unique.length === 1 ? "" : "s"} in both directions. Found ${completed.length} contract${completed.length === 1 ? "" : "s"} worth reviewing; ${actionable} ${actionable === 1 ? "is" : "are"} ready only if the stated conditions occur. ${rejected.length} did not meet the safety rules. Same-day options are off.`);
     } finally { setLoading(false); }
   };
 
   const analyze = () => analyzeTickers([symbol]);
+  const reset = () => {
+    setSymbol(initialSymbol || universeSymbols[0] || "SPY");
+    setMaxRisk(500);
+    setTargetDte(45);
+    setResults([]);
+    setRejections([]);
+    setNotice("Reset complete. Choose a stock and select Find options when you are ready.");
+  };
   useEffect(() => {
     const tickers = [...new Set(universeSymbols.map(value => value.toUpperCase()).filter(Boolean))].slice(0, 6);
     const key = `${accountId}:${tickers.join(",")}`;
@@ -112,18 +128,18 @@ export default function SwingOptionsAdvisor({
   return <section id="options-advisor" className="option-contract-advisor swing-options-advisor">
     <div className="option-advisor-head">
       <div>
-        <span>SWING ACCOUNT · CALL / PUT DECISION SUPPORT</span>
+        <span>OPTIONS REVIEW FOR THIS ACCOUNT</span>
         <h2>Options suggestions for {accountName}</h2>
-        <p>Northstar keeps the share thesis and option thesis separate. It compares both directions using this account, current chain liquidity, Greeks, premium risk and independent evidence.</p>
+        <p>Northstar first checks whether the stock has a strong enough setup. It then compares CALLs and PUTs and recommends a contract only when the direction, price, time remaining, trading quality, and account risk all agree.</p>
       </div>
       <em>ANALYSIS ONLY · NO ORDER IS SENT</em>
     </div>
     {!accountId && <div className="option-account-required" role="alert"><div><b>Investment account data is unavailable</b><span>{accountStatus}</span></div><div><button type="button" onClick={onRefreshAccounts}>Refresh accounts</button><button type="button" onClick={onConfigureAccount}>Open account settings</button></div></div>}
     <div className="option-fields">
-      <label>Underlying ticker<input value={symbol} onChange={event => setSymbol(event.target.value.toUpperCase().replace(/[^A-Z.]/g, "").slice(0, 10))} /></label>
-      <label>Expiration window<select value={targetDte} onChange={event => setTargetDte(Number(event.target.value))}><option value="21">About 21 DTE</option><option value="45">About 45 DTE</option><option value="60">About 60 DTE</option><option value="90">About 90 DTE</option></select></label>
-      <label>Maximum premium risk<div className="money-input"><b>$</b><input type="number" min="50" step="50" value={maxRisk} onChange={event => setMaxRisk(Math.max(50, Number(event.target.value) || 50))} /></div></label>
-      <button type="button" disabled={loading || !accountId} onClick={analyze}>{loading ? "Analyzing CALL + PUT…" : "Analyze CALL + PUT"}</button>
+      <label>Stock to analyze<input value={symbol} onChange={event => setSymbol(event.target.value.toUpperCase().replace(/[^A-Z.]/g, "").slice(0, 10))} /></label>
+      <label>How much time should it have?<select value={targetDte} onChange={event => setTargetDte(Number(event.target.value))}><option value="21">About 3 weeks</option><option value="45">About 6 weeks</option><option value="60">About 2 months</option><option value="90">About 3 months</option></select></label>
+      <label>Most I am willing to lose<div className="money-input"><b>$</b><input type="number" min="50" step="50" value={maxRisk} onChange={event => setMaxRisk(Math.max(50, Number(event.target.value) || 50))} /></div></label>
+      <button type="button" disabled={loading || !accountId} onClick={analyze}>{loading ? "Checking options…" : "Find options"}</button><button type="button" className="secondary" disabled={loading} onClick={reset}>Reset</button>
     </div>
     {notice && <div className="option-notice">{notice}</div>}
     {results.length > 0 && <div className="option-ranking-summary"><b>BEST OPTIONS SETUPS NOW</b><span>{results.filter(item => item.status === "CANDIDATE" && item.decision.action === "BUY_IF").length} actionable</span><b>WATCH / WAIT FOR TRIGGER</b><span>{results.filter(item => item.decision.action !== "BUY_IF").length} awaiting confirmation</span><b>NO TRADE / REJECTED</b><span>{rejections.length} rejected</span></div>}
@@ -153,5 +169,5 @@ export default function SwingOptionsAdvisor({
         <footer>Data {new Date(result.asOf).toLocaleString()} · Options may lose 100% of premium. Northstar never executes the trade.</footer>
       </article>;
     })}</div>}
-    {rejections.length > 0 && <section className="option-rejections"><header><b>NO TRADE · REJECTED SETUPS</b><span>Analyzed, but no exact contract passed every gate.</span></header>{rejections.map((item, index) => <article key={`${item.symbol}-${index}`}><b>{item.symbol}</b><p>{item.reason}</p></article>)}</section>}  </section>;
+    {rejections.length > 0 && <section className="option-rejections"><header><b>NO OPTION TRADE RIGHT NOW</b><span>Northstar checked both directions but did not find a contract that fits your budget and safety rules.</span></header>{rejections.map((item, index) => <article key={`${item.symbol}-${index}`}><b>{item.symbol}</b><p>{explainRejection(item.reason, maxRisk)}</p><details><summary>Technical reason</summary><p>{item.reason}</p></details></article>)}</section>}  </section>;
 }
