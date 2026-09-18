@@ -248,6 +248,10 @@ body>.workspace-view{position:fixed!important;inset:0!important;width:100%!impor
 :root{--ns-mobile-gutter:10px;--ns-mobile-card-gap:10px;--ns-bottom-nav-h:66px}
 .mobile-bottom-navigation{display:none}
 @media(max-width:950px){
+  body:has(>.workspace-view){height:auto!important;min-height:100dvh;overflow-x:clip!important;overflow-y:auto!important}
+  body>.workspace-view{position:relative!important;inset:auto!important;height:auto!important;min-height:100dvh!important;overflow:visible!important}
+  .workspace-view>.app-shell{position:relative!important;inset:auto!important;height:auto!important;min-height:calc(100dvh - var(--ns-header-h))!important;margin-top:var(--ns-header-h)!important;overflow:visible!important}
+  .workspace-view>.app-shell>.page-container{height:auto!important;max-height:none!important;overflow-x:clip!important;overflow-y:visible!important;overscroll-behavior-y:auto;scrollbar-gutter:auto;-webkit-overflow-scrolling:auto}
   .workspace-view>.app-topbar .mobile-nav-toggle{display:grid!important;place-items:center}
   .workspace-view>.app-shell>.page-container{padding-bottom:calc(var(--ns-bottom-nav-h) + max(18px,var(--ns-safe-bottom,0px)))!important}
   .mobile-bottom-navigation{position:fixed;z-index:calc(var(--ns-z-drawer) - 2);right:0;bottom:0;left:0;display:grid;grid-template-columns:repeat(5,minmax(0,1fr));min-height:calc(var(--ns-bottom-nav-h) + var(--ns-safe-bottom,0px));padding:5px max(6px,var(--ns-safe-right,0px)) max(5px,var(--ns-safe-bottom,0px)) max(6px,var(--ns-safe-left,0px));border-top:1px solid var(--ns-line-strong);background:rgba(255,255,255,.97);box-shadow:0 -10px 32px rgba(8,36,26,.12);backdrop-filter:blur(16px)}

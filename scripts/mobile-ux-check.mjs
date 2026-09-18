@@ -19,6 +19,7 @@ const checks=[
   ["no native confirmation",!workspace.includes("window.alert(")&&!workspace.includes("window.confirm(")&&!workspace.includes("window.prompt(")],
   ["projected future candles",workspace.includes("prediction-candles")&&workspace.includes("PROJECTED CANDLES")],
   ["mobile chart reserves forecast region",predictionStyles.includes("inset:18px 44% 0 32px!important")&&!responsiveStyles.includes(".candle-field{min-width:0!important;width:100%!important")],
+  ["native mobile document scrolling",styles.includes("body:has(>.workspace-view){height:auto!important")&&styles.includes("overflow-y:visible!important")&&responsiveStyles.includes("overflow-y:visible")],
 ];
 const failed=checks.filter(([,passed])=>!passed);
 if(failed.length){for(const[name]of failed)console.error(`FAIL: ${name}`);process.exit(1)}
