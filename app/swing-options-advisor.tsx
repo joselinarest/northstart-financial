@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 type OptionResult = {
   status: "CANDIDATE" | "NO_TRADE";
@@ -55,6 +55,7 @@ export default function SwingOptionsAdvisor({
   accountStatus = "ready",
   onConfigureAccount,
   onRefreshAccounts,
+  universeSymbols = [],
 }: {
   accountId: string;
   accountName: string;
@@ -63,6 +64,7 @@ export default function SwingOptionsAdvisor({
   accountStatus?: string;
   onConfigureAccount?: () => void;
   onRefreshAccounts?: () => void;
+  universeSymbols?: string[];
 }) {
   const [symbol, setSymbol] = useState(initialSymbol);
   const [maxRisk, setMaxRisk] = useState(500);
@@ -70,43 +72,43 @@ export default function SwingOptionsAdvisor({
   const [loading, setLoading] = useState(false);
   const [notice, setNotice] = useState("");
   const [results, setResults] = useState<OptionResult[]>([]);
+  const [rejections, setRejections] = useState<Array<{ symbol: string; reason: string }>>([]);
+  const autoScanKey = useRef("");
   const headers = useMemo(() => ({
     "Content-Type": "application/json",
     ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
   }), [accessToken]);
 
-  const analyze = async () => {
-    const ticker = symbol.trim().toUpperCase();
-    if (!accountId) {
-      setNotice(accountStatus || "Select a Swing, Options, or Mixed account first.");
-      return;
-    }
-    if (!ticker) return;
+  const analyzeTickers = async (tickers: string[], automatic = false) => {
+    if (!accountId) { setNotice(accountStatus || "Select a Swing, Options, or Mixed account first."); return; }
+    const unique = [...new Set(tickers.map(value => value.trim().toUpperCase()).filter(Boolean))].slice(0, 6);
+    if (!unique.length) return;
     setLoading(true);
-    setNotice(`Comparing a defined-risk CALL and PUT for ${ticker} in ${accountName}…`);
-    setResults([]);
+    setNotice(`${automatic ? "Scanning" : "Analyzing"} ${unique.length} underlying${unique.length === 1 ? "" : "s"} and both CALL / PUT chains for ${accountName}…`);
+    setResults([]); setRejections([]);
     try {
-      const settled = await Promise.allSettled(["bullish", "bearish"].map(async outlook => {
-        const response = await fetch("/api/market/options", {
-          method: "POST",
-          headers,
-          body: JSON.stringify({ accountId, symbol: ticker, outlook, maxRisk, targetDte }),
-        });
+      const settled = await Promise.allSettled(unique.flatMap(ticker => ["bullish", "bearish"].map(async outlook => {
+        const response = await fetch("/api/market/options", { method: "POST", headers, body: JSON.stringify({ accountId, symbol: ticker, outlook, maxRisk, targetDte }) });
         const body = await response.json();
-        if (!response.ok) throw new Error(body.error || `${outlook} option analysis failed`);
+        if (!response.ok) throw new Error(`${ticker} ${outlook === "bullish" ? "CALL" : "PUT"}: ${body.error || "option analysis failed"}`);
         return body as OptionResult;
-      }));
-      const completed = settled.flatMap(item => item.status === "fulfilled" ? [item.value] : []);
-      const errors = settled.flatMap(item => item.status === "rejected" ? [item.reason instanceof Error ? item.reason.message : "Option analysis failed"] : []);
-      setResults(completed);
-      setNotice(completed.length
-        ? `${ticker}: CALL and PUT are evaluated independently. A candidate is not an order; act only when the displayed confirmation is satisfied.`
-        : errors.join(" · ") || "No option contract passed the account and liquidity gates.");
-    } finally {
-      setLoading(false);
-    }
+      })));
+      const completed = settled.flatMap(item => item.status === "fulfilled" ? [item.value] : []).sort((a, b) => (b.decision.confidence + b.contract.score) - (a.decision.confidence + a.contract.score));
+      const rejected = settled.flatMap(item => item.status === "rejected" ? [{ symbol: item.reason instanceof Error ? item.reason.message.split(":")[0] : "Unknown", reason: item.reason instanceof Error ? item.reason.message : "Option analysis failed" }] : []);
+      setResults(completed); setRejections(rejected);
+      const actionable = completed.filter(item => item.status === "CANDIDATE" && item.decision.action === "BUY_IF").length;
+      setNotice(`Scan complete · ${unique.length} securities · ${completed.length} exact contracts evaluated · ${actionable} actionable · ${rejected.length} rejected. 0DTE is excluded; minimum 14 DTE.`);
+    } finally { setLoading(false); }
   };
 
+  const analyze = () => analyzeTickers([symbol]);
+  useEffect(() => {
+    const tickers = [...new Set(universeSymbols.map(value => value.toUpperCase()).filter(Boolean))].slice(0, 6);
+    const key = `${accountId}:${tickers.join(",")}`;
+    if (!accountId || !tickers.length || autoScanKey.current === key) return;
+    autoScanKey.current = key;
+    void analyzeTickers(tickers, true);
+  }, [accountId, universeSymbols.join(",")]);
   return <section id="options-advisor" className="option-contract-advisor swing-options-advisor">
     <div className="option-advisor-head">
       <div>
@@ -124,6 +126,7 @@ export default function SwingOptionsAdvisor({
       <button type="button" disabled={loading || !accountId} onClick={analyze}>{loading ? "Analyzing CALL + PUT…" : "Analyze CALL + PUT"}</button>
     </div>
     {notice && <div className="option-notice">{notice}</div>}
+    {results.length > 0 && <div className="option-ranking-summary"><b>BEST OPTIONS SETUPS NOW</b><span>{results.filter(item => item.status === "CANDIDATE" && item.decision.action === "BUY_IF").length} actionable</span><b>WATCH / WAIT FOR TRIGGER</b><span>{results.filter(item => item.decision.action !== "BUY_IF").length} awaiting confirmation</span><b>NO TRADE / REJECTED</b><span>{rejections.length} rejected</span></div>}
     {results.length > 0 && <div className="swing-option-results">{results.map(result => {
       const actionable = result.status === "CANDIDATE" && !["WAIT", "NO_ACTION", "INSUFFICIENT_CONFIRMATION"].includes(result.decision.action);
       return <article className={`exact-contract option-recommendation ${actionable ? "candidate" : "no-trade"}`} key={result.contract.contractSymbol}>
@@ -150,5 +153,5 @@ export default function SwingOptionsAdvisor({
         <footer>Data {new Date(result.asOf).toLocaleString()} · Options may lose 100% of premium. Northstar never executes the trade.</footer>
       </article>;
     })}</div>}
-  </section>;
+    {rejections.length > 0 && <section className="option-rejections"><header><b>NO TRADE · REJECTED SETUPS</b><span>Analyzed, but no exact contract passed every gate.</span></header>{rejections.map((item, index) => <article key={`${item.symbol}-${index}`}><b>{item.symbol}</b><p>{item.reason}</p></article>)}</section>}  </section>;
 }

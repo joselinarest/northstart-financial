@@ -6748,6 +6748,7 @@ export function NorthstarWorkspace({
                 )}
                 onConfigureAccount={() => navigate("Accounts")}
                 onRefreshAccounts={() => loadConnectedFinance(true)}
+                universeSymbols={swingAdvisorHoldings.map(holding => String(holding.ticker || holding.symbol || "")).filter(Boolean)}
               />
             </section>
           )}          {isLongTermInvestmentPage && !longTermAccounts.length && (
@@ -7337,6 +7338,7 @@ export function NorthstarWorkspace({
                 )}
                 onConfigureAccount={() => navigate("Accounts")}
                 onRefreshAccounts={() => loadConnectedFinance(true)}
+                universeSymbols={swingAdvisorHoldings.map(holding => String(holding.ticker || holding.symbol || "")).filter(Boolean)}
               />
             </section>
           )}
