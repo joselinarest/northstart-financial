@@ -40,6 +40,7 @@ const AcademyLab = dynamic(() => import("@/app/academy-lab")),
   ),
   DailyCloseReview = dynamic(() => import("@/app/daily-close-review")),
   TacticalRebuyPanel = dynamic(() => import("@/app/tactical-rebuy-panel")),
+  SwingOptionsAdvisor = dynamic(() => import("@/app/swing-options-advisor")),
   PaperTradingSimulator = dynamic(
     () => import("@/app/paper-trading-simulator"),
   ),
@@ -7336,6 +7337,14 @@ export function NorthstarWorkspace({
                   `/workspace/research/${encodeURIComponent(symbol.toLowerCase())}`,
                 )
               }
+            />
+          )}
+          {tab === "Daily Action Plan" && swingAdvisorAccount && (
+            <SwingOptionsAdvisor
+              accountId={String(swingAdvisorAccount.id)}
+              accountName={String(swingAdvisorAccount.nickname || swingAdvisorAccount.official_name || swingAdvisorAccount.name || "Swing account")}
+              accessToken={accessToken}
+              initialSymbol={String(swingAdvisorHoldings[0]?.ticker || swingAdvisorHoldings[0]?.symbol || "SPY")}
             />
           )}
           {tab === "Daily Action Plan" && (

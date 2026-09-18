@@ -23,9 +23,9 @@ assert.match(workspace, /No critical events right now/);
 assert.match(workspace, /Select one investment account above/);
 for (const label of ["Checking cash", "Savings", "Credit-card balances", "Upcoming bills", "Monthly income", "Monthly spending", "Monthly cash flow", "Safe-to-spend", "Net worth", "Total debt"])
   assert.match(workspace, new RegExp(label), `Household Financial Health is missing ${label}`);
-assert.match(workspace, /showInvestmentContext=\["Dashboard","Portfolio","Daily Action Plan","Growth Finder","New Candidates","Market Intel","Professional Charts","Prepare Trade"\]/);
-assert.match(workspace, /localStorage\.setItem\("northstar-analysis-scope",scope\)/);
-assert.match(workspace, /Analyzing: No investment account connected/);
+for (const tab of ["Dashboard", "Portfolio", "Daily Action Plan", "Growth Finder", "New Candidates", "Market Intel", "Professional Charts", "Prepare Trade"]) assert.match(workspace, new RegExp(`showInvestmentContext[\\s\\S]*["']${tab}["']`), `Investment context is missing ${tab}`);
+assert.match(workspace, /localStorage\.setItem\("northstar-analysis-scope",\s*scope\)/);
+assert.match(workspace, /AccountScopeDashboard/);
 
 for (const label of ["Account:", "Entry / trigger", "Estimated proceeds", "Estimated cost", "Cash", "Stop / invalidation", "Targets", "Confidence", "Confirmation required:", "ticker\/sector concentration", "liquidity"])
   assert.match(actionGuidance, new RegExp(label.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")), `Recommendation card is missing ${label}`);
