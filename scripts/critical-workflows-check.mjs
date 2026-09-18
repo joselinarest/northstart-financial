@@ -27,6 +27,10 @@ for (const label of ["Checking cash", "Savings", "Credit-card balances", "Upcomi
 for (const tab of ["Dashboard", "Portfolio", "Daily Action Plan", "Growth Finder", "New Candidates", "Market Intel", "Professional Charts", "Prepare Trade"]) assert.match(workspace, new RegExp(`showInvestmentContext[\\s\\S]*["']${tab}["']`), `Investment context is missing ${tab}`);
 assert.match(workspace, /localStorage\.setItem\("northstar-analysis-scope",\s*scope\)/);
 assert.match(workspace, /AccountScopeDashboard/);
+const swingPageList = workspace.match(/const swingDecisionTabs = \[([^\]]+)\]/)?.[1] || "";
+assert.doesNotMatch(swingPageList, /Daily Action Plan/, "Daily Action Plan must preserve the selected investment account instead of forcing the first Swing account");
+assert.match(workspace, /key=\{`today-guidance:\$\{advisorAccountId\}`\}/, "Daily guidance must remount for the selected investment account");
+assert.match(workspace, /initialStrategy=\{advisorStrategy\}/, "Daily recommendations must use the selected account strategy");
 
 for (const label of ["Account:", "Entry / trigger", "Estimated proceeds", "Estimated cost", "Cash", "Stop / invalidation", "Targets", "Confidence", "Confirmation required:", "ticker\/sector concentration", "liquidity"])
   assert.match(actionGuidance, new RegExp(label.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")), `Recommendation card is missing ${label}`);

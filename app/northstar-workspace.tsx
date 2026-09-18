@@ -2719,11 +2719,7 @@ export function NorthstarWorkspace({
       localStorage.setItem("northstar-advisor-account", next);
     }
   }, [tab, financeDataReady, swingAccounts, analysisScope]);
-  const swingDecisionTabs = [
-    "Daily Action Plan",
-    "Options Advisor",
-    "Prepare Trade",
-  ],
+  const swingDecisionTabs = ["Options Advisor", "Prepare Trade"],
     longTermInvestmentTabs = ["Growth Finder"],
     isPortfolioPage = tab === "Portfolio",
     isSwingDecisionPage = swingDecisionTabs.includes(tab),
@@ -7334,7 +7330,7 @@ export function NorthstarWorkspace({
               </footer>
             </section>
           )}
-          {tab === "Daily Action Plan" && (
+          {tab === "Daily Action Plan" && advisorStrategy === "swing" && (
             <section className="options-advisor-entry card">
               <header>
                 <div>
@@ -7346,18 +7342,18 @@ export function NorthstarWorkspace({
                     underlying Swing thesis.
                   </p>
                 </div>
-                <b>{swingAdvisorAccount ? swingAdvisorName : "ACCOUNT REQUIRED"}</b>
+                <b>{advisorAccount ? advisorAccountName : "ACCOUNT REQUIRED"}</b>
               </header>
               <SwingOptionsAdvisor
-                accountId={swingAdvisorAccount ? String(swingAdvisorAccount.id) : ""}
+                accountId={advisorAccount ? String(advisorAccount.id) : ""}
                 accountName={String(
-                  swingAdvisorAccount?.nickname ||
-                    swingAdvisorAccount?.official_name ||
-                    swingAdvisorAccount?.name ||
+                  advisorAccount?.nickname ||
+                    advisorAccount?.official_name ||
+                    advisorAccount?.name ||
                     "No eligible account selected",
                 )}
                 accountStatus={
-                  swingAdvisorAccount
+                  advisorAccount
                     ? "ready"
                     : financeDataReady
                       ? plaidNotice || "No Swing, Options, or Mixed account was returned."
@@ -7365,13 +7361,13 @@ export function NorthstarWorkspace({
                 }
                 accessToken={accessToken}
                 initialSymbol={String(
-                  swingAdvisorHoldings[0]?.ticker ||
-                    swingAdvisorHoldings[0]?.symbol ||
+                  advisorHoldings[0]?.ticker ||
+                    advisorHoldings[0]?.symbol ||
                     "SPY",
                 )}
                 onConfigureAccount={() => navigate("Accounts")}
                 onRefreshAccounts={() => loadConnectedFinance(true)}
-                universeSymbols={swingAdvisorHoldings.map(holding => String(holding.ticker || holding.symbol || "")).filter(Boolean)}
+                universeSymbols={advisorHoldings.map(holding => String(holding.ticker || holding.symbol || "")).filter(Boolean)}
               />
             </section>
           )}
@@ -7379,70 +7375,28 @@ export function NorthstarWorkspace({
             <MarketSessionReport marketOpen={marketPhase === "open"} />
           )}
           {tab === "Daily Action Plan" && (
-            <section
-              className={`daily-account-action-plans ${marketPhase === "open" ? "all-open-accounts" : "selected-account-only"}`}
-            >
+            <section className="daily-account-action-plans selected-account-only">
               <header>
-                <span>
-                  {marketPhase === "open"
-                    ? "MARKET-OPEN GUIDANCE · EVERY SWING PORTFOLIO"
-                    : "SELECTED SWING / OPTIONS PORTFOLIO"}
-                </span>
-                <h2>
-                  {marketPhase === "open"
-                    ? "Account-by-account actions, cash and risk"
-                    : swingAdvisorName}
-                </h2>
+                <span>SELECTED INVESTMENT ACCOUNT · ACCOUNT-SPECIFIC GUIDANCE</span>
+                <h2>{advisorAccountName}</h2>
                 <p>
-                  {marketPhase === "open"
-                    ? "Each portfolio is evaluated independently so holdings, cash, buying power, goal and risk limits are never mixed."
-                    : swingAdvisorAccount
-                      ? `Every item below uses only this account’s ${swingAdvisorHoldings.length} holding${swingAdvisorHoldings.length === 1 ? "" : "s"}, cash, buying power, risk limits, and action history. Change accounts with the selector above.`
-                      : "Choose or configure a Swing/Options account. Long-term accounts are reviewed in Portfolio."}
+                  {advisorAccount
+                    ? `Every item below uses only this ${advisorPurpose} account’s ${advisorHoldings.length} holding${advisorHoldings.length === 1 ? "" : "s"}, cash, buying power, horizon, risk limits, and action history. Change accounts with the selector above.`
+                    : "Choose or configure an investment account above."}
                 </p>
               </header>
-              {marketPhase === "open" && swingAccounts.length ? (
-                swingAccounts.map((account) => (
-                  <details
-                    className="account-guidance-accordion"
-                    open={
-                      String(account.id) === String(swingAdvisorAccount?.id)
-                    }
-                    key={String(account.id)}
-                  >
-                    <summary>
-                      <b>
-                        {account.nickname ||
-                          account.official_name ||
-                          account.name}
-                      </b>
-                      <span>
-                        {account.owner_name || "Household"} ·{" "}
-                        {account.investment_purpose || "Swing"}
-                      </span>
-                    </summary>
-                    <ActionGuidancePanel
-                      accountId={String(account.id)}
-                      accessToken={accessToken}
-                      mode="today"
-                      marketOpen
-                    />
-                  </details>
-                ))
-              ) : swingAdvisorAccount ? (
+              {advisorAccount ? (
                 <ActionGuidancePanel
-                  accountId={String(swingAdvisorAccount.id)}
+                  key={`today-guidance:${advisorAccountId}`}
+                  accountId={advisorAccountId}
                   accessToken={accessToken}
                   mode="today"
-                  marketOpen={false}
+                  marketOpen={marketPhase === "open"}
                 />
               ) : (
                 <div className="purpose-empty">
-                  <b>No Swing or Options account is configured.</b>
-                  <span>
-                    Open Accounts and assign an investment account to Swing or
-                    Options.
-                  </span>
+                  <b>No investment account is selected.</b>
+                  <span>Select an account above or configure an investment account.</span>
                   <button onClick={() => navigate("Accounts")}>
                     Configure an account →
                   </button>
@@ -7460,9 +7414,9 @@ export function NorthstarWorkspace({
               }
             />
           )}
-          {tab === "Daily Action Plan" && swingAdvisorAccount && (
+          {tab === "Daily Action Plan" && advisorStrategy === "swing" && advisorAccount && (
             <TacticalRebuyPanel
-              accountId={String(swingAdvisorAccount.id)}
+              accountId={String(advisorAccount.id)}
               onOpen={(symbol) =>
                 navigatePath(
                   `/workspace/research/${encodeURIComponent(symbol.toLowerCase())}`,
@@ -7475,22 +7429,19 @@ export function NorthstarWorkspace({
           {tab === "Daily Action Plan" && (
             <AutomaticMarketCopilot
               accessToken={accessToken}
-              initialStrategy="swing"
+              initialStrategy={advisorStrategy}
               marketPhase={marketPhase}
               refreshMinutes={intradayRefreshMinutes}
-              ownedSymbols={swingAdvisorHoldings
+              ownedSymbols={advisorHoldings
                 .map((holding) => String(holding.ticker || "").toUpperCase())
                 .filter(Boolean)}
-              holdings={swingAdvisorHoldings}
-              accountName={swingAdvisorName}
-              accountPurpose={String(
-                swingAdvisorAccount?.investment_purpose ||
-                  "Swing market research",
-              )}
+              holdings={advisorHoldings}
+              accountName={advisorAccountName}
+              accountPurpose={advisorPurpose}
               selectedAccountType={String(
-                swingAdvisorAccount?.subtype ||
-                  swingAdvisorAccount?.type ||
-                  "Assign a Swing account for sizing",
+                advisorAccount?.subtype ||
+                  advisorAccount?.type ||
+                  "Investment account",
               )}
               onPrepare={(symbol, action) => {
                 sessionStorage.setItem("northstar-chart-symbol", symbol);
@@ -7499,12 +7450,12 @@ export function NorthstarWorkspace({
                   JSON.stringify({
                     symbol,
                     action,
-                    accountId: swingAdvisorAccount
-                      ? String(swingAdvisorAccount.id)
+                    accountId: advisorAccount
+                      ? String(advisorAccount.id)
                       : null,
-                    accountName: swingAdvisorName,
+                    accountName: advisorAccountName,
                     accountPurpose: String(
-                      swingAdvisorAccount?.investment_purpose || "Swing",
+                      advisorAccount?.investment_purpose || "Swing",
                     ),
                   }),
                 );
@@ -7518,12 +7469,12 @@ export function NorthstarWorkspace({
               }}
             />
           )}
-          {tab === "Daily Action Plan" && swingAdvisorHoldings.length > 0 && (
+          {tab === "Daily Action Plan" && advisorHoldings.length > 0 && (
             <section className="daily-swing-holdings card">
               <header>
-                <span>SELECTED SWING ACCOUNT · CURRENT HOLDINGS</span>
+                <span>SELECTED INVESTMENT ACCOUNT · CURRENT HOLDINGS</span>
                 <h2>
-                  {swingAdvisorName}: live action review for every holding
+                  {advisorAccountName}: live action review for every holding
                 </h2>
                 <p>
                   Northstar automatically evaluates each owned position using
@@ -7533,9 +7484,9 @@ export function NorthstarWorkspace({
               </header>
               <ConnectedHoldingsAnalysis
                 marketOpen={marketPhase === "open"}
-                holdings={swingAdvisorHoldings}
-                mode="swing"
-                horizon="next session to 2–10 trading days"
+                holdings={advisorHoldings}
+                mode={advisorStrategy === "swing" ? "swing" : "long-term"}
+                horizon={advisorStrategy === "swing" ? "next session to 2–10 trading days" : advisorPurpose}
                 accessToken={accessToken}
                 onOpen={(symbol) => {
                   sessionStorage.setItem("northstar-chart-symbol", symbol);
