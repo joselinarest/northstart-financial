@@ -8029,6 +8029,10 @@ export function NorthstarWorkspace({
                   supportReference={plaidIssue.referenceId}
                   message={plaidIssue.message}
                   occurredAt={plaidIssue.occurredAt}
+                  retryable={plaidIssue.retryable !== false}
+                  requiresProviderRegistration={
+                    plaidIssue.requiresProviderRegistration === true
+                  }
                   busy={plaidBusy}
                   onRetry={() => connectPlaid(true)}
                   onAddManual={() =>
