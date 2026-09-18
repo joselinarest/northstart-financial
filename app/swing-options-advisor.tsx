@@ -87,7 +87,7 @@ export default function SwingOptionsAdvisor({
     ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
   }), [accessToken]);
 
-  const analyzeTickers = async (tickers: string[], automatic = false) => {
+  const analyzeTickers = async (tickers: string[], automatic = false, settings?: { maxRisk: number; targetDte: number }) => {
     if (!accountId) { setNotice(accountStatus || "Select a Swing, Options, or Mixed account first."); return; }
     const unique = [...new Set(tickers.map(value => value.trim().toUpperCase()).filter(Boolean))].slice(0, 6);
     if (!unique.length) return;
@@ -96,7 +96,7 @@ export default function SwingOptionsAdvisor({
     setResults([]); setRejections([]);
     try {
       const settled = await Promise.allSettled(unique.flatMap(ticker => ["bullish", "bearish"].map(async outlook => {
-        const response = await fetch("/api/market/options", { method: "POST", headers, body: JSON.stringify({ accountId, symbol: ticker, outlook, maxRisk, targetDte }) });
+        const response = await fetch("/api/market/options", { method: "POST", headers, body: JSON.stringify({ accountId, symbol: ticker, outlook, maxRisk: settings?.maxRisk ?? maxRisk, targetDte: settings?.targetDte ?? targetDte }) });
         const body = await response.json();
         if (!response.ok) throw new Error(`${ticker} ${outlook === "bullish" ? "CALL" : "PUT"}: ${body.error || "option analysis failed"}`);
         return body as OptionResult;
@@ -110,13 +110,14 @@ export default function SwingOptionsAdvisor({
   };
 
   const analyze = () => analyzeTickers([symbol]);
-  const reset = () => {
-    setSymbol(initialSymbol || universeSymbols[0] || "SPY");
+  const reset = async () => {
+    const defaultSymbol = initialSymbol || universeSymbols[0] || "SPY";
+    const accountUniverse = [...new Set(universeSymbols.map(value => value.toUpperCase()).filter(Boolean))].slice(0, 6);
+    setSymbol(defaultSymbol);
     setMaxRisk(500);
     setTargetDte(45);
-    setResults([]);
-    setRejections([]);
-    setNotice("Reset complete. Choose a stock and select Find options when you are ready.");
+    autoScanKey.current = "";
+    await analyzeTickers(accountUniverse.length ? accountUniverse : [defaultSymbol], true, { maxRisk: 500, targetDte: 45 });
   };
   useEffect(() => {
     const tickers = [...new Set(universeSymbols.map(value => value.toUpperCase()).filter(Boolean))].slice(0, 6);
