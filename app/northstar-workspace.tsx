@@ -3845,36 +3845,40 @@ export function NorthstarWorkspace({
   const loadConnectedFinance = async (force = false) => {
     if (!force && Date.now() - financeLoadAt.current < 30_000) return;
     if (financeLoadPromise.current) return financeLoadPromise.current;
-    setFinanceDataReady(false);
+    const hasSnapshot = connectedFinance.accounts.length > 0;
+    if (!hasSnapshot) setFinanceDataReady(false);
     const request = (async () => {
       try {
-        const [response, transactionResponse] = await Promise.all([
-            fetch("/api/connections/plaid", {
-              headers: financeHeaders(),
-              signal: AbortSignal.timeout(15000),
-            }),
-            fetch("/api/transactions", {
-              headers: financeHeaders(),
-              signal: AbortSignal.timeout(15000),
-            }),
-          ]),
-          data = await response.json(),
-          transactions = await transactionResponse.json();
-        if (!response.ok)
-          throw new Error(data.error || "Unable to load connected accounts");
-        setConnectedFinance(data);
-        if (transactionResponse.ok && Array.isArray(transactions))
-          setFamilyTransactions(transactions);
-        else if (!transactionResponse.ok)
-          throw new Error(
-            transactions?.error || "Transactions could not be loaded",
-          );
+        const accountResponse = await fetch("/api/connections/plaid", {
+          headers: financeHeaders(),
+          cache: "no-store",
+          signal: AbortSignal.timeout(45_000),
+        });
+        const accountData = await apiPayload(accountResponse);
+        if (!accountResponse.ok)
+          throw new Error(accountData.error || "Unable to load investment accounts");
+        setConnectedFinance(accountData as ConnectedFinance);
         financeLoadAt.current = Date.now();
+        setPlaidNotice("");
+        void (async () => {
+          try {
+            const transactionResponse = await fetch("/api/transactions", {
+              headers: financeHeaders(),
+              cache: "no-store",
+              signal: AbortSignal.timeout(20_000),
+            });
+            const transactions = await apiPayload(transactionResponse);
+            if (transactionResponse.ok && Array.isArray(transactions))
+              setFamilyTransactions(transactions);
+          } catch {
+            // Investment accounts and holdings remain usable when banking activity is slow.
+          }
+        })();
       } catch (error) {
         setPlaidNotice(
           error instanceof Error
-            ? error.message
-            : "Unable to load connected accounts",
+            ? `Investment accounts unavailable: ${error.message}`
+            : "Investment accounts are temporarily unavailable",
         );
       } finally {
         setFinanceDataReady(true);
