@@ -1743,6 +1743,7 @@ export function NorthstarWorkspace({
     "Bills & cards": "cash-flow",
     "Kids / Goals": "kids-goals",
     "Daily Action Plan": "daily-action-plan",
+    "Options Advisor": "options",
     Liabilities: "debt",
     Household: "household",
     "Ask Northstar": "assistant",
@@ -2701,7 +2702,11 @@ export function NorthstarWorkspace({
       localStorage.setItem("northstar-advisor-account", next);
     }
   }, [tab, financeDataReady, swingAccounts, analysisScope]);
-  const swingDecisionTabs = ["Daily Action Plan", "Prepare Trade"],
+  const swingDecisionTabs = [
+    "Daily Action Plan",
+    "Options Advisor",
+    "Prepare Trade",
+  ],
     longTermInvestmentTabs = ["Growth Finder"],
     isPortfolioPage = tab === "Portfolio",
     isSwingDecisionPage = swingDecisionTabs.includes(tab),
@@ -2710,6 +2715,7 @@ export function NorthstarWorkspace({
     "Dashboard",
     "Portfolio",
     "Daily Action Plan",
+    "Options Advisor",
     "Growth Finder",
     "New Candidates",
     "Market Intel",
@@ -5432,6 +5438,7 @@ export function NorthstarWorkspace({
       items: [
         ["Growth Finder", "↗"],
         ["New Candidates", "◎"],
+        ["Options Advisor", "◉"],
         ["Real Estate", "⌂"],
         ["Professional Charts", "⌁"],
       ],
@@ -5468,6 +5475,7 @@ export function NorthstarWorkspace({
     "Daily Action Plan": "Today",
     "Growth Finder": "Long-Term Opportunities",
     "New Candidates": "New Candidates",
+    "Options Advisor": "Options",
     "Professional Charts": "Markets & Charts",
     "Market News": "News",
     Household: "Household Overview",
@@ -6622,7 +6630,9 @@ export function NorthstarWorkspace({
               <p className="kicker">
                 {tab === "Daily Action Plan"
                   ? "LIVE MARKET DATA · DAILY ACTION PLAN"
-                  : `MARKET BRIEF · ${tab.toUpperCase()}`}
+                  : tab === "Options Advisor"
+                    ? "LIVE OPTIONS DATA · ACCOUNT-SPECIFIC DECISION SUPPORT"
+                    : `MARKET BRIEF · ${tab.toUpperCase()}`}
               </p>
               <h1>
                 {tab === "Dashboard"
@@ -6635,6 +6645,8 @@ export function NorthstarWorkspace({
                         ? "Portfolio — Is my money allocated correctly?"
                         : tab === "Daily Action Plan"
                           ? "Today — What should I prepare to do now?"
+                          : tab === "Options Advisor"
+                            ? "Options — Is a CALL, PUT, or NO TRADE justified?"
                           : tab === "Growth Finder"
                             ? "Long-Term — What should I accumulate, and why?"
                             : tab === "New Candidates"
@@ -6664,6 +6676,8 @@ export function NorthstarWorkspace({
                     ? "Select one long-term account. Northstar compares its holdings with a suggested target, opens the largest gap first, ranks suitable candidates, calculates the approximate dollars needed, and links every real ticker to its complete evaluation."
                     : tab === "Daily Action Plan"
                       ? "This is the real provider-backed market workspace—not an Academy exercise or paper simulation. It is built after the close for the next session, then re-ranked as current price, volume, fundamentals, news, and market structure change. Forecasts remain probabilistic."
+                      : tab === "Options Advisor"
+                        ? "Select a Swing, Options, or Mixed account, then compare a defined-risk CALL and PUT using current chain liquidity, Greeks, premium risk, and the account-specific underlying stock thesis."
                       : tab === "Real Estate"
                         ? "Manage household properties, rental operations, linked payment accounts, reserves, projects, and purchase or sale decisions without duplicating Household Finance transactions."
                         : tab === "Dividend Growth"
@@ -7244,7 +7258,7 @@ export function NorthstarWorkspace({
               </footer>
             </section>
           )}
-          {tab === "Daily Action Plan" && (
+          {["Daily Action Plan", "Options Advisor"].includes(tab) && (
             <section className="options-advisor-entry card">
               <header>
                 <div>

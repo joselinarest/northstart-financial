@@ -9,7 +9,7 @@ const tabs: Record<string,string> = {
   academy:"Learn", settings:"Settings", help:"Help", charts:"Professional Charts",
   "market-news":"Market News", growth:"Growth Finder", "dividend-growth":"Growth Finder", "new-candidates":"New Candidates",
   "real-estate":"Real Estate", "investment-account":"Accounts", "security-detail":"Professional Charts",
-  options:"Daily Action Plan", "options-detail":"Daily Action Plan", transactions:"Bills & cards", spending:"Bills & cards",
+  options:"Options Advisor", "options-detail":"Options Advisor", transactions:"Bills & cards", spending:"Bills & cards",
   budgets:"Bills & cards", notifications:"Settings", "kids-goals":"Kids / Goals", "system-health":"Settings",
 };
 
