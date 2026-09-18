@@ -31,6 +31,7 @@ import './flow-intelligence.css';
 import './daily-close-review.css';
 import './tactical-rebuy-panel.css';
 import './mobile-primary.css';
+import './layout-system.css';
 import { ConfirmProvider } from './confirmation-modal';
 import PwaManager from './pwa-manager';
 import MobileOverflowDebug from './mobile-overflow-debug';

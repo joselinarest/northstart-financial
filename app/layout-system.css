@@ -1,0 +1,34 @@
+/* Northstar responsive layout foundation — loaded last to prevent legacy clipping. */
+:root{--ns-page-gutter:clamp(12px,2.25vw,32px);--ns-section-gap:clamp(12px,1.6vw,24px);--ns-content-max:1600px}
+html,body{inline-size:100%;min-inline-size:0;min-block-size:100%;overflow-x:auto}
+.workspace-view,.workspace-view>.app-shell,.workspace-view>.shell,.workspace-view .page-container{inline-size:100%;min-inline-size:0;max-inline-size:100%}
+.workspace-view .page-container{padding-inline:var(--ns-page-gutter)}
+.workspace-view .content{display:grid;grid-template-columns:minmax(0,1fr);align-content:start;gap:var(--ns-section-gap);inline-size:min(100%,var(--ns-content-max));min-inline-size:0;max-inline-size:100%;margin-inline:auto;overflow:visible}
+.workspace-view .content>*{min-inline-size:0;max-inline-size:100%;margin-inline:0}
+.workspace-view :where(section,article,header,footer,main,aside,form,fieldset,label,dl,ol,ul){min-inline-size:0;max-inline-size:100%}
+.workspace-view :where(.card,.account-scope-dashboard,.action-guidance,.ai-evidence-panel,.auto-copilot,.prediction-lab,.buy-sell-guide,.option-contract-advisor,.exact-contract,.goal-progress-panel){overflow:visible}
+.workspace-view :where(h1,h2,h3,h4,p,li,dt,dd,b,strong,small,span,em,a,button){overflow-wrap:anywhere;word-break:normal}
+.workspace-view :where(img,svg,video,canvas){max-inline-size:100%}
+.workspace-view :where(.main-grid,.lower-grid,.finance-grid,.household,.real-estate-grid,.property-workflow-grid,.analysis-grid,.dashboard-grid,.action-evidence,.contract-metrics,.contract-explanation,.account-policy-row){display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,220px),1fr));gap:var(--ns-section-gap)}
+.workspace-view :where(.option-fields,.candidate-controls,.prediction-toolbar){display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,190px),1fr));align-items:end;gap:12px}
+.workspace-view :where(.swing-option-results,.candidate-grid,.auto-grid){display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,320px),1fr));gap:12px}
+.workspace-view :where(.table-scroll,.responsive-table,.ui-responsive-table){inline-size:100%;max-inline-size:100%;overflow-x:auto;overscroll-behavior-inline:contain}
+.workspace-view table{inline-size:100%;max-inline-size:100%}
+.options-workspace-hero{display:grid!important;grid-template-columns:minmax(0,1fr)}
+.options-workspace-hero>div{max-inline-size:none!important}
+.page-daily-action-plan .daily-plan-intro,.page-daily-action-plan .auto-copilot,.page-markets .auto-copilot,.page-markets .purpose-account-review,.page-markets .connected-holdings-analysis{display:grid!important;grid-template-columns:minmax(0,1fr)}
+@media(max-width:950px){
+ html,body,.workspace-view{overflow-x:auto}
+ .workspace-view .page-container,.workspace-view .content{inline-size:100%!important;min-inline-size:0!important;max-inline-size:100%!important;margin-inline:0!important;overflow:visible!important}
+ .workspace-view .content{padding:12px max(12px,env(safe-area-inset-right)) calc(var(--ns-bottom-nav-h,66px) + max(20px,env(safe-area-inset-bottom))) max(12px,env(safe-area-inset-left))!important}
+ .workspace-view :where(.hero,.option-advisor-head,.account-health-title,.cross-account-intelligence>header){display:grid!important;grid-template-columns:minmax(0,1fr);align-items:start;gap:10px}
+ .workspace-view :where(.hero,.card,.option-contract-advisor,.exact-contract,.account-scope-dashboard){inline-size:100%;min-inline-size:0;max-inline-size:100%;margin-inline:0}
+ .workspace-view :where(.chart,.chart-wrap,.chart-stage,.transaction-chart,.integrated-research-chart){inline-size:100%!important;min-inline-size:0!important;max-inline-size:100%!important;overflow-x:auto!important;overflow-y:visible!important}
+ .workspace-view :where(input,select,textarea,button){max-inline-size:100%}
+}
+@media(max-width:600px){
+ .workspace-view .content{gap:12px}
+ .workspace-view :where(.main-grid,.lower-grid,.finance-grid,.household,.real-estate-grid,.property-workflow-grid,.analysis-grid,.dashboard-grid,.action-evidence,.contract-metrics,.contract-explanation,.account-policy-row,.option-fields,.candidate-controls,.prediction-toolbar,.swing-option-results,.candidate-grid,.auto-grid){grid-template-columns:minmax(0,1fr)!important}
+ .workspace-view table{font-size:.82rem}
+ .workspace-view :where(.table-scroll,.responsive-table,.ui-responsive-table){scrollbar-gutter:stable}
+}
