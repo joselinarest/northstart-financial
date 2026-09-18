@@ -6708,7 +6708,46 @@ export function NorthstarWorkspace({
               ✦ Analyze an idea
             </button>
           </div>
-          {isLongTermInvestmentPage && !longTermAccounts.length && (
+          {tab === "Options Advisor" && (
+            <section className="options-advisor-entry options-advisor-route">
+              <header>
+                <div>
+                  <span>OPTIONS · CALLS AND PUTS</span>
+                  <h2>Account-specific options suggestions</h2>
+                  <p>
+                    Compare a defined-risk CALL and PUT using the selected account,
+                    current option-chain liquidity, Greeks, premium risk, and the
+                    underlying Swing thesis.
+                  </p>
+                </div>
+                <b>{swingAdvisorAccount ? swingAdvisorName : "ACCOUNT REQUIRED"}</b>
+              </header>
+              <SwingOptionsAdvisor
+                accountId={swingAdvisorAccount ? String(swingAdvisorAccount.id) : ""}
+                accountName={String(
+                  swingAdvisorAccount?.nickname ||
+                    swingAdvisorAccount?.official_name ||
+                    swingAdvisorAccount?.name ||
+                    "No eligible account selected",
+                )}
+                accountStatus={
+                  swingAdvisorAccount
+                    ? "ready"
+                    : financeDataReady
+                      ? plaidNotice || "No Swing, Options, or Mixed account was returned."
+                      : "Investment account synchronization is still loading or timed out."
+                }
+                accessToken={accessToken}
+                initialSymbol={String(
+                  swingAdvisorHoldings[0]?.ticker ||
+                    swingAdvisorHoldings[0]?.symbol ||
+                    "SPY",
+                )}
+                onConfigureAccount={() => navigate("Accounts")}
+                onRefreshAccounts={() => loadConnectedFinance(true)}
+              />
+            </section>
+          )}          {isLongTermInvestmentPage && !longTermAccounts.length && (
             <section className="purpose-empty card">
               <b>
                 No Long-Term or Retirement investment account is configured.
@@ -7258,7 +7297,7 @@ export function NorthstarWorkspace({
               </footer>
             </section>
           )}
-          {["Daily Action Plan", "Options Advisor"].includes(tab) && (
+          {tab === "Daily Action Plan" && (
             <section className="options-advisor-entry card">
               <header>
                 <div>
