@@ -18,7 +18,7 @@ html,body{inline-size:100%;min-inline-size:0;min-block-size:100%;overflow-x:auto
 .options-workspace-hero>div{max-inline-size:none!important}
 .page-daily-action-plan .daily-plan-intro,.page-daily-action-plan .auto-copilot,.page-markets .auto-copilot,.page-markets .purpose-account-review,.page-markets .connected-holdings-analysis{display:grid!important;grid-template-columns:minmax(0,1fr)}
 @media(max-width:950px){
- html,body,.workspace-view{overflow-x:auto}
+ html,body,.workspace-view{overflow-x:clip}
  .workspace-view .page-container,.workspace-view .content{inline-size:100%!important;min-inline-size:0!important;max-inline-size:100%!important;margin-inline:0!important;overflow:visible!important}
  .workspace-view .content{padding:12px max(12px,env(safe-area-inset-right)) calc(var(--ns-bottom-nav-h,66px) + max(20px,env(safe-area-inset-bottom))) max(12px,env(safe-area-inset-left))!important}
  .workspace-view :where(.hero,.option-advisor-head,.account-health-title,.cross-account-intelligence>header){display:grid!important;grid-template-columns:minmax(0,1fr);align-items:start;gap:10px}
@@ -28,6 +28,10 @@ html,body{inline-size:100%;min-inline-size:0;min-block-size:100%;overflow-x:auto
 }
 @media(max-width:600px){
  .workspace-view .content{gap:12px}
+ .workspace-view .account-scope-switcher{display:none!important}
+ .workspace-view .account-kpi-strip{display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr))!important;overflow:visible!important}
+ .workspace-view .account-kpi-strip>div{min-width:0!important;padding:11px!important}
+ .workspace-view .account-kpi-strip>div:last-child{grid-column:1/-1}
  .workspace-view :where(.main-grid,.lower-grid,.finance-grid,.household,.real-estate-grid,.property-workflow-grid,.analysis-grid,.dashboard-grid,.action-evidence,.contract-metrics,.contract-explanation,.account-policy-row,.option-fields,.candidate-controls,.prediction-toolbar,.swing-option-results,.candidate-grid,.auto-grid){grid-template-columns:minmax(0,1fr)!important}
  .workspace-view table{font-size:.82rem}
  .workspace-view :where(.table-scroll,.responsive-table,.ui-responsive-table){scrollbar-gutter:stable}

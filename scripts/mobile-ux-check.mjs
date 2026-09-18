@@ -1,11 +1,12 @@
 import {readFile} from "node:fs/promises";
 
-const [workspace,styles,confirmation,predictionStyles,responsiveStyles]=await Promise.all([
+const [workspace,styles,confirmation,predictionStyles,responsiveStyles,layoutStyles]=await Promise.all([
   readFile(new URL("../app/northstar-workspace.tsx",import.meta.url),"utf8"),
   readFile(new URL("../app/design-system.css",import.meta.url),"utf8"),
   readFile(new URL("../app/confirmation-modal.tsx",import.meta.url),"utf8"),
   readFile(new URL("../app/professional-prediction-overlay.css",import.meta.url),"utf8"),
   readFile(new URL("../app/responsive-mobile.css",import.meta.url),"utf8"),
+  readFile(new URL("../app/layout-system.css",import.meta.url),"utf8"),
 ]);
 const checks=[
   ["five mobile destinations",/["']Today["']/.test(workspace)&&/["']Portfolio["']/.test(workspace)&&/["']Markets["']/.test(workspace)&&/["']Finance["']/.test(workspace)&&workspace.includes("<span>Alerts</span>")],
@@ -20,6 +21,8 @@ const checks=[
   ["projected future candles",workspace.includes("prediction-candles")&&workspace.includes("PROJECTED CANDLES")],
   ["mobile chart reserves forecast region",predictionStyles.includes("inset:18px 44% 0 32px!important")&&!responsiveStyles.includes(".candle-field{min-width:0!important;width:100%!important")],
   ["native mobile document scrolling",styles.includes("body:has(>.workspace-view){height:auto!important")&&styles.includes("overflow-y:visible!important")&&responsiveStyles.includes("overflow-y:visible")],
+  ["single mobile account selector",layoutStyles.includes(".workspace-view .account-scope-switcher{display:none!important}")],
+  ["no page-level horizontal scrolling",layoutStyles.includes("html,body,.workspace-view{overflow-x:clip}")],
 ];
 const failed=checks.filter(([,passed])=>!passed);
 if(failed.length){for(const[name]of failed)console.error(`FAIL: ${name}`);process.exit(1)}
