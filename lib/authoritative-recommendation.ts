@@ -104,9 +104,14 @@ export async function authoritativeRecommendation(
     .bind(input.householdId, input.accountId, symbol)
     .first<Json>();
   const priorChecks = parse(prior?.checks_json);
+  const priorAgeMs = prior?.evidence_as_of
+    ? Date.now() - Date.parse(String(prior.evidence_as_of))
+    : Infinity;
+  const priorActionableBuy = ["BUY", "ACCUMULATE"].includes(String(prior?.action || ""));
   const priorNeedsRefresh =
     priorChecks?.freshness?.stale === true ||
-    /DATA REFRESH REQUIRED/i.test(String(prior?.reason || ""));
+    /DATA REFRESH REQUIRED/i.test(String(prior?.reason || "")) ||
+    (priorActionableBuy && priorAgeMs > 10 * 60_000);
   if (prior && !input.force && !priorNeedsRefresh)
     return {
       recommendation: prior,
@@ -143,6 +148,12 @@ export async function authoritativeRecommendation(
     avgVolume = avg(recent.slice(0, -1).map((bar: any) => Number(bar.volume))),
     relativeVolume = avgVolume && last ? Number(last.volume) / avgVolume : null,
     currentPrice = Number(quote?.last || 0),
+    previousClose = Number(quote?.previousClose || 0),
+    dayChangePct = previousClose ? ((currentPrice - previousClose) / previousClose) * 100 : null,
+    threeDayBase = closes.length >= 4 ? closes.at(-4) || 0 : 0,
+    threeDayReturnPct = threeDayBase ? ((currentPrice - threeDayBase) / threeDayBase) * 100 : null,
+    recentHigh = recent.length ? Math.max(...recent.slice(-10).map((bar: any) => Number(bar.high))) : null,
+    pullbackFromHighPct = recentHigh ? ((currentPrice - recentHigh) / recentHigh) * 100 : null,
     technicalState =
       currentPrice > sma20 && sma20 > sma50
         ? "BULLISH"
@@ -265,8 +276,22 @@ export async function authoritativeRecommendation(
       growthQuality >= 50 &&
       balanceSheetQuality >= 45,
     valuationAcceptable = valuationAttractiveness >= 45,
+    adverseNews = fundamental.news.filter((item: Json) => {
+      const published = Number(item.datetime || 0) * 1000;
+      const recentEnough = published > Date.now() - 72 * 3600_000;
+      return recentEnough && /cut|miss|downgrade|investigation|lawsuit|decline|weak|warning|delay|cancel|fraud|probe|guidance lowered/i.test(`${item.headline || ""} ${item.summary || ""}`);
+    }),
+    deteriorationReasons = [
+      ...(dayChangePct !== null && dayChangePct <= -2.5 ? [`Current session decline ${dayChangePct.toFixed(1)}% exceeds the BUY release limit`] : []),
+      ...(threeDayReturnPct !== null && threeDayReturnPct <= -4 ? [`Three-session momentum ${threeDayReturnPct.toFixed(1)}% is deteriorating`] : []),
+      ...(pullbackFromHighPct !== null && pullbackFromHighPct <= -7 ? [`Price is ${Math.abs(pullbackFromHighPct).toFixed(1)}% below its recent high`] : []),
+      ...(currentPrice < sma20 ? ["Price is below SMA20"] : []),
+      ...(adverseNews.length ? [`${adverseNews.length} recent adverse company-news item${adverseNews.length === 1 ? "" : "s"} require review`] : []),
+    ],
     technicalPositive =
-      technicalState === "BULLISH" && Number(relativeVolume || 0) >= 0.8,
+      technicalState === "BULLISH" &&
+      Number(relativeVolume || 0) >= 0.8 &&
+      deteriorationReasons.length === 0,
     conflicts: string[] = [];
   if (technicalPositive && !valuationAcceptable)
     conflicts.push(
@@ -280,6 +305,9 @@ export async function authoritativeRecommendation(
     conflicts.push(
       "Price trend is bullish while fundamental quality remains insufficient",
     );
+  if (deteriorationReasons.length)
+    conflicts.push(...deteriorationReasons);
+
   const marketMaxAgeMs = swing ? 15 * 60_000 : 24 * 3600_000,
     fundamentalMaxAgeMs = 7 * 86400000,
     dataIssues: string[] = [];
@@ -453,6 +481,11 @@ export async function authoritativeRecommendation(
         support,
         resistance,
         relativeVolume,
+        dayChangePct,
+        threeDayReturnPct,
+        pullbackFromHighPct,
+        adverseNewsCount: adverseNews.length,
+        deteriorationReasons,
       },
       marketRegime: "NOT_AVAILABLE",
       news: {
