@@ -6632,7 +6632,7 @@ export function NorthstarWorkspace({
               )}
             </section>
           )}
-          <div className="hero" id="dashboard-top">
+          <div className={`hero ${tab === "Options Advisor" ? "options-workspace-hero" : ""}`} id="dashboard-top">
             <div>
               <p className="kicker">
                 {tab === "Daily Action Plan"
@@ -6699,8 +6699,20 @@ export function NorthstarWorkspace({
                                   ? "Use live market references to practice long-term investing, swing plans, calls, and puts. Every transaction remains simulated."
                                   : "Built for every experience level. Protect capital first. Find opportunities second. Profit is the result of a repeatable process—not a prediction."}
               </p>
+              {tab === "Options Advisor" && (
+                <SwingOptionsAdvisor
+                  accountId={swingAdvisorAccount ? String(swingAdvisorAccount.id) : ""}
+                  accountName={swingAdvisorAccount ? swingAdvisorName : "No eligible account selected"}
+                  accountStatus={swingAdvisorAccount ? "ready" : financeDataReady ? plaidNotice || "No Swing, Options, or Mixed account was returned." : "Investment account synchronization is loading."}
+                  accessToken={accessToken}
+                  initialSymbol={String(swingAdvisorHoldings[0]?.ticker || swingAdvisorHoldings[0]?.symbol || "SPY")}
+                  onConfigureAccount={() => navigate("Accounts")}
+                  onRefreshAccounts={() => loadConnectedFinance(true)}
+                  universeSymbols={swingAdvisorHoldings.map(holding => String(holding.ticker || holding.symbol || "")).filter(Boolean)}
+                />
+              )}
             </div>
-            <button
+            {tab !== "Options Advisor" && <button
               className="primary"
               onClick={() => {
                 const prompt = `Analyze an investment idea for ${advisorAccountName}. Account purpose: ${advisorPurpose}. Account type: ${advisorAccountType}. Planning horizon: ${portfolioGoal === "5 years" ? "3–5 years" : portfolioGoal}. Current account value: $${connectedPortfolioValue.toLocaleString(undefined, { maximumFractionDigits: 0 })}. Current holdings: ${advisorHoldings.map((holding) => `${holding.ticker || holding.name} (${Number(holding.quantity || 0).toLocaleString()} shares, $${(Number(holding.market_value_cents || 0) / 100).toLocaleString(undefined, { maximumFractionDigits: 0 })})`).join(", ") || "none recorded"}. Investment idea or ticker: [ENTER TICKER OR COMPANY]. Give one final classification: BUY REVIEW, BUY MORE REVIEW, HOLD, WAIT, or SELL/TRIM REVIEW. Automatically research current price and bid/ask; five-year price, revenue, EPS, and free-cash-flow growth; market capitalization; P/E and valuation versus history and peers; balance sheet, margins, and debt; dividend yield, payout coverage, and dividend growth; market and sector conditions; 50/100/200-day trend; volume; news and catalysts; overlap; concentration; downside/invalidation price; upside target; reward/risk; maximum dollar allocation; and estimated shares. Explain the result in beginner-friendly language, identify the evidence that could reverse it, and never place an order.`;
@@ -6713,7 +6725,7 @@ export function NorthstarWorkspace({
               }}
             >
               ✦ Analyze an idea
-            </button>
+            </button>}
           </div>
           {tab === "Options Advisor" && (
             <section className="options-advisor-entry options-advisor-route">
