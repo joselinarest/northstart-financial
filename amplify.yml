@@ -15,6 +15,7 @@ frontend:
         - test -n "$COGNITO_USER_POOL_ID" || (echo "Missing Amplify variable COGNITO_USER_POOL_ID" && exit 1)
         - test -n "$NORTHSTAR_SECRET_ID" || (echo "Missing Amplify variable NORTHSTAR_SECRET_ID" && exit 1)
         - printf 'NEXT_PUBLIC_COGNITO_DOMAIN=%s\nNEXT_PUBLIC_COGNITO_CLIENT_ID=%s\nCOGNITO_ISSUER=%s\nCOGNITO_USER_POOL_ID=%s\nCOGNITO_CLIENT_ID=%s\nNORTHSTAR_SECRET_ID=%s\n' "$NEXT_PUBLIC_COGNITO_DOMAIN" "$NEXT_PUBLIC_COGNITO_CLIENT_ID" "$COGNITO_ISSUER" "$COGNITO_USER_POOL_ID" "$NEXT_PUBLIC_COGNITO_CLIENT_ID" "$NORTHSTAR_SECRET_ID" > .env.production
+        - node scripts/write-runtime-public-config.mjs
         - pnpm run build
   artifacts:
     baseDirectory: .next

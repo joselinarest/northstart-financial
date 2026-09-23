@@ -1,3 +1,6 @@
+import {detectPatternEvidence} from "@/lib/pattern-evidence";
+import {reviewClosedTrades} from "@/lib/post-trade-review-service";
+import type {DecisionOutput} from "@/lib/ai-investment-decision-engine";
 import {reasonLifecycle} from "@/lib/ai-lifecycle-reasoning";
 import type {AIProvider} from "@/lib/ai-provider";
 import {measureCentralDecisionOutcomes} from "@/lib/ai-decision-outcomes";
@@ -26,9 +29,9 @@ function rotationCandidate(row:Row,risk:AccountRisk):RotationCandidate|null{
 async function event(db:PostgresDatabase, account:string, security:string, key:string, type:string, snapshot:unknown) {
   await db.prepare("INSERT INTO trade_lifecycle_events(id,account_id,security_id,event_key,event_type,snapshot_json) VALUES(?,?,?,?,?,?) ON CONFLICT(event_key) DO NOTHING").bind(id("lifecycle_event"),account,security,key,type,JSON.stringify(snapshot)).run();
 }
-async function alert(db:PostgresDatabase, household:string, account:string, key:string, title:string) {
+async function alert(db:PostgresDatabase, household:string, account:string, key:string, title:string, detail:Record<string,unknown>={}) {
   const alertId=`lifecycle_${key}`;
-  await db.prepare("INSERT INTO alerts(id,household_id,severity,type,title,explanation,evidence_json) VALUES(?,?,'important','trade_lifecycle',?,?,?) ON CONFLICT(id) DO NOTHING").bind(alertId,household,title,title,JSON.stringify({accountId:account,deepLink:`/workspace/daily-action-plan?accountId=${encodeURIComponent(account)}`})).run();
+  await db.prepare("INSERT INTO alerts(id,household_id,severity,type,title,explanation,evidence_json) VALUES(?,?,'important','trade_lifecycle',?,?,?) ON CONFLICT(id) DO NOTHING").bind(alertId,household,title,title,JSON.stringify({...detail,accountId:account,deepLink:`/workspace/daily-action-plan?accountId=${encodeURIComponent(account)}`})).run();
   const users = await db.prepare("SELECT hm.user_id,np.in_app_enabled,np.browser_push_enabled,np.email_enabled FROM household_members hm LEFT JOIN notification_preferences np ON np.household_id=hm.household_id AND np.user_id=hm.user_id WHERE hm.household_id=? AND hm.status='active'").bind(household).all<Row>();
   for (const user of users.results) for (const channel of [user.in_app_enabled!==false?"IN_APP":null,user.browser_push_enabled?"BROWSER_PUSH":null,user.email_enabled?"EMAIL":null].filter(Boolean)) await db.prepare("INSERT INTO alert_deliveries(id,alert_id,user_id,channel,status,available_at) VALUES(?,?,?,?,'QUEUED',CURRENT_TIMESTAMP) ON CONFLICT(alert_id,user_id,channel) DO NOTHING").bind(id("delivery"),alertId,user.user_id,channel).run();
   await db.prepare("INSERT INTO background_jobs(id,household_id,job_type,idempotency_key,payload_json) VALUES(?,?,'NOTIFICATION_DELIVERY',?,?) ON CONFLICT(idempotency_key) DO NOTHING").bind(id("job"),household,alertId,"{}").run();
@@ -56,6 +59,7 @@ export async function runTradeLifecycle(db:PostgresDatabase, householdId:string,
     const symbols=[researchTicker,"SPY",...(sectorBenchmark?[sectorBenchmark]:[])];
     const quotes=await provider.getQuotes(symbols);
     const bars=(await provider.getBars(researchTicker,{timeframe:"1Day",start:new Date(Date.now()-365*86400000).toISOString(),limit:250})).bars;
+    const entryBars=isOption?[]:(await provider.getBars(researchTicker,{timeframe:"1Min",start:new Date(Date.now()-20*60000).toISOString(),limit:1000}).catch(()=>({bars:[]}))).bars;
     const option=isOption?await loadLifecycleOption(security.ticker):null;
     const quote=quotes.quotes[researchTicker], closes=bars.map(b=>b.close), price=isOption?(option?.premium||0)*100:Number(quote?.last||0), asOf=option?.asOf||quote?.timestamp||quotes.asOf;
     const atr=avg(bars.slice(-14).map((b,i,all)=>Math.max(b.high-b.low,Math.abs(b.high-(all[i-1]?.close??b.open)),Math.abs(b.low-(all[i-1]?.close??b.open)))));
@@ -77,7 +81,10 @@ export async function runTradeLifecycle(db:PostgresDatabase, householdId:string,
       const prior=await tx.prepare("SELECT state_json FROM position_states WHERE account_id=? AND security_id=? FOR UPDATE").bind(accountId,security.security_id).first<Row>();
       const previous:PositionState|undefined=prior?json(prior.state_json):undefined;
       const shares=Number(holding?.shares||0), basis=Number(holding?.basis||0)/100;
-      const position:PositionState={investmentAccountId:accountId,ticker:security.ticker,strategy:isOption?"OPTIONS":/SWING/.test(account.strategy)?"SWING":"LONG_TERM",shares,averageCost:shares?basis/shares:previous?.averageCost||0,currentPrice:price,thesisStatus,positionState:shares?"OPEN":"CANDIDATE",recommendationId:rec?.id||null,sellReason:previous?.sellReason||null,exitPrice:previous?.exitPrice||null,exitDate:previous?.exitDate||null,proceeds:previous?.proceeds||0,reservedReentryCash:0,reentryLow:null,reentryHigh:null,reentryTrigger:null,reentryInvalidation:null,target1:previous?.target1??(Array.isArray(rec?.targets_json)?Number(rec.targets_json[0])/100||null:null),target2:previous?.target2||null,stop:previous?.stop??(Number(rec?.invalidation_cents)/100||null),lastAnalysisAt:new Date().toISOString(),strategyVersion:STRATEGY_VERSION,modelVersion:rec?.model_version||"lifecycle-rules-1"};
+      const position:PositionState={entryPlan:previous&&shares<=previous.shares?previous.entryPlan:undefined,investmentAccountId:accountId,ticker:security.ticker,strategy:isOption?"OPTIONS":/SWING/.test(account.strategy)?"SWING":"LONG_TERM",shares,averageCost:shares?basis/shares:previous?.averageCost||0,currentPrice:price,thesisStatus,positionState:shares?"OPEN":"CANDIDATE",recommendationId:rec?.id||null,sellReason:previous?.sellReason||null,exitPrice:previous?.exitPrice||null,exitDate:previous?.exitDate||null,proceeds:previous?.proceeds||0,reservedReentryCash:0,reentryLow:null,reentryHigh:null,reentryTrigger:null,reentryInvalidation:null,target1:previous?.target1??(Array.isArray(rec?.targets_json)?Number(rec.targets_json[0])/100||null:null),target2:previous?.target2||null,stop:previous?.stop??(Number(rec?.invalidation_cents)/100||null),lastAnalysisAt:new Date().toISOString(),strategyVersion:STRATEGY_VERSION,modelVersion:rec?.model_version||"lifecycle-rules-1"};
+      const recent=entryBars.filter(b=>Date.parse(b.time)>=Date.now()-5*60000&&Date.parse(b.time)<=Date.now()),last=recent.at(-1),before=recent.at(-2);
+      evidence.ask=Number(quote?.ask)||undefined;
+      evidence.entryObservation={asOf,price,lowSinceSetup:recent.length>=2?Math.min(...entryBars.filter(b=>Date.parse(b.time)>=Date.now()-20*60000&&Date.parse(b.time)<=Date.now()).map(b=>b.low)):null,supportHeld:recent.length>=2&&recent.every(b=>b.low>Number(previous?.entryPlan?.cancelBelow??evidence.support-evidence.atr*.5)),sellingPressureWeakening:Boolean(last&&before&&last.close>before.close&&last.close>=last.open),reclaimed:price>=Number(previous?.entryPlan?.trigger??price)&&Boolean(last&&last.close>=Number(previous?.entryPlan?.trigger??price)),volumeConfirmed:evidence.volumeRatio>=1.2,newsClear:evidence.newsClear,thesisValid:thesisStatus==="VALID"};
       evidence.targetReached=Boolean(position.target1&&price>=position.target1);
       const sold=(await tx.prepare(`SELECT t.*,COALESCE((SELECT SUM(d.realized_pnl_cents) FROM tax_lot_disposals d WHERE d.sell_transaction_id=t.id),NULL)::text realized_pnl FROM investment_transactions t LEFT JOIN trade_lifecycle_exits x ON x.exit_transaction_id=t.id WHERE t.account_id=? AND t.security_id=? AND t.transaction_type='SELL' AND t.reverses_transaction_id IS NULL AND NOT EXISTS(SELECT 1 FROM investment_transactions reversal WHERE reversal.reverses_transaction_id=t.id) AND x.id IS NULL ORDER BY t.trade_at,t.id`).bind(accountId,security.security_id).all<Row>()).results;
       for(const trade of sold){
@@ -172,10 +179,12 @@ export async function runTradeLifecycle(db:PostgresDatabase, householdId:string,
     });
     if(reasoningSnapshot){
       const snapshot=reasoningSnapshot as {position:PositionState;action:Action};
+      checks.patterns=detectPatternEvidence(bars.filter(b=>Date.parse(b.time)+86400000<=Date.now()),{timeframe:"1Day",market:market?(evidence.marketStrong?"UP":"DOWN"):undefined,sector:sectorQuote?(evidence.sectorStrong?"UP":"DOWN"):undefined,newsClear:evidence.newsClear,fundamentalsValid:thesisStatus==="VALID",riskApproved:false,dataFresh:evidence.complete});
       const decision=await reasonLifecycle(db,householdId,security.security_id,snapshot.position,snapshot.action,evidence,risk,{checks,fundamentals:fund,fundamentalAsOf:checks.sources?.fundamental?.asOf||fund.dataTimestamp,news:checks.news?.state==='UNAVAILABLE'?null:checks.news,valuation:checks.valuation||{score:fund.valuationAttractiveness},technical:checks.technical,marketRegime:market&&sectorQuote?{market,sector:sectorQuote}:null,accountPolicy:policy,researchComplete:evidence.complete},dependencies.aiProvider);
-      if(decision.providerStatus==='AVAILABLE'&&decision.action==='REBUY_IF')for(const notification of pendingAlerts)await db.transaction(tx=>alert(tx,householdId,accountId,notification.key,notification.text));
+      if(decision.providerStatus==='AVAILABLE'&&decision.action==='REBUY_IF')for(const notification of pendingAlerts)await db.transaction(tx=>alert(tx,householdId,accountId,notification.key,decision.entryPlan?positionAlert(decision,snapshot.position):notification.text,{ticker:snapshot.position.ticker,recommendationId:decision.decisionId,decisionId:decision.decisionId,asOf:decision.dataTimestamp}));
     }
     if(!isOption)await measureCentralDecisionOutcomes(db,accountId,security.ticker,bars);
+    await reviewClosedTrades(db,accountId,security.security_id,isOption?[]:bars);
     monitored++;
   }
   return {monitored};
@@ -190,5 +199,8 @@ export async function lifecycleAccountView(db:PostgresDatabase,householdId:strin
   let available=Math.max(0,(positions[0]?.action.cashBefore||0)-positions.reduce((sum,p)=>sum+Number(p.state.reservedReentryCash||0),0));
   const actions=positions.sort((a,b)=>(priority[a.action.action]??8)-(priority[b.action.action]??8)).map(p=>{const action={...p.action};if(["ADD","BUY NOW"].includes(action.action)){if(action.cost>available){action.action="BUY IF";action.shares=0;action.cost=0;action.reason="Wait for account cash after existing reservations and higher priority actions.";}else available-=action.cost;}return {...p,action};});
   const outcomesByReason=Object.entries(Object.groupBy(exits,x=>x.sell_reason||"UNCLASSIFIED")).map(([reason,rows])=>({reason,decisions:rows!.length,excessVsHold:round(rows!.reduce((sum,r)=>sum+Number(json(r.outcome_json).excessVsHold||0),0)),reentries:rows!.filter(r=>r.status==="REENTERED").length,rotations:rows!.filter(r=>r.status==="ROTATED").length}));
-  return {positions,actions:actions.slice(0,5),exits,audits,outcomesByReason,cashDeployment:exits.map(x=>({ticker:x.ticker,status:x.status,plan:json(x.plan_json),allocation:json(x.allocation_json)})),unreservedCash:available,cashReason:"Unreserved cash waits for a fresh thesis, attractive valuation, confirmed setup and account risk capacity; proposed sale proceeds are not spendable until execution sync.",pipeline:!positions.length||audits.some(x=>x.pipeline_status!=="COMPLETE")||positions.some(x=>x.action.pipeline!=="COMPLETE")?"INCOMPLETE":"COMPLETE"};
+  const reviews=(await db.prepare("SELECT p.review_json,s.ticker FROM post_trade_reviews p JOIN trade_lifecycle_exits x ON x.id=p.exit_id JOIN securities s ON s.id=x.security_id WHERE x.household_id=? AND x.account_id=? ORDER BY p.updated_at DESC").bind(householdId,accountId).all()).results;
+  return {reviews,positions,actions:actions.slice(0,5),exits,audits,outcomesByReason,cashDeployment:exits.map(x=>({ticker:x.ticker,status:x.status,plan:json(x.plan_json),allocation:json(x.allocation_json)})),unreservedCash:available,cashReason:"Unreserved cash waits for a fresh thesis, attractive valuation, confirmed setup and account risk capacity; proposed sale proceeds are not spendable until execution sync.",pipeline:!positions.length||audits.some(x=>x.pipeline_status!=="COMPLETE")||positions.some(x=>x.action.pipeline!=="COMPLETE")?"INCOMPLETE":"COMPLETE"};
 }
+
+function positionAlert(d:DecisionOutput,p:PositionState){return p.ticker+" — REENTRY READY — "+p.investmentAccountId+". Trigger $"+d.entryPlan?.trigger+" confirmed. Proposed "+d.shares+" shares; order "+d.entryPlan?.orderType+" limit $"+d.entryPlan?.orderPrice+". Cost $"+d.expectedCostProceeds+". Cash after $"+d.cashAfter+". Cancel if confirmation fails. User confirmation required.";}

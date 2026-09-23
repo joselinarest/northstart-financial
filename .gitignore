@@ -40,3 +40,10 @@ next-env.d.ts
 /outputs/
 /work/
 *.tsbuildinfo
+
+# local test browsers, credentials and generated reports
+/.cache/
+/audit-results/
+/playwright-report/
+/test-results/
+/.auth/

@@ -1,3 +1,5 @@
+import {checkWorkBudget} from "@/lib/work-budget";
+import {acquireDatabaseClient} from "@/lib/database-recovery";
 import pg from "pg";
 import { schemaStatements } from "@/db/schema";
 import { requireUser } from "@/lib/auth";
@@ -7,7 +9,7 @@ import {runMigrations} from "@/lib/migrations";
 const { Pool } = pg;
 type QueryResult = { rows: Array<Record<string, unknown>>; rowCount: number | null };
 const globalDatabase = globalThis as typeof globalThis & { northstarPool?: InstanceType<typeof Pool>; northstarSchemaReady?: Promise<void>; northstarSchemaVersion?: number; northstarRdsCa?: string; northstarRdsCaReady?: Promise<string> };
-const schemaVersion=27;
+const schemaVersion=31;
 const awsRdsCaUrl="https://truststore.pki.rds.amazonaws.com/global/global-bundle.pem";
 
 async function loadAwsRdsCa(){
@@ -31,7 +33,7 @@ function pool() {
     // Serverless instances multiply this number. Keep production at one client;
     // local development may use two for parallel route work.
     const development=process.env.NODE_ENV!=="production",hardLimit=development?2:1,max=Number.isFinite(configuredMax)?Math.min(hardLimit,Math.max(1,configuredMax)):1;
-    globalDatabase.northstarPool = new Pool({ connectionString: connectionUrl.toString(), max, min:0, idleTimeoutMillis: 1_000, connectionTimeoutMillis: development ? 15_000 : 5_000, maxLifetimeSeconds:60, allowExitOnIdle:true, ssl: local || process.env.DATABASE_SSL === "disable" ? false : { ca:globalDatabase.northstarRdsCa, rejectUnauthorized:true } });
+    globalDatabase.northstarPool = new Pool({ connectionString: connectionUrl.toString(), max, min:0, idleTimeoutMillis: 10_000, connectionTimeoutMillis: development ? 15_000 : 5_000, maxLifetimeSeconds:300, statement_timeout:10_000, lock_timeout:3_000, allowExitOnIdle:true, ssl: local || process.env.DATABASE_SSL === "disable" ? false : { ca:globalDatabase.northstarRdsCa, rejectUnauthorized:true } });
     globalDatabase.northstarPool.on("error",error=>console.error("Idle PostgreSQL client error",error.message));
   }
   return globalDatabase.northstarPool;
@@ -48,9 +50,9 @@ function postgresSql(source: string) {
 
 export class DbStatement {
   values: unknown[] = [];
-  constructor(public sql: string, private client: { query(text: string, values?: unknown[]): Promise<QueryResult> } = pool()) {}
+  constructor(public sql: string, private client?: { query(text: string, values?: unknown[]): Promise<QueryResult> }) {}
   bind(...values: unknown[]) { this.values = values; return this; }
-  async execute() { return this.client.query(postgresSql(this.sql), this.values); }
+  async execute() { checkWorkBudget();if(this.client)return this.client.query(postgresSql(this.sql), this.values);const client=await acquireDatabaseClient(()=>pool().connect());try{return await client.query(postgresSql(this.sql),this.values);}finally{client.release();} }
   async all<T = Record<string, unknown>>() { const result = await this.execute(); return { results: result.rows as T[] }; }
   async first<T = Record<string, unknown>>() { const result = await this.execute(); return (result.rows[0] as T | undefined) || null; }
   async run() { const result = await this.execute(); return { success: true, meta: { changes: result.rowCount || 0 } }; }
@@ -61,7 +63,7 @@ export class PostgresDatabase {
   prepare(sql: string) { return new DbStatement(sql,this.client); }
   async batch(statements: DbStatement[]) {
     if(this.client){const output=[];for(const statement of statements){const result=await new DbStatement(statement.sql,this.client).bind(...statement.values).execute();output.push({results:result.rows,success:true,meta:{changes:result.rowCount||0}})}return output}
-    const client = await pool().connect();
+    const client = await acquireDatabaseClient(()=>pool().connect());
     try {
       await client.query("BEGIN"); const output = [];
       for (const statement of statements) { const result = await new DbStatement(statement.sql, client).bind(...statement.values).execute(); output.push({ results: result.rows, success: true, meta: { changes: result.rowCount || 0 } }); }
@@ -71,7 +73,7 @@ export class PostgresDatabase {
   }
   async transaction<T>(work:(db:PostgresDatabase)=>Promise<T>){
     if(this.client)return work(this);
-    const client=await pool().connect();
+    const client=await acquireDatabaseClient(()=>pool().connect());
     try{await client.query("BEGIN");const result=await work(new PostgresDatabase(client));await client.query("COMMIT");return result}catch(error){await client.query("ROLLBACK");throw error}finally{client.release()}
   }
 }
@@ -85,7 +87,7 @@ export async function database() {
   // application environment—not the database hostname—determines whether the
   // local dev server should apply pending migrations automatically.
   const databaseIsLocal=/(?:localhost|127\.0\.0\.1)/.test(process.env.DATABASE_URL||""),shouldMigrate=process.env.AUTO_MIGRATE_DATABASE==="true"||(databaseIsLocal&&process.env.AUTO_MIGRATE_DATABASE!=="false");
-  if(shouldMigrate&&(!globalDatabase.northstarSchemaReady||globalDatabase.northstarSchemaVersion!==schemaVersion))globalDatabase.northstarSchemaReady=(async()=>{const client=await pool().connect();try{await client.query("SELECT pg_advisory_lock(hashtext($1))",["northstar_schema_init"]);for(const statement of schemaStatements)await client.query(postgresSql(statement));await runMigrations(client);globalDatabase.northstarSchemaVersion=schemaVersion}finally{await client.query("SELECT pg_advisory_unlock(hashtext($1))",["northstar_schema_init"]).catch(()=>undefined);client.release()}})().catch(error=>{globalDatabase.northstarSchemaReady=undefined;throw error});
+  if(shouldMigrate&&(!globalDatabase.northstarSchemaReady||globalDatabase.northstarSchemaVersion!==schemaVersion))globalDatabase.northstarSchemaReady=(async()=>{const client=await acquireDatabaseClient(()=>pool().connect());try{await client.query("SELECT pg_advisory_lock(hashtext($1))",["northstar_schema_init"]);for(const statement of schemaStatements)await client.query(postgresSql(statement));await runMigrations(client);globalDatabase.northstarSchemaVersion=schemaVersion}finally{await client.query("SELECT pg_advisory_unlock(hashtext($1))",["northstar_schema_init"]).catch(()=>undefined);client.release()}})().catch(error=>{globalDatabase.northstarSchemaReady=undefined;throw error});
   if(globalDatabase.northstarSchemaReady)await globalDatabase.northstarSchemaReady;
   return new PostgresDatabase();
 }

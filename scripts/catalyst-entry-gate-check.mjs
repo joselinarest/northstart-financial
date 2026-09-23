@@ -15,7 +15,12 @@ assert.match(gate, /recent adverse material news item/);
 assert.match(today, /evaluateCatalystEntryGate\(catalystContext, \{ mode: "SHARES" \}\)/);
 assert.match(today, /catalystGate\.pass/);
 assert.match(today, /catalysts: \{ \.\.\.catalystGate/);
-assert.match(today, /!stale && catalystGate\.pass/);
+assert.match(today, /actionable: false/); // Research cannot authorize orders; runtime gates are tested below.
+const {evaluateCatalystEntryGate}=await import("../lib/catalyst-entry-gate.ts");
+const context={available:true,provider:"TEST",asOf:new Date().toISOString(),events:[],recentNewsCount:1,adverseNewsCount:0};
+assert.equal(evaluateCatalystEntryGate({...context,available:false},{mode:"SHARES"}).pass,false);
+assert.equal(evaluateCatalystEntryGate({...context,events:[{kind:"EARNINGS",label:"Tomorrow",daysAway:1}]},{mode:"SHARES"}).pass,false);
+assert.equal(evaluateCatalystEntryGate(context,{mode:"SHARES"}).pass,true);
 assert.match(options, /evaluateCatalystEntryGate\(catalystContext,\{mode:"OPTIONS"/);
 assert.match(options, /catalystPass\?"BUY_IF":"WAIT"/);
 assert.match(options, /"catalystGate","optionQuote"/);

@@ -6,7 +6,7 @@ const sync = await readFile(new URL("../app/api/connections/plaid/sync/route.ts"
 const webhook = await readFile(new URL("../app/api/connections/plaid/webhook/route.ts", import.meta.url), "utf8");
 const alerts = await readFile(new URL("../app/api/alerts/route.ts", import.meta.url), "utf8");
 const history = await readFile(new URL("../app/api/notifications/history/route.ts", import.meta.url), "utf8");
-const worker = await readFile(new URL("../app/api/notifications/process/route.ts", import.meta.url), "utf8");
+const worker = await readFile(new URL("../lib/notification-worker.ts", import.meta.url), "utf8");
 const serviceWorker = await readFile(new URL("../public/sw.js", import.meta.url), "utf8");
 
 for (const eventType of [
@@ -16,7 +16,7 @@ for (const eventType of [
 ]) assert.match(notifications + sync, new RegExp(`\\b${eventType}\\b`));
 
 assert.match(webhook, /verifyPlaidWebhook/);
-assert.match(alerts, /COALESCE\(read_at,CURRENT_TIMESTAMP\)/);
+assert.match(alerts, /read_at=CURRENT_TIMESTAMP/);
 assert.doesNotMatch(alerts, /CURRENT_TIMESTAMP::text/);
 assert.doesNotMatch(history, /CURRENT_TIMESTAMP::text/);
 assert.match(webhook, /PLAID_SYNC/);

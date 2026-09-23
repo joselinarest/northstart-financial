@@ -15,5 +15,5 @@ assert.match(api,/worker_heartbeats/);
 assert.match(api,/market_discovery_runs/);
 assert.match(api,/PROVIDER_REQUIRED/);
 assert.match(workspace,/SystemCapabilityAudit/);
-assert.match(workspace,/<SystemCapabilityAudit accessToken=\{accessToken\}\/>/);
+assert.match(workspace,/<SystemCapabilityAudit accessToken=\{accessToken\}\s*\/>/);
 console.log("System capability registry, runtime evidence, honest statuses, and System Health rendering verified.");

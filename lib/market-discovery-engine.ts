@@ -1,3 +1,4 @@
+import {providerSignal} from "@/lib/work-budget";
 import {id,type PostgresDatabase} from "@/lib/db";
 import {loadRuntimeSecrets} from "@/lib/runtime-secrets";
 import {decideInvestment} from "@/lib/ai-investment-decision-engine";
@@ -19,26 +20,26 @@ const parse=(v:unknown,fallback:any)=>{if(v&&typeof v==="object")return v;try{re
 
 async function alpacaDirectory(headers:Record<string,string>){
  const base=(process.env.ALPACA_CLOCK_BASE_URL||"https://paper-api.alpaca.markets").replace(/\/(?:v2(?:\/clock)?)?\/?$/,"");
- const response=await fetch(`${base}/v2/assets?status=active&asset_class=us_equity`,{headers,cache:"no-store",signal:AbortSignal.timeout(15000)});
+ const response=await fetch(`${base}/v2/assets?status=active&asset_class=us_equity`,{headers,cache:"no-store",signal:providerSignal(15000)});
  if(!response.ok)throw new Error(`ALPACA_DIRECTORY_${response.status}`);return await response.json() as Asset[];
 }
 async function recentIpos(token:string){
  const to=new Date(),from=new Date(Date.now()-730*86400000),date=(d:Date)=>d.toISOString().slice(0,10);
- const response=await fetch(`https://finnhub.io/api/v1/calendar/ipo?from=${date(from)}&to=${date(to)}&token=${encodeURIComponent(token)}`,{cache:"no-store",signal:AbortSignal.timeout(15000)});
+ const response=await fetch(`https://finnhub.io/api/v1/calendar/ipo?from=${date(from)}&to=${date(to)}&token=${encodeURIComponent(token)}`,{cache:"no-store",signal:providerSignal(15000)});
  if(!response.ok)return[];const data=await response.json() as {ipoCalendar?:Array<{symbol?:string;name?:string;date?:string;status?:string}>};
  return (data.ipoCalendar||[]).filter(x=>x.symbol&&x.date&&!/withdraw/i.test(x.status||""));
 }
 async function barsFor(symbols:string[],headers:Record<string,string>){
  if(!symbols.length)return{};const feed=process.env.ALPACA_DATA_FEED||"iex",start=new Date(Date.now()-190*86400000).toISOString();
- const response=await fetch(`https://data.alpaca.markets/v2/stocks/bars?symbols=${symbols.join(",")}&timeframe=1Day&start=${encodeURIComponent(start)}&limit=10000&adjustment=all&feed=${encodeURIComponent(feed)}`,{headers,cache:"no-store",signal:AbortSignal.timeout(20000)});
+ const response=await fetch(`https://data.alpaca.markets/v2/stocks/bars?symbols=${symbols.join(",")}&timeframe=1Day&start=${encodeURIComponent(start)}&limit=10000&adjustment=all&feed=${encodeURIComponent(feed)}`,{headers,cache:"no-store",signal:providerSignal(20000)});
  if(!response.ok)throw new Error(`ALPACA_BARS_${response.status}`);return ((await response.json()) as {bars?:Record<string,Bar[]>}).bars||{};
 }
 async function enrich(symbol:string,token:string){
  const today=new Date(),from=new Date(Date.now()-32*86400000),date=(d:Date)=>d.toISOString().slice(0,10),headers={"X-Finnhub-Token":token};
  const [profileResponse,metricResponse,newsResponse]=await Promise.all([
-  fetch(`https://finnhub.io/api/v1/stock/profile2?symbol=${symbol}`,{headers,cache:"no-store",signal:AbortSignal.timeout(10000)}),
-  fetch(`https://finnhub.io/api/v1/stock/metric?symbol=${symbol}&metric=all`,{headers,cache:"no-store",signal:AbortSignal.timeout(10000)}),
-  fetch(`https://finnhub.io/api/v1/company-news?symbol=${symbol}&from=${date(from)}&to=${date(today)}`,{headers,cache:"no-store",signal:AbortSignal.timeout(10000)}),
+  fetch(`https://finnhub.io/api/v1/stock/profile2?symbol=${symbol}`,{headers,cache:"no-store",signal:providerSignal(10000)}),
+  fetch(`https://finnhub.io/api/v1/stock/metric?symbol=${symbol}&metric=all`,{headers,cache:"no-store",signal:providerSignal(10000)}),
+  fetch(`https://finnhub.io/api/v1/company-news?symbol=${symbol}&from=${date(from)}&to=${date(today)}`,{headers,cache:"no-store",signal:providerSignal(10000)}),
  ]);
  const profile=profileResponse.ok?await profileResponse.json() as Record<string,any>:{};
  const metric=metricResponse.ok?((await metricResponse.json()) as {metric?:Record<string,number>}).metric||{}:{};

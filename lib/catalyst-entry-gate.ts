@@ -1,3 +1,4 @@
+import {providerSignal} from "@/lib/work-budget";
 export type CatalystEvent = {
   kind: "EARNINGS" | "NEWS" | "MACRO" | "OTHER";
   label: string;
@@ -27,7 +28,7 @@ export async function loadCatalystContext(symbol: string): Promise<CatalystConte
   if (!token) return { available: false, provider: "FINNHUB_NOT_CONFIGURED", asOf: null, events: [], recentNewsCount: 0, adverseNewsCount: 0 };
   const today = new Date(), from = new Date(Date.now() - 7 * day), to = new Date(Date.now() + 120 * day), base = "https://finnhub.io/api/v1";
   const get = async (path: string) => {
-    const response = await fetch(`${base}${path}`, { headers: { "X-Finnhub-Token": token }, cache: "no-store", signal: AbortSignal.timeout(10000) });
+    const response = await fetch(`${base}${path}`, { headers: { "X-Finnhub-Token": token }, cache: "no-store", signal: providerSignal(10000) });
     if (!response.ok) throw new Error(`FINNHUB_${response.status}`);
     return response.json();
   };

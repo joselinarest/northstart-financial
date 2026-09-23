@@ -54,6 +54,7 @@ export async function POST(request: Request) {
         String(body.userAgentHint||"").slice(0,100),
       )
       .run();
+    await db.prepare("INSERT INTO notification_preferences(household_id,user_id,in_app_enabled,browser_push_enabled) VALUES(?,?,TRUE,TRUE) ON CONFLICT(household_id,user_id) DO UPDATE SET browser_push_enabled=TRUE,updated_at=CURRENT_TIMESTAMP").bind(householdId,userId).run();
     return Response.json({ ok: true });
   } catch (error) {
     if (error instanceof Response) return error;

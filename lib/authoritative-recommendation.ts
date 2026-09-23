@@ -1,3 +1,4 @@
+import {providerSignal} from "@/lib/work-budget";
 import { id, type PostgresDatabase } from "@/lib/db";
 import { marketDataProvider } from "@/lib/providers/alpaca-market-data";
 import { loadRuntimeSecrets } from "@/lib/runtime-secrets";
@@ -46,7 +47,7 @@ async function fundamentals(symbol: string) {
       const response = await fetch(`${base}${path}`, {
         headers: { "X-Finnhub-Token": token },
         cache: "no-store",
-        signal: AbortSignal.timeout(12000),
+        signal: providerSignal(12000),
       });
       if (!response.ok) throw new Error(`FINNHUB_${response.status}`);
       return response.json();

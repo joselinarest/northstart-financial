@@ -1,10 +1,11 @@
+import type {EntryPlan,EntryObservation} from "@/lib/entry-plan";
 /** Deterministic, versioned policy. Money in dollars; stock sizing in whole shares. */
 export const STRATEGY_VERSION = "lifecycle-1.0.0";
 export const SELL_REASONS = ["THESIS BROKEN", "TECHNICAL EXIT", "STOP/INVALIDATION", "TARGET REACHED", "OVERVALUED/TRIM", "CONCENTRATION REDUCTION", "CAPITAL ROTATION", "TACTICAL SELL FOR EXPECTED PULLBACK", "GOAL/REBALANCE"] as const;
 export type SellReason = typeof SELL_REASONS[number];
 export type Strategy = "LONG_TERM" | "SWING" | "OPTIONS";
 export type PositionState = {
-  investmentAccountId: string; ticker: string; strategy: Strategy; shares: number; averageCost: number;
+  entryPlan?:EntryPlan; investmentAccountId: string; ticker: string; strategy: Strategy; shares: number; averageCost: number;
   currentPrice: number; thesisStatus: "VALID" | "BROKEN" | "RESEARCH_REQUIRED";
   positionState: "CANDIDATE" | "ENTRY_READY" | "OPEN" | "ADD" | "HOLD" | "TRIM" | "EXIT" | "REENTRY_WATCH" | "REENTRY_READY" | "REENTER" | "CLOSED";
   recommendationId: string | null; sellReason: SellReason | null; exitPrice: number | null; exitDate: string | null;
@@ -13,7 +14,7 @@ export type PositionState = {
   stop: number | null; lastAnalysisAt: string; strategyVersion: string; modelVersion: string;
 };
 export type Evidence = {
-  asOf: string; complete: boolean; thesis: PositionState["thesisStatus"]; price: number; support: number; resistance: number;
+  entryObservation?:EntryObservation; ask?:number; asOf: string; complete: boolean; thesis: PositionState["thesisStatus"]; price: number; support: number; resistance: number;
   sma20: number; sma50: number; atr: number; volumeRatio: number; relativeStrength: number;
   marketStrong: boolean; sectorStrong: boolean; newsClear: boolean; valuationAttractive: boolean; majorValuationRisk: boolean;
   momentumBroken: boolean; goalChanged: boolean; targetReached: boolean; sellConfirmations: number;
@@ -27,6 +28,7 @@ export type ReentryPlan = {
   reason: string; mode?: "PULLBACK" | "BREAKOUT";
 };
 export type Action = {
+  entryPlan?:EntryPlan;
   action: "BUY NOW" | "BUY IF" | "ADD" | "HOLD" | "TRIM" | "SELL" | "REBUY IF" | "NO ACTION";
   shares: number; price: number; proceeds: number; cost: number; remainingShares: number; realizedGain: number;
   cashBefore: number; cashAfter: number; stop: number | null; targets: number[]; reason: string; sellReason: SellReason | null;

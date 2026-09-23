@@ -1088,4 +1088,30 @@ export const migrations: readonly Migration[] = [
       `CREATE TRIGGER recommendations_ai_guard BEFORE INSERT OR UPDATE ON recommendations FOR EACH ROW EXECUTE FUNCTION guard_ai_recommendation()`,
       `UPDATE recommendations SET actionable=FALSE,pipeline_status='INCOMPLETE' WHERE actionable=TRUE AND checks_json->'aiEvidence' IS NULL`,
     ],
-  },] as const;
+  },
+  {id:"0041_entry_and_notification_integrity",description:"Confirmed entry gates and durable notification event timelines",statements:[
+    `CREATE OR REPLACE FUNCTION guard_entry_recommendation() RETURNS trigger LANGUAGE plpgsql AS $$ DECLARE p JSONB; BEGIN p=NEW.checks_json->'aiEvidence'->'entryPlan'; IF NEW.actionable AND NEW.action IN ('BUY','STRONG_BUY','BUY_PARTIAL','ACCUMULATE') AND (p IS NULL OR COALESCE(p->>'status','')<>'CONFIRMED' OR COALESCE(p->>'orderType','NONE')='NONE' OR p->>'orderPrice' IS NULL OR COALESCE(p->>'confirmedAt','')='' OR COALESCE(p->>'expiresAt','')='') THEN NEW.actionable=FALSE; NEW.pipeline_status='INCOMPLETE'; END IF; RETURN NEW; END $$`,
+    `CREATE TRIGGER recommendations_entry_guard BEFORE INSERT OR UPDATE ON recommendations FOR EACH ROW EXECUTE FUNCTION guard_entry_recommendation()`,
+    `UPDATE recommendations SET actionable=FALSE,pipeline_status='INCOMPLETE' WHERE actionable=TRUE AND action IN ('BUY','STRONG_BUY','BUY_PARTIAL','ACCUMULATE') AND checks_json->'aiEvidence'->'entryPlan' IS NULL`,
+    `CREATE TABLE notification_events(id TEXT PRIMARY KEY,household_id TEXT NOT NULL REFERENCES households(id),event_key TEXT NOT NULL,category TEXT NOT NULL,severity TEXT NOT NULL CHECK(severity IN ('CRITICAL','HIGH','MEDIUM','LOW')),title TEXT NOT NULL,summary TEXT NOT NULL,snapshot_json JSONB NOT NULL,created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,UNIQUE(household_id,event_key))`,
+    `CREATE TABLE notification_event_updates(id TEXT PRIMARY KEY,event_id TEXT NOT NULL REFERENCES notification_events(id),alert_id TEXT NOT NULL UNIQUE REFERENCES alerts(id) ON DELETE CASCADE,snapshot_json JSONB NOT NULL,created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP)`,
+    `CREATE TABLE notification_event_states(event_id TEXT NOT NULL REFERENCES notification_events(id),user_id TEXT NOT NULL REFERENCES users(id),read_at TIMESTAMPTZ,dismissed_at TIMESTAMPTZ,PRIMARY KEY(event_id,user_id))`,
+    `CREATE TABLE notification_category_preferences(household_id TEXT NOT NULL REFERENCES households(id),user_id TEXT NOT NULL REFERENCES users(id),category TEXT NOT NULL,in_app BOOLEAN NOT NULL DEFAULT TRUE,push BOOLEAN NOT NULL DEFAULT TRUE,email BOOLEAN NOT NULL DEFAULT FALSE,PRIMARY KEY(household_id,user_id,category))`,
+    `CREATE TABLE notification_push_receipts(delivery_id TEXT NOT NULL REFERENCES alert_deliveries(id) ON DELETE CASCADE,subscription_id TEXT NOT NULL REFERENCES push_subscriptions(id),accepted_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,PRIMARY KEY(delivery_id,subscription_id))`,
+    `CREATE INDEX idx_notification_events_household ON notification_events(household_id,updated_at DESC)`,
+  ]},
+  {id:"0042_configuration_and_strategy_positions",description:"Audited settings and explicit strategy ownership",statements:[
+    `CREATE TABLE app_user_settings(household_id TEXT NOT NULL REFERENCES households(id),user_id TEXT NOT NULL REFERENCES users(id),settings_json JSONB NOT NULL,updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,PRIMARY KEY(household_id,user_id))`,
+    `CREATE TABLE account_risk_config(account_id TEXT PRIMARY KEY REFERENCES accounts(id),recommended_json JSONB NOT NULL,custom_json JSONB,updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP)`,
+    `CREATE TABLE provider_health_checks(provider TEXT PRIMARY KEY,status TEXT NOT NULL,last_success_at TIMESTAMPTZ,last_error TEXT,checked_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP)`,
+    `CREATE TABLE strategy_positions(id TEXT PRIMARY KEY,account_id TEXT NOT NULL REFERENCES accounts(id),security_id TEXT NOT NULL REFERENCES securities(id),strategy TEXT NOT NULL CHECK(strategy IN ('SWING','DAY_TRADE','LONG_TERM')),shares NUMERIC NOT NULL DEFAULT 0 CHECK(shares>=0),average_cost NUMERIC NOT NULL DEFAULT 0,stop NUMERIC,opened_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,closed_at TIMESTAMPTZ,realized_pnl NUMERIC NOT NULL DEFAULT 0)`,
+    `CREATE UNIQUE INDEX idx_strategy_position_open ON strategy_positions(account_id,security_id,strategy) WHERE closed_at IS NULL`,
+    `CREATE TABLE strategy_position_fills(transaction_id TEXT PRIMARY KEY REFERENCES investment_transactions(id),position_id TEXT NOT NULL REFERENCES strategy_positions(id),shares NUMERIC NOT NULL,price NUMERIC NOT NULL,created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP)`,
+  ]},
+  {id:"0043_post_trade_reviews",description:"Immutable predictions and versioned observational post-trade reviews",statements:[
+    `CREATE TABLE post_trade_reviews(exit_id TEXT PRIMARY KEY REFERENCES trade_lifecycle_exits(id),input_json JSONB NOT NULL,review_json JSONB NOT NULL,revision_hash TEXT NOT NULL,updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP)`,
+    `CREATE TABLE post_trade_review_revisions(exit_id TEXT NOT NULL REFERENCES trade_lifecycle_exits(id),revision_hash TEXT NOT NULL,review_json JSONB NOT NULL,created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,PRIMARY KEY(exit_id,revision_hash))`,
+  ]},
+  {id:"0044_worker_run_lease",description:"Durable whole-worker concurrency control",statements:[
+    `CREATE TABLE worker_run_leases(name TEXT PRIMARY KEY,owner TEXT NOT NULL,expires_at TIMESTAMPTZ NOT NULL)`,
+  ]},] as const;

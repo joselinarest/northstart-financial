@@ -1,8 +1,9 @@
+import {queueLifecycleTickers} from "@/lib/lifecycle-work-queue";
 import {id,type PostgresDatabase} from "@/lib/db";
-import {decideInvestment,type DecisionStrategy} from "@/lib/ai-investment-decision-engine";
+import {type DecisionStrategy} from "@/lib/ai-investment-decision-engine";
 import {marketDataProvider} from "@/lib/providers/alpaca-market-data";
 import {refreshInvestmentNotificationCoverage} from "@/lib/investment-notification-coverage";
-import {runTradeLifecycle} from "@/lib/trade-lifecycle-service";
+
 
 const parse=(value:unknown)=>{if(value&&typeof value==='object')return value as Record<string,any>;try{return JSON.parse(String(value||'{}'))}catch{return{}}};
 const decisionStrategy=(strategy:string):DecisionStrategy=>/SWING/i.test(strategy)?'SWING_SHARES':/OPTION/i.test(strategy)?'OPTIONS':'LONG_TERM_SHARES';
@@ -24,8 +25,9 @@ export async function runAccountIntelligenceLoop(db:PostgresDatabase,input:{hous
   await stage(db,runId,'ANALYZE',providerError?'FAILED':symbols.length?'SUCCEEDED':'SKIPPED',symbols.length,snapshot?Object.keys(snapshot.quotes).length:0,{provider:snapshot?.feed||null,asOf:snapshot?.asOf||null},providerError);
   const capturedAt=new Date().toISOString(),holdingValue=holdings.reduce((sum,h)=>sum+BigInt(String(h.market_value_cents||0)),0n),basis=holdings.reduce((sum,h)=>sum+BigInt(String(h.cost_basis_cents||0)),0n),cash=BigInt(String(account.cash_cents||0));
   await db.prepare(`INSERT INTO portfolio_snapshots(id,household_id,account_id,captured_at,market_value_cents,cash_cents,cost_basis_cents,realized_pnl_cents,unrealized_pnl_cents,allocation_json,source_freshness_json) VALUES(?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(account_id,captured_at) DO NOTHING`).bind(id('portfolio_snapshot'),input.householdId,account.id,capturedAt,holdingValue.toString(),cash.toString(),basis.toString(),'0',(holdingValue-basis).toString(),JSON.stringify({positions:holdings.map(h=>({ticker:h.ticker,valueCents:h.market_value_cents}))}),JSON.stringify({provider:snapshot?.feed||null,asOf:snapshot?.asOf||syncFreshAt,status:providerError?'FAILED':syncStale?'STALE':'CURRENT'})).run();
-  let decisions=0,waits=0;
-  if(snapshot)for(const holding of holdings.filter(h=>h.ticker)){const symbol=String(holding.ticker).toUpperCase(),quote=snapshot.quotes[symbol],asOf=quote?.timestamp||snapshot.asOf||capturedAt,positionValue=Number(holding.market_value_cents||0),accountValue=Number(holdingValue+cash),weightBps=accountValue>0?Math.round(positionValue/accountValue*10000):0;const result=await decideInvestment({householdId:input.householdId,accountId:account.id,accountName:account.account_name,strategy:decisionStrategy(account.strategy),ticker:symbol,requestType:'CONTINUOUS_ACCOUNT_LOOP',features:{account:{name:account.account_name,strategy:account.strategy,riskProfile:account.risk_profile,cashCents:String(cash),maximumPositionBps:account.maximum_position_bps,maximumRiskBps:account.maximum_risk_bps},position:{quantity:holding.quantity,costBasisCents:holding.cost_basis_cents,marketValueCents:holding.market_value_cents,weightBps},quote},evidence:[{label:'currentPrice',value:quote?.last,sourceType:'PROVIDER',sourceId:quote?.source||snapshot.feed,asOf},{label:'accountCash',value:String(cash),sourceType:'CALCULATION',asOf:capturedAt},{label:'position',value:{quantity:holding.quantity,weightBps,costBasisCents:holding.cost_basis_cents},sourceType:'CALCULATION',asOf:capturedAt},{label:'riskLimit',value:{maximumPositionBps:account.maximum_position_bps,maximumRiskBps:account.maximum_risk_bps},sourceType:'USER',asOf:capturedAt}],dataTimestamp:asOf,requiredFacts:['currentPrice','accountCash','position','riskLimit'],conflicts:providerError?[providerError]:[]},{db,persist:true});decisions++;if(['WAIT','NO_ACTION','INSUFFICIENT_CONFIRMATION'].includes(result.action))waits++}
+  const decisions=0,waits=0;
+  // Full evidence analysis is queued per ticker, including exited positions.
+  // This snapshot stage must not publish a second recommendation from partial facts.
   await stage(db,runId,'PREDICT',providerError?'DEGRADED':decisions?'SUCCEEDED':'SKIPPED',holdings.length,decisions,{safetyGatedWaits:waits,dataTimestamp:snapshot?.asOf||capturedAt,probabilistic:true},providerError);
   const active=await db.prepare(`SELECT COUNT(*) count,MAX(created_at) last_run FROM recommendations WHERE account_id=? AND lifecycle IN ('MONITORING','TRIGGERED')`).bind(account.id).first<Record<string,any>>();
   await stage(db,runId,'RECOMMEND','SUCCEEDED',decisions,Number(active?.count||0),{activeRecommendations:Number(active?.count||0),lastRecommendationAt:active?.last_run||null,note:'Only evidence-gated stored recommendations remain actionable'});
@@ -36,9 +38,9 @@ export async function runAccountIntelligenceLoop(db:PostgresDatabase,input:{hous
   await stage(db,runId,'MEASURE','SUCCEEDED',old.length,measured,{immutableOutcomes:true});
   const model=await db.prepare(`SELECT version,strategy,status,calibration_factor,validation_results_json FROM ai_model_versions WHERE strategy=? ORDER BY CASE status WHEN 'CHAMPION' THEN 0 WHEN 'CHALLENGER' THEN 1 ELSE 2 END,created_at DESC LIMIT 1`).bind(decisionStrategy(account.strategy)).first<Record<string,any>>();
   await stage(db,runId,'LEARN',model?'SUCCEEDED':'SKIPPED',measured,model?1:0,{modelVersion:model?.version||null,status:model?.status||'NO_APPROVED_MODEL',calibrationFactor:model?.calibration_factor||null,policy:'No automatic production mutation'});
-  await runTradeLifecycle(db,input.householdId,input.accountId);
+  const tickerJobsQueued=await queueLifecycleTickers(db,input.householdId,input.accountId,input.cycleKey);
   await refreshInvestmentNotificationCoverage(db,input.householdId);
-  await stage(db,runId,'REANALYZE','SUCCEEDED',1,1,{nextCycle:'scheduled server-side',accountId:account.id});
+  await stage(db,runId,'REANALYZE','SUCCEEDED',1,1,{nextCycle:'queued per ticker; execution tracked in background_jobs',accountId:account.id,tickerJobsQueued});
   const degraded=Boolean(providerError||account.investment_sync_error||syncStale||unmapped);
   await db.prepare(`UPDATE intelligence_loop_runs SET status=?,data_timestamp=?,model_version=?,strategy_version=?,positions_loaded=?,decisions_created=?,recommendations_evaluated=?,alerts_created=?,outcomes_measured=?,summary_json=?,completed_at=CURRENT_TIMESTAMP WHERE id=?`).bind(degraded?'DEGRADED':'SUCCEEDED',snapshot?.asOf||capturedAt,process.env.NORTHSTAR_CHAMPION_MODEL_VERSION||'northstar-decision-1.0.0',process.env.NORTHSTAR_STRATEGY_VERSION||'account-strategy-1.0.0',holdings.length,decisions,Number(active?.count||0),Number(alerts?.count||0),measured,JSON.stringify({accountName:account.account_name,strategy:account.strategy,provider:snapshot?.feed||null,providerError,syncStale,unmapped}),runId).run();
   return{runId,status:degraded?'DEGRADED':'SUCCEEDED',accountId:account.id,accountName:account.account_name,strategy:account.strategy,positions:holdings.length,decisions,recommendations:Number(active?.count||0),alerts:Number(alerts?.count||0),outcomes:measured};

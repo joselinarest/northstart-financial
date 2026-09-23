@@ -20,13 +20,29 @@ Resources:
             Action: sts:AssumeRole
       ManagedPolicyArns:
         - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:
+        - PolicyName: WorkerFailureQueue
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action: sqs:SendMessage
+                Resource: !GetAtt WorkerDeadLetterQueue.Arn
+  WorkerDeadLetterQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      MessageRetentionPeriod: 1209600
+      SqsManagedSseEnabled: true
   WorkerFunction:
     Type: AWS::Lambda::Function
     Properties:
       Runtime: nodejs22.x
       Handler: index.handler
       Role: !GetAtt WorkerRole.Arn
-      Timeout: 60
+      Timeout: 90
+      ReservedConcurrentExecutions: 1
+      DeadLetterConfig:
+        TargetArn: !GetAtt WorkerDeadLetterQueue.Arn
       MemorySize: 128
       Environment:
         Variables:
@@ -35,12 +51,24 @@ Resources:
       Code:
         ZipFile: |
           exports.handler = async () => {
-            const response = await fetch(`${process.env.APP_URL.replace(/\/$/, "")}/api/notifications/process`, {
-              method: "POST",
-              headers: { authorization: `Bearer ${process.env.CRON_SECRET}` }
-            });
-            if (!response.ok) throw new Error(`Northstar worker returned ${response.status}`);
-            return response.json();
+            for (let attempt = 0; attempt < 2; attempt++) {
+              try {
+                const response = await fetch(`${process.env.APP_URL.replace(/\/$/, "")}/api/notifications/process`, {
+                  method: "POST",
+                  headers: { authorization: `Bearer ${process.env.CRON_SECRET}` },
+                  signal: AbortSignal.timeout(26000)
+                });
+                if (!response.ok) {
+                  const error = new Error(`Northstar worker returned ${response.status}; reference ${response.headers.get('x-correlation-id') || 'unavailable'}`);
+                  error.retryable = response.status === 429 || response.status >= 500;
+                  throw error;
+                }
+                return await response.json();
+              } catch (error) {
+                if (attempt === 1 || error.retryable === false) throw error;
+                await new Promise(resolve => setTimeout(resolve, 500 + Math.floor(Math.random() * 500)));
+              }
+            }
           };
   WorkerSchedule:
     Type: AWS::Events::Rule
@@ -62,5 +90,7 @@ Resources:
       Principal: events.amazonaws.com
       SourceArn: !GetAtt WorkerSchedule.Arn
 Outputs:
+  DeadLetterQueueUrl:
+    Value: !Ref WorkerDeadLetterQueue
   WorkerFunctionName:
     Value: !Ref WorkerFunction

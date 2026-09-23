@@ -31,7 +31,12 @@
     "test:foundation-audit": "node scripts/foundation-audit-check.mjs",
     "test:account-candidates": "node scripts/account-candidate-ranking-check.mjs",
     "test:account-goals": "node scripts/account-goal-profile-check.mjs",
-    "test:critical-workflows": "node scripts/critical-workflows-check.mjs"
+    "test:critical-workflows": "node scripts/critical-workflows-check.mjs",
+    "test:pattern-review": "node scripts/pattern-review-check.mjs",
+    "test:entry-plan": "node scripts/entry-plan-check.mjs",
+    "test:notification-events": "node scripts/notification-events-check.mjs",
+    "build:worker": "node scripts/build-market-worker.mjs",
+    "test:worker": "node scripts/worker-reliability-check.mjs"
   },
   "dependencies": {
     "@aws-sdk/client-secrets-manager": "^3.1125.0",
@@ -51,6 +56,7 @@
     "@types/react": "19.2.14",
     "@types/react-dom": "19.2.3",
     "@types/web-push": "^3.6.4",
+    "esbuild": "^0.28.2",
     "eslint": "9.39.4",
     "eslint-config-next": "15.5.25",
     "tailwindcss": "4.2.1",

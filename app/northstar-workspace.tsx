@@ -13244,7 +13244,7 @@ export function NorthstarWorkspace({
                 </small>
               </div>
             </div>
-            <TransactionNotificationCenter accessToken={accessToken} />
+            <p><a href="/workspace/configuration">Configuration Center — account risk, providers, market and display settings</a> · <a href="/workspace/notifications">Notification Center</a></p><TransactionNotificationCenter accessToken={accessToken} />
             <MarketAlertCenter accessToken={accessToken} settings />
             <InvestmentNotificationHealth accessToken={accessToken} />
             <IntelligenceLoopHealth accessToken={accessToken} />

@@ -260,7 +260,7 @@ export default function TransactionNotificationCenter({ accessToken }: Props) {
             }
           />{" "}
           Quiet hours
-        </label>
+        </label><label><input type="checkbox" checked={quiet.criticalBypass===true} onChange={e=>save(globalBody({quietHours:{...quiet,criticalBypass:e.target.checked}}))}/>Allow CRITICAL alerts during quiet hours</label>
         <label>
           From
           <input
