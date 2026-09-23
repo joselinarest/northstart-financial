@@ -5935,37 +5935,6 @@ export function NorthstarWorkspace({
                   {cognitoConfigured ? "AWS Cognito" : "Setup required"}
                 </span>
               </button>
-              <div className="or">
-                <i />
-                or
-                <i />
-              </div>
-              <label>
-                Account email
-                <input
-                  value={accountEmail}
-                  onChange={(e) => setAccountEmail(e.target.value.trim())}
-                  placeholder="you@example.com"
-                  type="email"
-                  autoComplete="email"
-                />
-              </label>
-              <button
-                className="primary full-auth"
-                disabled={!accountEmail.includes("@")}
-                onClick={() => {
-                  setVerifyMethod("email");
-                  setDestination(accountEmail);
-                  setAuthStep("verify");
-                  setAuthNotice("");
-                }}
-              >
-                Continue to verification
-              </button>
-              <small>
-                Enter the account email first. Access requires successful AWS
-                Cognito verification.
-              </small>
               <div className="auth-legal">
                 <a href="/privacy">Privacy Policy</a>
                 <span>
