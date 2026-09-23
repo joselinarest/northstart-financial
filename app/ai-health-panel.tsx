@@ -1,0 +1,8 @@
+"use client";
+import {useEffect,useState} from "react";
+type Health={configured:boolean;health:{provider:string;last_success_at:string|null;last_latency_ms:number;last_model:string;last_model_version:string;failures:number;fallback_state:string;error_code:string|null}[];models:{version:string;status:string;strategy_status:string;strategy:string}[]};
+export default function AIHealthPanel({accessToken}:{accessToken?:string|null}){
+  const [data,setData]=useState<Health|null>(null),[error,setError]=useState("");
+  useEffect(()=>{const controller=new AbortController();fetch('/api/ai/health',{signal:controller.signal,cache:'no-store',headers:accessToken?{Authorization:`Bearer ${accessToken}`}:{}}).then(async r=>{if(!r.ok)throw Error('AI health unavailable');setData(await r.json());}).catch(e=>{if(!controller.signal.aborted)setError(e.message);});return()=>controller.abort();},[accessToken]);
+  return <details className="card" style={{padding:16}}><summary>AI health · {error||(!data?'Loading':!data.configured?'Provider not configured':data.health[0]?.fallback_state==='NONE'?'Available':'Recommendations unavailable')}</summary><p>AI analyzes verified snapshots and prepares actions. It cannot place an order.</p>{data?.health.map(h=><p key={h.provider}>{h.provider} · {h.last_model} / {h.last_model_version} · Last success {h.last_success_at?new Date(h.last_success_at).toLocaleString():'Never'} · {h.last_latency_ms} ms · {h.failures} failures · Fallback {h.fallback_state} {h.error_code}</p>)}{data&&!data.models.some(m=>m.status==='CHAMPION'&&m.strategy_status==='APPROVED')&&<p>No approved champion and strategy. Portfolio facts remain available; AI recommendations are unavailable.</p>}</details>;
+}

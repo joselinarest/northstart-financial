@@ -2,6 +2,7 @@ import {id,type PostgresDatabase} from "@/lib/db";
 import {decideInvestment,type DecisionStrategy} from "@/lib/ai-investment-decision-engine";
 import {marketDataProvider} from "@/lib/providers/alpaca-market-data";
 import {refreshInvestmentNotificationCoverage} from "@/lib/investment-notification-coverage";
+import {runTradeLifecycle} from "@/lib/trade-lifecycle-service";
 
 const parse=(value:unknown)=>{if(value&&typeof value==='object')return value as Record<string,any>;try{return JSON.parse(String(value||'{}'))}catch{return{}}};
 const decisionStrategy=(strategy:string):DecisionStrategy=>/SWING/i.test(strategy)?'SWING_SHARES':/OPTION/i.test(strategy)?'OPTIONS':'LONG_TERM_SHARES';
@@ -35,6 +36,7 @@ export async function runAccountIntelligenceLoop(db:PostgresDatabase,input:{hous
   await stage(db,runId,'MEASURE','SUCCEEDED',old.length,measured,{immutableOutcomes:true});
   const model=await db.prepare(`SELECT version,strategy,status,calibration_factor,validation_results_json FROM ai_model_versions WHERE strategy=? ORDER BY CASE status WHEN 'CHAMPION' THEN 0 WHEN 'CHALLENGER' THEN 1 ELSE 2 END,created_at DESC LIMIT 1`).bind(decisionStrategy(account.strategy)).first<Record<string,any>>();
   await stage(db,runId,'LEARN',model?'SUCCEEDED':'SKIPPED',measured,model?1:0,{modelVersion:model?.version||null,status:model?.status||'NO_APPROVED_MODEL',calibrationFactor:model?.calibration_factor||null,policy:'No automatic production mutation'});
+  await runTradeLifecycle(db,input.householdId,input.accountId);
   await refreshInvestmentNotificationCoverage(db,input.householdId);
   await stage(db,runId,'REANALYZE','SUCCEEDED',1,1,{nextCycle:'scheduled server-side',accountId:account.id});
   const degraded=Boolean(providerError||account.investment_sync_error||syncStale||unmapped);

@@ -79,7 +79,7 @@ async function fundamentals(symbol: string) {
   }
 }
 
-export async function authoritativeRecommendation(
+export async function researchRecommendation(
   db: PostgresDatabase,
   input: {
     householdId: string;
@@ -100,7 +100,7 @@ export async function authoritativeRecommendation(
   if (!account) throw new Error("Investment account not found");
   const prior = await db
     .prepare(
-      `SELECT r.*,s.ticker FROM recommendations r JOIN securities s ON s.id=r.security_id WHERE r.household_id=? AND r.account_id=? AND s.ticker=? AND r.lifecycle IN ('MONITORING','TRIGGERED') AND r.expires_at>CURRENT_TIMESTAMP ORDER BY r.created_at DESC LIMIT 1`,
+      `SELECT r.*,s.ticker FROM recommendations r JOIN securities s ON s.id=r.security_id WHERE r.household_id=? AND r.account_id=? AND s.ticker=? AND r.checks_json->>'researchOnly'='true' AND r.expires_at>CURRENT_TIMESTAMP ORDER BY r.created_at DESC LIMIT 1`,
     )
     .bind(input.householdId, input.accountId, symbol)
     .first<Json>();
@@ -405,9 +405,10 @@ export async function authoritativeRecommendation(
     action = "WAIT";
     reason = `${conflicts.join("; ")} — WAIT.`;
   }
+  const reservation = await db.prepare("SELECT COALESCE(SUM((plan_json->>'reservedCash')::numeric),0)::text total FROM trade_lifecycle_exits WHERE account_id=? AND status IN ('REENTRY_WATCH','REENTRY_READY')").bind(input.accountId).first<Json>();
   const price = Number(quote?.last || 0),
     risk = Math.max(0.01, price - Number(support || price * 0.94)),
-    cash = Number(account.cash_cents || 0) / 100,
+    cash = Math.max(0,Number(account.cash_cents || 0) / 100-Number(reservation?.total||0)),
     maxRisk = Number(account.maximum_risk_bps || 50) / 10000,
     accountValueRow = await db
       .prepare(
@@ -435,6 +436,7 @@ export async function authoritativeRecommendation(
     researchSnapshotId = id("research"),
     marketSnapshotId = id("market"),
     checks: Json = {
+      company: {industry:fundamental.profile.finnhubIndustry||null},
       recommendationId: null,
       account: { id: account.id, name: account.account_name, strategy },
       sources: {
@@ -584,6 +586,7 @@ export async function authoritativeRecommendation(
       .first<{ id: string }>(),
     recommendationId = id("recommendation");
   checks.recommendationId = recommendationId;
+  checks.researchOnly = true;
   await db.transaction(async (tx) => {
     const active = await tx
       .prepare(
@@ -618,7 +621,7 @@ export async function authoritativeRecommendation(
         confidence,
         reason,
         JSON.stringify(checks),
-        !stale && catalystGate.pass && ["BUY", "ACCUMULATE"].includes(action),
+        false, // Research facts are published only after the central AI gate.
         modelVersion,
         marketAsOf,
         expiresAt.toISOString(),
@@ -657,4 +660,16 @@ export async function authoritativeRecommendation(
     checks,
     source: "GENERATED",
   };
+}
+
+/** All user-facing surfaces consume the same account-scoped published decision. */
+export async function authoritativeRecommendation(db:PostgresDatabase,input:{householdId:string;accountId:string;symbol:string;force?:boolean}){
+  const existing=await db.prepare("SELECT r.*,s.ticker FROM recommendations r JOIN securities s ON s.id=r.security_id WHERE r.household_id=? AND r.account_id=? AND s.ticker=? AND r.checks_json->'aiEvidence' IS NOT NULL AND r.lifecycle IN ('MONITORING','TRIGGERED') AND r.expires_at>CURRENT_TIMESTAMP ORDER BY r.created_at DESC LIMIT 1").bind(input.householdId,input.accountId,input.symbol.toUpperCase()).first<Json>();
+  if(existing&&!input.force)return {recommendation:existing,checks:parse(existing.checks_json),source:"CENTRAL_AI_PERSISTED"};
+  await researchRecommendation(db,input);
+  const {runTradeLifecycle}=await import("@/lib/trade-lifecycle-service");
+  await runTradeLifecycle(db,input.householdId,input.accountId,{symbol:input.symbol.toUpperCase()});
+  const published=await db.prepare("SELECT r.*,s.ticker FROM recommendations r JOIN securities s ON s.id=r.security_id WHERE r.household_id=? AND r.account_id=? AND s.ticker=? AND r.checks_json->'aiEvidence' IS NOT NULL ORDER BY r.created_at DESC LIMIT 1").bind(input.householdId,input.accountId,input.symbol.toUpperCase()).first<Json>();
+  if(!published)throw new Error("CENTRAL_DECISION_UNAVAILABLE");
+  return {recommendation:published,checks:parse(published.checks_json),source:"CENTRAL_AI"};
 }

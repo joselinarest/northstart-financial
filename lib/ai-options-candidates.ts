@@ -1,0 +1,13 @@
+import type {DecisionCandidate,DecisionOutput} from "@/lib/ai-investment-decision-engine";
+export type OptionCandidateFacts={contractSymbol:string;type:"CALL"|"PUT";ask:number;bid:number;dte:number;spreadPct:number;impliedVolatility:number|null;delta:number|null;gamma:number|null;theta:number|null;vega:number|null;volume:number;openInterest:number|null};
+export function buildOptionCandidates(contracts:OptionCandidateFacts[],underlying:DecisionOutput|null,cash:number,risk:number,catalystPass:boolean):DecisionCandidate[]{
+  const noTrade:DecisionCandidate={id:"no-trade",action:"NO_ACTION",shares:0,entry:null,trigger:null,stop:null,targets:[],cost:0,proceeds:0,cashBefore:cash,cashAfter:cash,thesisStatus:underlying?.thesisStatus||"RESEARCH_REQUIRED",sellReason:null,reentryPlan:null,instrument:"NO_TRADE",eligible:true,reason:"Keep cash and avoid premium decay, IV and catalyst risk."};
+  if(!underlying||underlying.providerStatus!=="AVAILABLE"||!catalystPass)return [noTrade];
+  const bullish=["BUY_NOW","BUY_IF","ADD","REBUY_IF"].includes(underlying.action),bearish=["SELL_NOW","SELL_IF"].includes(underlying.action)&&underlying.thesisStatus==="BROKEN";
+  const shares=(underlying.deterministicCandidates||[]).filter(c=>c.instrument==="SHARES"&&["BUY_NOW","BUY_IF","ADD"].includes(c.action)&&c.cost<=cash&&c.cost<=risk).map(c=>({...c,id:`shares-${c.id}`}));
+  const options=contracts.filter(c=>(c.type==="CALL"?bullish:bearish)&&c.ask>0&&c.bid>0&&c.ask>=c.bid&&c.spreadPct<=8&&c.dte>=14&&c.volume>=10&&Number(c.openInterest)>0&&Number(c.impliedVolatility)>0&&[c.delta,c.gamma,c.theta,c.vega].every(v=>typeof v==="number"&&Number.isFinite(v))).slice(0,10).map(c=>{
+    const contracts=Math.floor(Math.min(cash,risk)/(c.ask*100)),cost=Math.round(contracts*c.ask*10000)/100;
+    return {id:c.contractSymbol,action:"BUY_IF" as const,shares:contracts,entry:c.ask,trigger:c.ask,stop:Math.round(c.ask*.5*100)/100,targets:[Math.round(c.ask*1.5*100)/100,Math.round(c.ask*2*100)/100],cost,proceeds:0,cashBefore:cash,cashAfter:Math.round((cash-cost)*100)/100,thesisStatus:underlying.thesisStatus||"RESEARCH_REQUIRED",sellReason:null,reentryPlan:null,instrument:c.type,contractSymbol:c.contractSymbol,eligible:contracts>0,reason:`${c.type}: underlying thesis confirmed; premium, IV, Greeks, DTE, liquidity and catalyst risk passed. Maximum premium loss ${cost}; compare with shares and no trade.`};
+  });
+  return [noTrade,...shares,...options];
+}

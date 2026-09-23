@@ -40,7 +40,8 @@ const AcademyLab = dynamic(() => import("@/app/academy-lab")),
     () => import("@/app/flow-intelligence-panel"),
   ),
   DailyCloseReview = dynamic(() => import("@/app/daily-close-review")),
-  TacticalRebuyPanel = dynamic(() => import("@/app/tactical-rebuy-panel")),
+  TradeLifecyclePanel = dynamic(() => import("@/app/trade-lifecycle-panel")),
+  AIHealthPanel = dynamic(() => import("@/app/ai-health-panel")),
   PaperTradingSimulator = dynamic(
     () => import("@/app/paper-trading-simulator"),
   ),
@@ -7486,16 +7487,8 @@ export function NorthstarWorkspace({
               }
             />
           )}
-          {tab === "Daily Action Plan" && advisorStrategy === "swing" && advisorAccount && (
-            <TacticalRebuyPanel
-              accountId={String(advisorAccount.id)}
-              onOpen={(symbol) =>
-                navigatePath(
-                  `/workspace/research/${encodeURIComponent(symbol.toLowerCase())}`,
-                )
-              }
-            />
-          )}
+          {tab === "Daily Action Plan" && advisorAccountId && <TradeLifecyclePanel accountId={advisorAccountId} accessToken={accessToken} />}
+          {tab === "Daily Action Plan" && <AIHealthPanel accessToken={accessToken} />}
 
 
           {tab === "Daily Action Plan" && (

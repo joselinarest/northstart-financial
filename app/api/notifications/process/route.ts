@@ -6,11 +6,12 @@ import {evaluateMarketIntelligence} from "@/lib/market-alert-engine";
 import {runMarketDiscovery} from "@/lib/market-discovery-engine";
 import {generateDailyMarketReview} from "@/lib/daily-market-review";
 import {marketSessionAt} from "@/lib/market-session";
-import {evaluateTacticalSellRebuy,monitorTacticalReentries} from "@/lib/tactical-rebuy-engine";
-import {evaluateTacticalOutcomes} from "@/lib/tactical-rebuy-outcomes";
+import {evaluateTacticalSellRebuy} from "@/lib/tactical-rebuy-engine";
+// Execution monitoring and outcomes are owned by the account Trade Lifecycle Engine.
 import {evaluateOptionsFlow} from "@/lib/options-flow-engine";
 import {refreshInvestmentNotificationCoverage} from "@/lib/investment-notification-coverage";
 import {runAccountIntelligenceLoop} from "@/lib/continuous-intelligence-loop";
+import {authoritativeRecommendation} from "@/lib/authoritative-recommendation";
 import {reviewKidsPlans} from "@/lib/kids-planning";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -99,6 +100,7 @@ export async function POST(request: Request) {
         await evaluateMarketIntelligence(db,householdId);
       }
       if(job.job_type==="MARKET_DISCOVERY")await runMarketDiscovery(db);
+      if(job.job_type==="AI_EVENT_REVIEW"){const payload=json(job.payload_json);await authoritativeRecommendation(db,{householdId:String(job.household_id),accountId:String(payload.accountId),symbol:String(payload.symbol),force:true});}
       if(job.job_type==="OPTIONS_FLOW")await evaluateOptionsFlow(db);
       if(job.job_type==="KIDS_PLAN_REVIEW"){const householdId=String(job.household_id||"");if(!householdId)throw new Error("KIDS_REVIEW_HOUSEHOLD_REQUIRED");await reviewKidsPlans(db,householdId,"MONTHLY");}
       if(job.job_type==="ACCOUNT_INTELLIGENCE_LOOP"){const payload=json(job.payload_json);await runAccountIntelligenceLoop(db,{householdId:String(payload.householdId||job.household_id||""),accountId:String(payload.accountId||""),trigger:String(payload.trigger||"SCHEDULED"),cycleKey:String(payload.cycleKey||job.id)});}
@@ -107,7 +109,7 @@ export async function POST(request: Request) {
         const householdId=String(job.household_id||"");if(!householdId)throw new Error("REVIEW_HOUSEHOLD_REQUIRED");
         await generateDailyMarketReview(db,householdId,job.job_type==="DAILY_CLOSE_REVIEW"?"MARKET_CLOSE":"PREMARKET_REVISION");
       }
-      if(job.job_type==="TACTICAL_REENTRY_MONITOR"){if(session==="REGULAR")for(const household of households.results)await evaluateTacticalSellRebuy(db,household.household_id);await monitorTacticalReentries(db);await evaluateTacticalOutcomes(db)}
+      if(job.job_type==="TACTICAL_REENTRY_MONITOR"){if(session==="REGULAR")for(const household of households.results)await evaluateTacticalSellRebuy(db,household.household_id)}
       await db
         .prepare(
           "UPDATE background_jobs SET status='SUCCEEDED',completed_at=CURRENT_TIMESTAMP,error_code=NULL,updated_at=CURRENT_TIMESTAMP WHERE id=?",

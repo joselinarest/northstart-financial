@@ -11,6 +11,7 @@
     "build": "next build",
     "start": "next start -p 3100",
     "lint": "eslint . --ignore-pattern dist --ignore-pattern .next",
+    "test:trade-lifecycle": "node scripts/trade-lifecycle-check.mjs && node scripts/trade-lifecycle-integration-check.mjs",
     "test:pwa": "node scripts/pwa-check.mjs",
     "test:market-alerts": "node scripts/market-alert-check.mjs",
     "test:transaction-alerts": "node scripts/transaction-alert-check.mjs",
@@ -41,6 +42,7 @@
     "web-push": "^3.6.7"
   },
   "devDependencies": {
+    "@electric-sql/pglite": "^0.5.8",
     "@eslint/eslintrc": "^3.3.7",
     "@playwright/test": "^1.63.0",
     "@tailwindcss/postcss": "4.2.1",
