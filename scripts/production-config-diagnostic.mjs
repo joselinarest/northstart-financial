@@ -12,7 +12,7 @@ const client=new pg.Client({connectionString:url.toString(),ssl:{ca,rejectUnauth
 try{
  await client.connect();
  console.log('DATABASE_CONNECTION_PASS');
- for(const [name,sql] of Object.entries({connections:"SELECT state,count(*)::int count FROM pg_stat_activity GROUP BY state",capacity:"SHOW max_connections",migrations:"SELECT tablename FROM pg_tables WHERE schemaname='public' AND tablename IN ('schema_migrations','ai_strategy_versions','ai_model_versions','post_trade_reviews','notification_events')",workers:"SELECT worker_name,status,heartbeat_at FROM worker_heartbeats ORDER BY heartbeat_at DESC LIMIT 5"})){
+ for(const [name,sql] of Object.entries({connections:"SELECT state,count(*)::int count FROM pg_stat_activity GROUP BY state",capacity:"SHOW max_connections",waits:"SELECT state,wait_event_type,wait_event,count(*)::int count,round(max(extract(epoch FROM (clock_timestamp()-query_start))))::int oldest_query_seconds FROM pg_stat_activity WHERE backend_type='client backend' GROUP BY state,wait_event_type,wait_event",migrations:"SELECT tablename FROM pg_tables WHERE schemaname='public' AND tablename IN ('schema_migrations','ai_strategy_versions','ai_model_versions','post_trade_reviews','notification_events')",workers:"SELECT worker_name,status,heartbeat_at FROM worker_heartbeats ORDER BY heartbeat_at DESC LIMIT 5"})){
   try{console.log(JSON.stringify({check:name,result:(await client.query(sql)).rows}));}catch(e){console.log(JSON.stringify({check:name,errorCode:e.code||'QUERY_FAILED'}));}
  }
 }catch(e){console.log(JSON.stringify({check:'database',errorCode:e.code||'CONNECTION_FAILED',timeout:/timeout/.test(e.message)}));process.exitCode=1;}finally{await client.end().catch(()=>{});}

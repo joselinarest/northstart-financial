@@ -15,7 +15,7 @@ const awsRdsCaUrl="https://truststore.pki.rds.amazonaws.com/global/global-bundle
 async function loadAwsRdsCa(){
   const connectionString=process.env.DATABASE_URL||"";
   if(/(?:localhost|127\.0\.0\.1)/.test(connectionString)||process.env.DATABASE_SSL==="disable")return;
-  if(!globalDatabase.northstarRdsCaReady)globalDatabase.northstarRdsCaReady=(async()=>{const response=await fetch(awsRdsCaUrl,{cache:"force-cache",signal:AbortSignal.timeout(10_000)});if(!response.ok)throw new Error(`AWS RDS CA bundle could not be loaded (${response.status})`);const certificate=await response.text();if(!certificate.includes("-----BEGIN CERTIFICATE-----"))throw new Error("AWS RDS CA bundle response was invalid");globalDatabase.northstarRdsCa=certificate;return certificate})();
+  if(!globalDatabase.northstarRdsCaReady)globalDatabase.northstarRdsCaReady=(async()=>{const response=await fetch(awsRdsCaUrl,{cache:"force-cache",signal:AbortSignal.timeout(10_000)});if(!response.ok)throw new Error(`AWS RDS CA bundle could not be loaded (${response.status})`);const certificate=await response.text();if(!certificate.includes("-----BEGIN CERTIFICATE-----"))throw new Error("AWS RDS CA bundle response was invalid");globalDatabase.northstarRdsCa=certificate;return certificate})().catch(error=>{globalDatabase.northstarRdsCaReady=undefined;throw error});
   await globalDatabase.northstarRdsCaReady;
 }
 
@@ -33,7 +33,7 @@ function pool() {
     // Serverless instances multiply this number. Keep production at one client;
     // local development may use two for parallel route work.
     const development=process.env.NODE_ENV!=="production",hardLimit=development?2:1,max=Number.isFinite(configuredMax)?Math.min(hardLimit,Math.max(1,configuredMax)):1;
-    globalDatabase.northstarPool = new Pool({ connectionString: connectionUrl.toString(), max, min:0, idleTimeoutMillis: 10_000, connectionTimeoutMillis: development ? 15_000 : 5_000, maxLifetimeSeconds:300, statement_timeout:10_000, lock_timeout:3_000, allowExitOnIdle:true, ssl: local || process.env.DATABASE_SSL === "disable" ? false : { ca:globalDatabase.northstarRdsCa, rejectUnauthorized:true } });
+    globalDatabase.northstarPool = new Pool({ connectionString: connectionUrl.toString(), max, min:0, idleTimeoutMillis: 10_000, connectionTimeoutMillis: development ? 15_000 : 5_000, maxLifetimeSeconds:300, keepAlive:true, keepAliveInitialDelayMillis:5_000, statement_timeout:10_000, lock_timeout:3_000, allowExitOnIdle:true, ssl: local || process.env.DATABASE_SSL === "disable" ? false : { ca:globalDatabase.northstarRdsCa, rejectUnauthorized:true } });
     globalDatabase.northstarPool.on("error",error=>console.error("Idle PostgreSQL client error",error.message));
   }
   return globalDatabase.northstarPool;
@@ -52,7 +52,7 @@ export class DbStatement {
   values: unknown[] = [];
   constructor(public sql: string, private client?: { query(text: string, values?: unknown[]): Promise<QueryResult> }) {}
   bind(...values: unknown[]) { this.values = values; return this; }
-  async execute() { checkWorkBudget();if(this.client)return this.client.query(postgresSql(this.sql), this.values);const client=await acquireDatabaseClient(()=>pool().connect());try{return await client.query(postgresSql(this.sql),this.values);}finally{client.release();} }
+  async execute() { checkWorkBudget();if(this.client)return this.client.query(postgresSql(this.sql), this.values);const client=await acquireDatabaseClient(()=>pool().connect());try{checkWorkBudget();return await client.query(postgresSql(this.sql),this.values);}finally{client.release();} }
   async all<T = Record<string, unknown>>() { const result = await this.execute(); return { results: result.rows as T[] }; }
   async first<T = Record<string, unknown>>() { const result = await this.execute(); return (result.rows[0] as T | undefined) || null; }
   async run() { const result = await this.execute(); return { success: true, meta: { changes: result.rowCount || 0 } }; }
@@ -64,17 +64,19 @@ export class PostgresDatabase {
   async batch(statements: DbStatement[]) {
     if(this.client){const output=[];for(const statement of statements){const result=await new DbStatement(statement.sql,this.client).bind(...statement.values).execute();output.push({results:result.rows,success:true,meta:{changes:result.rowCount||0}})}return output}
     const client = await acquireDatabaseClient(()=>pool().connect());
+    let discard=false;
     try {
       await client.query("BEGIN"); const output = [];
       for (const statement of statements) { const result = await new DbStatement(statement.sql, client).bind(...statement.values).execute(); output.push({ results: result.rows, success: true, meta: { changes: result.rowCount || 0 } }); }
       await client.query("COMMIT"); return output;
-    } catch (error) { await client.query("ROLLBACK"); throw error; }
-    finally { client.release(); }
+    } catch (error) { await client.query("ROLLBACK").catch(()=>{discard=true}); throw error; }
+    finally { client.release(discard); }
   }
   async transaction<T>(work:(db:PostgresDatabase)=>Promise<T>){
     if(this.client)return work(this);
     const client=await acquireDatabaseClient(()=>pool().connect());
-    try{await client.query("BEGIN");const result=await work(new PostgresDatabase(client));await client.query("COMMIT");return result}catch(error){await client.query("ROLLBACK");throw error}finally{client.release()}
+    let discard=false;
+    try{await client.query("BEGIN");const result=await work(new PostgresDatabase(client));await client.query("COMMIT");return result}catch(error){await client.query("ROLLBACK").catch(()=>{discard=true});throw error}finally{client.release(discard)}
   }
 }
 
