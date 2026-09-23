@@ -3528,6 +3528,9 @@ export function NorthstarWorkspace({
       setHeaderAlertsLoading(false);
     }
   };
+  const dismissHeaderAlert = async (id:string) => {
+    try {const response=await fetch("/api/alerts",{method:"PATCH",headers:financeHeaders(),body:JSON.stringify({id,dismiss:true})});if(!response.ok)throw Error("Unable to close notification. Please retry.");await loadHeaderAlerts();}catch(error){window.alert(error instanceof Error?error.message:"Unable to close notification");}
+  };
   const clearHeaderAlerts = async () => {
     if (!headerAlerts.length && marketUnread === 0) return;
     await confirmAction({
@@ -6403,8 +6406,7 @@ export function NorthstarWorkspace({
                         : (item.evidence_json as Record<string, any>) || {};
                   } catch {}
                   return (
-                    <a
-                      key={item.id}
+                    <div key={item.id} className="header-notification-item"><button type="button" aria-label={`Close notification: ${item.title}`} onClick={()=>void dismissHeaderAlert(item.id)}>× Close</button><a
                       href={
                         evidence.deepLink ||
                         "/workspace/settings#transaction-notifications"
@@ -6428,8 +6430,7 @@ export function NorthstarWorkspace({
                           {new Date(item.created_at).toLocaleString()}
                         </time>
                       </span>
-                      <em>›</em>
-                    </a>
+                      <em>›</em></a></div>
                   );
                 })
               ) : (

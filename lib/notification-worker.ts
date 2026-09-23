@@ -153,7 +153,7 @@ async function processNotifications(request: Request,limits:{totalMs:number;jobM
   await indexNotificationEvents(db);
   const deliveries = await db.prepare(`WITH claimable AS (
       SELECT d.id FROM alert_deliveries d JOIN alerts a ON a.id=d.alert_id
-      WHERE d.available_at<=CURRENT_TIMESTAMP
+      WHERE d.available_at<=CURRENT_TIMESTAMP AND a.dismissed_at IS NULL AND NOT EXISTS(SELECT 1 FROM notification_event_updates eu JOIN notification_event_states es ON es.event_id=eu.event_id WHERE eu.alert_id=a.id AND es.user_id=d.user_id AND es.dismissed_at IS NOT NULL)
         AND (SELECT COUNT(*) FROM notification_delivery_attempts ax WHERE ax.delivery_id=d.id)<5 AND (
         d.status IN ('QUEUED','PENDING') OR
         (d.status='FAILED' AND NOT EXISTS(SELECT 1 FROM notification_delivery_attempts x WHERE x.delivery_id=d.id AND x.next_retry_at>CURRENT_TIMESTAMP)) OR
@@ -173,6 +173,8 @@ async function processNotifications(request: Request,limits:{totalMs:number;jobM
   for (let deliveryIndex=0;deliveryIndex<deliveries.results.length;deliveryIndex++) {
     const row=deliveries.results[deliveryIndex];
     if(Date.now()>=deliveryDeadline){await db.prepare("UPDATE alert_deliveries SET status='QUEUED' WHERE id=ANY(?::text[]) AND status='SENT'").bind(deliveries.results.slice(deliveryIndex).map(d=>d.id)).run();break;}
+    const cancelled=await db.prepare("SELECT 1 cancelled FROM alert_deliveries d JOIN alerts a ON a.id=d.alert_id WHERE d.id=? AND (d.status='DISMISSED' OR a.dismissed_at IS NOT NULL OR EXISTS(SELECT 1 FROM notification_event_updates eu JOIN notification_event_states es ON es.event_id=eu.event_id WHERE eu.alert_id=a.id AND es.user_id=d.user_id AND es.dismissed_at IS NOT NULL))").bind(row.id).first();
+    if(cancelled){await db.prepare("UPDATE alert_deliveries SET status='DISMISSED',error_code='USER_DISMISSED' WHERE id=?").bind(row.id).run();continue;}
     const preference=await db.prepare("SELECT in_app,push,email FROM notification_category_preferences WHERE household_id=? AND user_id=? AND category=?").bind(row.household_id,row.user_id,row.event_category||"System").first<Record<string,boolean>>();
     const channelKey=row.channel==="BROWSER_PUSH"?"push":row.channel==="EMAIL"?"email":"in_app";
     if(preference?.[channelKey]===false){await db.prepare("UPDATE alert_deliveries SET status='DISMISSED',error_code='CATEGORY_DISABLED' WHERE id=?").bind(row.id).run();continue;}
