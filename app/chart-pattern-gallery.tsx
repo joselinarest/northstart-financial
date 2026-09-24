@@ -1,39 +1,40 @@
 "use client";
 import {useEffect,useMemo,useState} from 'react';
+import {completedPatternBars} from "@/lib/completed-pattern-bars";
 import {patternHistory} from '@/lib/pattern-history';
 import type {PatternEvidence,PatternBar} from '@/lib/pattern-evidence';
 
-function DetectedPatternImage({pattern,bars}:{pattern:PatternEvidence;bars:PatternBar[]}){
- const sample=bars.filter(b=>b.time>=pattern.startTime&&b.time<=pattern.endTime).slice(-60);
+function DetectedPatternImage({pattern,bars}:{pattern?:PatternEvidence;bars:PatternBar[]}){
+ const sample=(pattern?bars.filter(b=>b.time>=pattern.startTime&&b.time<=pattern.endTime):bars).slice(-60);
  if(!sample.length)return <p>Pattern image unavailable: matching candles are missing.</p>;
- const low=Math.min(pattern.confirmationLevel,pattern.invalidationLevel,...sample.map(b=>b.low));
- const high=Math.max(pattern.confirmationLevel,pattern.invalidationLevel,...sample.map(b=>b.high));
+ const low=Math.min(...(pattern?[pattern.confirmationLevel,pattern.invalidationLevel]:[]),...sample.map(b=>b.low));
+ const high=Math.max(...(pattern?[pattern.confirmationLevel,pattern.invalidationLevel]:[]),...sample.map(b=>b.high));
  const y=(price:number)=>20+(high-price)/Math.max(high-low,.01)*120;
  const step=240/sample.length;
- return <svg viewBox="0 0 360 175" role="img" aria-label={`${pattern.name} on actual candles; confirmation ${pattern.confirmationLevel.toFixed(2)}, invalidation ${pattern.invalidationLevel.toFixed(2)}`}>
+ return <svg viewBox="0 0 360 175" role="img" aria-label={pattern?`${pattern.name} on actual candles; confirmation ${pattern.confirmationLevel.toFixed(2)}, invalidation ${pattern.invalidationLevel.toFixed(2)}`:"Latest available holding candles"}>
   {sample.map((b,i)=>{const x=10+i*step+step/2,color=b.close>=b.open?'#087f5b':'#c2413a';return <g key={b.time}><line x1={x} x2={x} y1={y(b.high)} y2={y(b.low)} stroke={color}/><rect x={x-Math.max(1,step*.6)/2} y={Math.min(y(b.open),y(b.close))} width={Math.max(1,step*.6)} height={Math.max(1,Math.abs(y(b.open)-y(b.close)))} fill={color}/></g>})}
-  <line x1="5" x2="250" y1={y(pattern.confirmationLevel)} y2={y(pattern.confirmationLevel)} stroke="#2563eb" strokeDasharray="4 3"/>
+  {pattern&&<><line x1="5" x2="250" y1={y(pattern.confirmationLevel)} y2={y(pattern.confirmationLevel)} stroke="#2563eb" strokeDasharray="4 3"/>
   <text x="254" y={y(pattern.confirmationLevel)} fontSize="10" fill="#1e40af">Trigger ${pattern.confirmationLevel.toFixed(2)}</text>
   <line x1="5" x2="250" y1={y(pattern.invalidationLevel)} y2={y(pattern.invalidationLevel)} stroke="#c2413a" strokeDasharray="4 3"/>
-  <text x="254" y={y(pattern.invalidationLevel)+10} fontSize="10" fill="#9f1239">Invalid ${pattern.invalidationLevel.toFixed(2)}</text>
+  <text x="254" y={y(pattern.invalidationLevel)+10} fontSize="10" fill="#9f1239">Invalid ${pattern.invalidationLevel.toFixed(2)}</text></>}
   <text x="10" y="166" fontSize="10" fill="#334155">Actual completed candles · no future prices drawn</text>
  </svg>;
 }
 
 function HoldingPatternHistory({symbol}:{symbol:string}){
- const [attempt,setAttempt]=useState(0),[requested,setRequested]=useState(false),[bars,setBars]=useState<PatternBar[]>([]),[status,setStatus]=useState(''),[visible,setVisible]=useState(12);
+ const [range,setRange]=useState("1Y"),[attempt,setAttempt]=useState(0),[requested,setRequested]=useState(true),[bars,setBars]=useState<PatternBar[]>([]),[status,setStatus]=useState(''),[visible,setVisible]=useState(12);
  useEffect(()=>{
   if(!requested)return;
-  const controller=new AbortController();setBars([]);setStatus('Loading earliest available weekly history…');
-  fetch(`/api/market/bars?symbol=${encodeURIComponent(symbol)}&range=MAX`,{signal:controller.signal}).then(async response=>{const data=await response.json();if(!response.ok)throw new Error(data.error||'History unavailable');if(!Array.isArray(data.bars))throw new Error('Provider returned no candle history');if(controller.signal.aborted)return;setBars(data.bars.filter((b:PatternBar)=>Date.parse(b.time)+7*86400000<=Date.now()));setStatus('Loaded provider history. The unfinished weekly candle is excluded.');}).catch(error=>{if(!controller.signal.aborted)setStatus(error instanceof Error?error.message:'History unavailable');});
+  const controller=new AbortController();setBars([]);setStatus('Loading latest holding pattern history…');
+  fetch(`/api/market/bars?symbol=${encodeURIComponent(symbol)}&range=${range}`,{signal:controller.signal}).then(async response=>{const data=await response.json();if(!response.ok)throw new Error(data.error||'History unavailable');if(!Array.isArray(data.bars))throw new Error('Provider returned no candle history');if(controller.signal.aborted)return;setBars(completedPatternBars(data.bars,range==="MAX"?"1Week":"1Day"));setStatus("Loaded provider history; unfinished candles are excluded from pattern confirmation.");}).catch(error=>{if(!controller.signal.aborted)setStatus(error instanceof Error?error.message:'History unavailable');});
   return()=>controller.abort();
- },[requested,symbol,attempt]);
- const history=useMemo(()=>patternHistory(bars,'1Week'),[bars]);
- return <section className="holding-pattern-history"><h4>{symbol} · Pattern timeline from earliest available history</h4><p>Stock / ETF market history, not your purchase date. Weekly candles give the longest view. Patterns are replayed using only information available at the time; the first 24 candles provide context. Historical signals are not current orders.</p>
-  <button type="button" onClick={()=>{setRequested(true);setAttempt(n=>n+1);setVisible(12)}} disabled={requested&&status.startsWith("Loading")}>Load all available history for {symbol}</button>
-  {requested&&<><p role="status">{status}</p>{bars.length>0&&<p><strong>Coverage: {bars[0].time.slice(0,10)} through {bars.at(-1)!.time.slice(0,10)}</strong> · {bars.length} completed weekly candles · {history.length} pattern episodes. This may not reach the listing date or today; it is the provider’s available completed history.</p>}{bars.length>0&&!history.length&&<p>No qualifying pattern episodes found in this history.</p>}
-  <div className="pattern-gallery-grid">{history.slice(0,visible).map(p=><article className="pattern-gallery-card" key={p.id} style={{padding:14}}><h4>{p.name} · {p.endTime.slice(0,10)}</h4><DetectedPatternImage pattern={p} bars={bars}/><p><strong>Historical {p.direction==='UP'?'buy setup':p.direction==='DOWN'?'sell / trim warning':'neutral setup'}</strong> · {p.validation} at detection.</p><p>Trigger ${p.confirmationLevel.toFixed(2)} · invalidation ${p.invalidationLevel.toFixed(2)} · volume {p.volumeConfirmation}. These are historical levels, not an order to place today.</p><details><summary>Evidence missing at that time</summary><p>{p.missingConfirmation.join('; ')||'Pattern checks passed; independent account review still required.'}</p></details></article>)}</div>
-  {history.length>visible&&<button type="button" onClick={()=>setVisible(n=>n+12)}>Show next 12 episodes ({visible} of {history.length})</button>}</>}
+ },[requested,symbol,attempt,range]);
+ const history=useMemo(()=>patternHistory(bars,range==="MAX"?"1Week":"1Day").reverse(),[bars,range]);
+ return <section className="holding-pattern-history"><h4>{symbol} · Latest holding patterns</h4><p>Recent daily patterns load automatically, newest first. Switch to weekly history for the longest available view. Patterns are replayed using only information available at the time; the first 24 candles provide context. Historical signals are not current orders.</p>
+  <label>History range <select value={range} onChange={e=>{setRange(e.target.value);setVisible(12)}}><option value="1Y">Recent daily · latest first</option><option value="MAX">All available weekly · latest first</option></select></label><button type="button" onClick={()=>{setRequested(true);setAttempt(n=>n+1);setVisible(12)}} disabled={requested&&status.startsWith("Loading")}>Refresh holding patterns</button>
+  {requested&&<><p role="status">{status}</p>{bars.length>0&&<p><strong>Coverage: {bars[0].time.slice(0,10)} through {bars.at(-1)!.time.slice(0,10)}</strong> · {bars.length} completed {range==="MAX"?"weekly":"daily"} candles · {history.length} pattern episodes. This may not reach the listing date or today; it is the provider’s available completed history.</p>}{bars.length>0&&!history.length&&<p>No qualifying pattern episodes found in this history.</p>}
+  <div className="pattern-gallery-card" style={{padding:14,marginBottom:16}}><h4>{symbol} · Latest available completed candles</h4><DetectedPatternImage bars={bars}/><p>This image always shows the latest returned candles, even when no named pattern qualifies. See the coverage date above; it is not a live intraday signal.</p></div><div className="pattern-gallery-grid">{history.slice(0,visible).map(p=><article className="pattern-gallery-card" key={p.id} style={{padding:14}}><h4>{p.name} · {p.endTime.slice(0,10)}</h4><DetectedPatternImage pattern={p} bars={bars}/><p><strong>Historical {p.direction==='UP'?'buy setup':p.direction==='DOWN'?'sell / trim warning':'neutral setup'}</strong> · {p.validation} at detection.</p><p>Trigger ${p.confirmationLevel.toFixed(2)} · invalidation ${p.invalidationLevel.toFixed(2)} · volume {p.volumeConfirmation}. These are historical levels, not an order to place today.</p><details><summary>Evidence missing at that time</summary><p>{p.missingConfirmation.join('; ')||'Pattern checks passed; independent account review still required.'}</p></details></article>)}</div>
+  {history.length>visible&&<button type="button" onClick={()=>setVisible(n=>n+12)}>Show older 12 episodes ({visible} of {history.length})</button>}</>}
  </section>;
 }
 

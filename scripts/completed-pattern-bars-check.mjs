@@ -1,0 +1,12 @@
+import assert from 'node:assert/strict';
+import {completedPatternBars} from '../lib/completed-pattern-bars.ts';
+const bar=time=>({time,open:100,high:102,low:99,close:101,volume:100});
+const bars=[bar('2026-09-22T04:00:00Z'),bar('2026-09-23T04:00:00Z')];
+assert.equal(completedPatternBars(bars,'1Day',Date.parse('2026-09-23T19:59:00Z')).length,1);
+assert.equal(completedPatternBars(bars,'1Day',Date.parse('2026-09-23T20:00:00Z')).length,2);
+assert.equal(completedPatternBars([bar('2026-01-12T05:00:00Z')],'1Day',Date.parse('2026-01-12T20:59:00Z')).length,0);
+assert.equal(completedPatternBars([bar('2026-01-12T05:00:00Z')],'1Day',Date.parse('2026-01-12T21:00:00Z')).length,1);
+assert.equal(completedPatternBars([bar('invalid')],'1Day').length,0);
+assert.equal(completedPatternBars([bar('2026-09-23T14:00:00Z')],'5m',Date.parse('2026-09-23T14:04:59Z')).length,0);
+assert.equal(completedPatternBars([bar('2026-09-23T14:00:00Z')],'5m',Date.parse('2026-09-23T14:05:00Z')).length,1);
+console.log('PASS: current daily candle at NY close, DST, unfinished intraday bars, invalid dates.');
