@@ -2,7 +2,7 @@
 import {useEffect,useRef,useState,type ReactNode} from 'react';
 import {createPortal} from 'react-dom';
 export default function MovableStockPanel({children,onClose}:{children:ReactNode;onClose:()=>void}){
- const [floating,setFloating]=useState(false),[position,setPosition]=useState({left:16,top:16});
+ const [floating,setFloating]=useState(true),[position,setPosition]=useState({left:16,top:16});
  const panel=useRef<HTMLDivElement>(null),drag=useRef<{x:number;y:number;left:number;top:number}|null>(null);
  const move=(left:number,top:number)=>{const rect=panel.current?.getBoundingClientRect();setPosition({left:Math.max(0,Math.min(left,window.innerWidth-(rect?.width||320))),top:Math.max(0,Math.min(top,window.innerHeight-(rect?.height||260)))})};
  useEffect(()=>{if(!floating)return;const resize=()=>setPosition(p=>({left:Math.max(0,Math.min(p.left,innerWidth-(panel.current?.offsetWidth||320))),top:Math.max(0,Math.min(p.top,innerHeight-(panel.current?.offsetHeight||260)))}));window.addEventListener('resize',resize);return()=>window.removeEventListener('resize',resize)},[floating]);
