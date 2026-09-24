@@ -696,6 +696,10 @@ export default function AutomaticMarketCopilot({
                         </dd>
                       </div>
                     </dl>
+                    <div style={{display:"flex",flexWrap:"wrap",gap:8,margin:"12px 0"}}>
+                      <a style={{display:"inline-block",padding:"10px 12px",border:"1px solid #16795b",borderRadius:8,fontWeight:700}} target="_blank" rel="noopener noreferrer" href={chartSetupLink({symbol:item.symbol,accountId,trigger:triggerPrice,high:triggerPrice+riskPerShare*.15,pullback:pullbackReference,stop:item.invalidation,target1,target2})}>Analyze buy setup ↗</a>
+                      <a style={{display:"inline-block",padding:"10px 12px",border:"1px solid #16795b",borderRadius:8,fontWeight:700}} target="_blank" rel="noopener noreferrer" href={chartSetupLink({symbol:item.symbol,accountId,trigger:triggerPrice,high:triggerPrice+riskPerShare*.15,pullback:pullbackReference,stop:item.invalidation,target1,target2}).replace('#market-charts','#sell-trim-analysis')}>Analyze sell / trim ↗</a>
+                    </div>
                     <small>
                       Why wait: ${triggerPrice.toFixed(2)} is confirmation, not
                       a claim that a higher price is cheaper. Paying up is valid

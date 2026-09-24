@@ -60,6 +60,13 @@ export default function ChartDecisionWorkspace(props: Props) {
     [loading, setLoading] = useState(true),
     [refreshingDecision, setRefreshingDecision] = useState(false);
   useEffect(() => {
+    if (window.location.hash !== "#sell-trim-analysis") return;
+    const frame = requestAnimationFrame(() => {
+      document.getElementById("sell-trim-analysis")?.scrollIntoView({ block: "start" });
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [props.accountId, props.symbol]);
+  useEffect(() => {
     let active = true;
     const load = async () => {
       setLoading(true);
@@ -280,7 +287,7 @@ export default function ChartDecisionWorkspace(props: Props) {
         </strong>
       </header>
       <HoldingCostBadge symbol={props.symbol} accountId={props.accountId} currentPrice={props.price} stop={props.stop}/>
-      <ChartExitReview key={`${props.accountId}:${props.symbol}`} symbol={props.symbol} accountId={props.accountId} price={props.price} support={props.support} resistance={props.resistance} stop={props.stop} target={props.target1} relativeVolume={props.relativeVolume} fresh={props.fresh} recommendation={finalRecommendation} error={authoritative?.error}/>
+      <div id="sell-trim-analysis" style={{scrollMarginTop:100}}><ChartExitReview key={`${props.accountId}:${props.symbol}`} symbol={props.symbol} accountId={props.accountId} price={props.price} support={props.support} resistance={props.resistance} stop={props.stop} target={props.target1} relativeVolume={props.relativeVolume} fresh={props.fresh} recommendation={finalRecommendation} error={authoritative?.error}/></div>
       <IntegratedResearchChart
         accountId={props.accountId}
         accountValue={props.accountValue}
