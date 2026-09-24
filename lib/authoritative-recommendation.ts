@@ -112,6 +112,7 @@ export async function researchRecommendation(
   const priorActionableBuy = ["BUY", "ACCUMULATE"].includes(String(prior?.action || ""));
   const priorNeedsRefresh =
     priorChecks?.freshness?.stale === true ||
+    /^FINNHUB_(?:401|403|429|5\d\d|NOT_CONFIGURED|ERROR)$/.test(String(priorChecks?.sources?.fundamental?.provider||"")) ||
     /DATA REFRESH REQUIRED/i.test(String(prior?.reason || "")) ||
     (priorActionableBuy && (priorAgeMs > 10 * 60_000 || !priorChecks?.catalysts));
   if (prior && !input.force && !priorNeedsRefresh)
