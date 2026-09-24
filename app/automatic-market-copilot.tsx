@@ -530,7 +530,7 @@ export default function AutomaticMarketCopilot({
     });
   }, [data.asOf, strategy, accountName, accountScope, holdings]);
   return (
-    <section className="auto-copilot">
+    <section id="today-market-context" className="auto-copilot">
       <header>
         <div>
           <span>

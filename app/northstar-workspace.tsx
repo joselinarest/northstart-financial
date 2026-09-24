@@ -7312,68 +7312,17 @@ export function NorthstarWorkspace({
           {tab === "Daily Action Plan" && (
             <section className="daily-plan-intro card">
               <header>
-                <span>
-                  {marketPhase === "open"
-                    ? "REAL MARKET DATA · MARKET OPEN · LIVE UPDATE"
-                    : "REAL MARKET DATA · NEXT-SESSION PREPARATION"}
-                </span>
-                <h2>
-                  {marketPhase === "open"
-                    ? "One ranked plan that changes with current evidence"
-                    : marketClock.status === "connected"
-                      ? `Preparing for the next open in ${marketCountdown}`
-                      : "Preparing the next-session plan"}
-                </h2>
-                {!marketClock.isOpen && clockTargetLabel && (
-                  <p>
-                    Next official U.S. market open: <b>{clockTargetLabel}</b>. A
-                    long weekend or holiday countdown is shown as days and
-                    hours, not a confusing total such as 88 hours.
-                  </p>
-                )}
+                <span>{marketPhase === "open" ? "MARKET OPEN · LIVE MONITORING" : "NEXT-SESSION PREPARATION"}</span>
+                <h2>{marketPhase === "open" ? "Your next move, with the evidence." : "Prepare now. Confirm at the next open."}</h2>
+                <p>{advisorAccountName} · Review risk first, then confirmed opportunities. HOLD and WAIT are valid decisions.</p>
+                {!marketClock.isOpen && clockTargetLabel && <p>Next U.S. market open: <b>{clockTargetLabel}</b></p>}
               </header>
-              <div>
-                <article>
-                  <b>While the market is closed</b>
-                  <p>
-                    Rank the next-session list from the latest completed
-                    provider bars, Weekly/Daily structure, volume, support,
-                    resistance, available fundamentals, and defined risk.
-                    Closed-market prices remain the latest available values.
-                  </p>
-                </article>
-                <article>
-                  <b>Before the next open</b>
-                  <p>
-                    Keep the plan as preparation—not an immediate entry. At the
-                    decision window, recheck gaps, pre-market information,
-                    relative volume, index/sector confirmation, and invalidate
-                    stale setups.
-                  </p>
-                </article>
-                <article>
-                  <b>When trading resumes</b>
-                  <p>
-                    Switch to live-session monitoring, refresh provider data
-                    every {intradayRefreshMinutes} minutes, and promote only
-                    candidates whose trigger, liquidity, and reward/risk still
-                    qualify.
-                  </p>
-                </article>
-              </div>
-              <footer>
-                <b>
-                  {marketClock.isOpen
-                    ? "Live decision workspace:"
-                    : "Next-session plan:"}
-                </b>{" "}
-                values and timestamps come from the connected providers shown
-                below.{" "}
-                {decisionAlarmEnabled
-                  ? `Review alarm ON · ${decisionTime} New York / ${decisionTimeLabel}`
-                  : "Review alarm OFF · configure it in Settings"}
-                . Northstar proposes; you decide.
-              </footer>
+              <nav className="today-section-links" aria-label="Today sections">
+                <a href="#today-recommendations">Account recommendations ↓</a>
+                <a href="#today-market-context">Market context ↓</a>
+                <a href="#today-ai-health">AI availability ↓</a>
+              </nav>
+              <details className="today-how-it-works"><summary>How this plan updates</summary><p>During the session, provider data refreshes every {intradayRefreshMinutes} minutes. Background workers monitor triggers independently of this page. Closed-market plans use completed session data and require fresh confirmation before entry. {decisionAlarmEnabled ? `Review alarm: ${decisionTimeLabel}.` : "Review alarm is off; configure it in Settings."} Recommendations never place orders.</p></details>
             </section>
           )}
           {tab === "Daily Action Plan" && advisorStrategy === "swing" && (
@@ -7418,7 +7367,7 @@ export function NorthstarWorkspace({
             </section>
           )}
           {tab === "Daily Action Plan" && (
-            <section className="daily-account-action-plans selected-account-only">
+            <section id="today-recommendations" className="daily-account-action-plans selected-account-only">
               <header>
                 <span>SELECTED INVESTMENT ACCOUNT · ACCOUNT-SPECIFIC GUIDANCE</span>
                 <h2>{advisorAccountName}</h2>

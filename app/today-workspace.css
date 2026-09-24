@@ -1,0 +1,40 @@
+/* Today: decision-first hierarchy, legible evidence, and one-column recommendation cards. */
+.workspace-view.page-daily-action-plan .content{max-width:1440px;gap:20px}
+.page-daily-action-plan .daily-plan-intro:before{content:none}
+.page-daily-action-plan .daily-plan-intro{padding:24px!important;border:1px solid #ceddd5;border-radius:18px;background:linear-gradient(120deg,#eff7f2,#fff);box-shadow:none}
+.page-daily-action-plan .daily-plan-intro h2{font:600 clamp(24px,3vw,36px)/1.2 Georgia,serif;max-width:900px;margin:10px 0}
+.page-daily-action-plan .daily-plan-intro header>p{font-size:14px!important;line-height:1.6}
+.today-section-links{display:flex;flex-wrap:wrap;gap:10px;margin:18px 0}.today-section-links a{padding:10px 14px;border:1px solid #b9d2c4;border-radius:99px;background:white;color:#175a42;font-size:13px;font-weight:700;text-decoration:none}
+.today-how-it-works{padding-top:12px;border-top:1px solid #d2e2d9}.today-how-it-works summary{cursor:pointer;font-size:13px;font-weight:700}.today-how-it-works p{font-size:14px;line-height:1.6;max-width:900px}
+.page-daily-action-plan #today-recommendations,.page-daily-action-plan #today-market-context,.page-daily-action-plan #today-ai-health{scroll-margin-top:90px}
+.page-daily-action-plan .daily-account-action-plans{border-radius:18px;box-shadow:0 8px 28px #163d2610}
+.page-daily-action-plan .daily-account-action-plans>header{padding:18px 24px;background:#f3f7f5;color:#173d30;border-bottom:1px solid #d4e0d9}
+.page-daily-action-plan .daily-account-action-plans>header h2{color:#173d30;font:600 22px/1.3 Georgia,serif;margin:6px 0}
+.page-daily-action-plan .daily-account-action-plans>header span,.page-daily-action-plan .daily-account-action-plans>header p{color:#526b5e;font-size:13px;line-height:1.5}
+.page-daily-action-plan .daily-account-action-plans>header span:before{content:none}
+.page-daily-action-plan .action-guidance>header{padding:20px 24px;background:#173d30}
+.page-daily-action-plan .action-guidance h2{font-size:22px}.page-daily-action-plan .action-guidance header p,.page-daily-action-plan .action-guidance header small{font-size:13px;line-height:1.5}
+.page-daily-action-plan .action-guidance header span{font-size:11px;letter-spacing:.06em}
+.page-daily-action-plan .execution-board>header aside button{font-size:13px;min-height:42px;padding:10px 16px;border-radius:9px;background:#fff;color:#173d30}
+.page-daily-action-plan .guidance-cash span{padding:16px 24px;font-size:13px}.page-daily-action-plan .guidance-cash b{display:block;font-size:21px;margin-top:7px}
+.page-daily-action-plan .analysis-availability{background:#fffaf0;color:#584725}.page-daily-action-plan .analysis-availability p,.page-daily-action-plan .analysis-availability small{font-size:13px;line-height:1.6}
+.page-daily-action-plan .no-trades-required{font-size:13px;padding:16px 24px;line-height:1.5}
+.page-daily-action-plan .action-groups{gap:24px;padding:24px}.page-daily-action-plan .action-groups>section{display:grid;grid-template-columns:minmax(0,1fr);gap:10px}.page-daily-action-plan .action-groups>section>h3{font-size:13px;letter-spacing:.05em}
+.page-daily-action-plan .recommendation-card>summary{display:grid!important;grid-template-columns:minmax(0,1fr) auto!important;gap:12px;padding:20px!important}
+.page-daily-action-plan .recommendation-card>summary>em{grid-column:2;grid-row:1;font-size:11px;align-self:start}
+.page-daily-action-plan .recommendation-card>summary>strong{grid-column:1;grid-row:1;font-size:19px;line-height:1.35}
+.page-daily-action-plan .recommendation-card>summary>span,.page-daily-action-plan .recommendation-card>summary>i,.page-daily-action-plan .recommendation-primary-facts{grid-column:1/-1;font-size:14px!important;line-height:1.55}
+.page-daily-action-plan .recommendation-primary-facts{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;padding:14px;background:#edf3ef;border-radius:10px}
+.page-daily-action-plan .recommendation-primary-facts span{font-size:12px!important}.page-daily-action-plan .recommendation-primary-facts b{display:block;font-size:14px;margin-top:4px}
+.page-daily-action-plan .recommendation-card>summary>button{grid-column:1/-1;justify-self:start;min-height:42px;padding:10px 16px;font-size:13px}
+.page-daily-action-plan .action-evidence article{padding:16px}.page-daily-action-plan .action-evidence article b,.page-daily-action-plan .action-evidence article p,.page-daily-action-plan .action-evidence article small{font-size:13px;line-height:1.6}
+.page-daily-action-plan .today-support-panel{border:1px solid #d0ded5;border-radius:16px;padding:20px!important;background:#fff}.page-daily-action-plan .today-support-panel summary{font-size:15px;cursor:pointer}.page-daily-action-plan .today-support-panel p{font-size:14px;line-height:1.6}
+@media(max-width:700px){.page-daily-action-plan .daily-plan-intro{padding:16px!important}.page-daily-action-plan .action-groups{padding:12px}.page-daily-action-plan .recommendation-card>summary{grid-template-columns:minmax(0,1fr)!important;padding:14px!important}.page-daily-action-plan .recommendation-card>summary>em{grid-column:1;grid-row:1;justify-self:start}.page-daily-action-plan .recommendation-card>summary>strong{grid-row:2}.page-daily-action-plan .recommendation-primary-facts{grid-template-columns:repeat(2,minmax(0,1fr))}.page-daily-action-plan .guidance-cash span{padding:12px 16px}}
+/* Reset legacy named grid rows so the save button cannot overlap the ticker. */
+.page-daily-action-plan .recommendation-card>summary>*{position:static!important;inset:auto!important;order:0!important;grid-row:auto!important;grid-column:1/-1!important}
+.page-daily-action-plan .recommendation-card>summary>strong{grid-row:1!important;grid-column:1!important}
+.page-daily-action-plan .recommendation-card>summary>em{grid-row:1!important;grid-column:2!important}
+.page-daily-action-plan .recommendation-primary-facts{grid-template-columns:repeat(3,minmax(0,1fr))!important}
+.page-daily-action-plan .content{font-family:var(--font-geist-sans,Arial),sans-serif}
+.page-daily-action-plan .execution-board>header>div>span{color:#98e5c4!important}
+@media(max-width:700px){.page-daily-action-plan .recommendation-card>summary>em{grid-row:1!important;grid-column:1!important}.page-daily-action-plan .recommendation-card>summary>strong{grid-row:2!important}.page-daily-action-plan .recommendation-primary-facts{grid-template-columns:repeat(2,minmax(0,1fr))!important}}
