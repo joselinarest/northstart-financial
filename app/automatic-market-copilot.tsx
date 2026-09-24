@@ -531,7 +531,7 @@ export default function AutomaticMarketCopilot({
     });
   }, [data.asOf, strategy, accountName, accountScope, holdings]);
   const [collapsedCards,setCollapsedCards]=useState<Record<string,boolean>>({});
-  const [sectionOpen,setSectionOpen]=useState(true);
+  const [sectionOpen,setSectionOpen]=useState(false);
   return (
     <section id="today-market-context" className="auto-copilot"><button type="button" aria-expanded={sectionOpen} aria-controls="market-suggestions-body" onClick={()=>setSectionOpen(v=>!v)} style={{padding:16,cursor:"pointer",fontWeight:700,order:-10}}>Market suggestions · {sectionOpen?"hide":"show"}</button><div id="market-suggestions-body" style={{display:sectionOpen?"contents":"none"}}>
       <header>
@@ -1187,8 +1187,8 @@ export default function AutomaticMarketCopilot({
                       <small>/100</small>
                     </strong>
                   </div>
-                  <button type="button" className="holding-toggle-label" aria-expanded={!collapsedCards[item.symbol]} aria-controls={`candidate-details-${item.symbol}`} onClick={()=>setCollapsedCards(previous=>({...previous,[item.symbol]:!previous[item.symbol]}))}>{collapsedCards[item.symbol]?'▸ Show':'▾ Hide'} {item.symbol} details</button>
-                  <div id={`candidate-details-${item.symbol}`} style={{display:collapsedCards[item.symbol]?'none':'contents'}}>
+                  <button type="button" className="holding-toggle-label" aria-expanded={!(collapsedCards[item.symbol]??true)} aria-controls={`candidate-details-${item.symbol}`} onClick={()=>setCollapsedCards(previous=>({...previous,[item.symbol]:!(previous[item.symbol]??true)}))}>{(collapsedCards[item.symbol]??true)?'▸ Show':'▾ Hide'} {item.symbol} details</button>
+                  <div id={`candidate-details-${item.symbol}`} style={{display:(collapsedCards[item.symbol]??true)?'none':'contents'}}>
                   <em
                     className={
                       [

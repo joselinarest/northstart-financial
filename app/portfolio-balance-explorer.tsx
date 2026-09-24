@@ -72,7 +72,7 @@ export default function PortfolioBalanceExplorer({ enabled=true, accountId, acce
     setSavedSymbols(next.map(item => String(item.symbol)));
   }
 
-  return <details className="portfolio-balance-explorer" open>
+  return <details className="portfolio-balance-explorer" >
     <summary><i>Show / hide</i></summary>
     <div className="interactive-balance-main"><div className="interactive-target-pie">
       <svg viewBox="0 0 100 100" role="img" aria-label={`Interactive target allocation for ${accountName}`}>{slices.map(slice => <path key={slice.key} d={arc(slice.start, slice.end)} fill={meta[slice.key].color} className={active === slice.key ? "active" : ""} tabIndex={0} role="button" aria-label={`${meta[slice.key].label}: ${slice.target}% target, ${slice.actual.toFixed(1)}% current`} onMouseEnter={() => setHovered(slice.key)} onMouseLeave={() => setHovered(null)} onFocus={() => setHovered(slice.key)} onBlur={() => setHovered(null)} onClick={() => setSelected(slice.key)} />)}</svg>

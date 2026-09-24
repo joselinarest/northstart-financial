@@ -7368,7 +7368,7 @@ export function NorthstarWorkspace({
             </section>
           )}
           {tab === "Daily Action Plan" && (
-            <details open id="today-recommendations" className="daily-account-action-plans selected-account-only"><summary style={{padding:16,cursor:"pointer",fontWeight:700}}>Account recommendations · show / hide</summary>
+            <details  id="today-recommendations" className="daily-account-action-plans selected-account-only"><summary style={{padding:16,cursor:"pointer",fontWeight:700}}>Account recommendations · show / hide</summary>
               <header>
                 <span>SELECTED INVESTMENT ACCOUNT · ACCOUNT-SPECIFIC GUIDANCE</span>
                 <h2>{advisorAccountName}</h2>
@@ -7457,7 +7457,7 @@ export function NorthstarWorkspace({
             />
           )}
           {tab === "Daily Action Plan" && advisorHoldings.length > 0 && (
-            <details open className="daily-swing-holdings card"><summary style={{padding:16,cursor:"pointer",fontWeight:700}}>Current holdings analysis · show / hide</summary>
+            <details  className="daily-swing-holdings card"><summary style={{padding:16,cursor:"pointer",fontWeight:700}}>Current holdings analysis · show / hide</summary>
               <header>
                 <span>SELECTED INVESTMENT ACCOUNT · CURRENT HOLDINGS</span>
                 <h2>
@@ -8300,7 +8300,7 @@ export function NorthstarWorkspace({
                   >
                     {accountHoldings.length ? (
                       <>
-                        <details open><summary style={{padding:12,cursor:"pointer",fontWeight:700}}>Holdings and growth · show / hide</summary><div className="account-holdings-heading">
+                        <details ><summary style={{padding:12,cursor:"pointer",fontWeight:700}}>Holdings and growth · show / hide</summary><div className="account-holdings-heading">
                           <div>
                             <b>Holdings and growth</b>
                             <span>
@@ -8496,7 +8496,7 @@ export function NorthstarWorkspace({
             )}
             {tab === "Portfolio" && !!advisorHoldings.length && (
               <section className="holdings-table analysis-holdings">
-                <details open>
+                <details >
                   <summary>
                     <span>
                       STEP 4 · CURRENT HOLDINGS ·{" "}

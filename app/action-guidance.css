@@ -12,3 +12,5 @@
 .recommendation-card .action-evidence > .recommendation-primary-facts,.recommendation-card .action-evidence > .holding-cost-badge,.recommendation-card .action-evidence > i{grid-column:1/-1}
 
 .holding-toggle-label{display:inline-block!important;padding:8px 12px!important;border:1px solid #12785b;border-radius:6px;background:#e6f4ec;color:#07543e!important;font-size:14px!important;font-weight:700;line-height:1.4;cursor:pointer}
+
+.position-evaluation-list>details>summary>div{min-width:0}.position-evaluation-list>details>summary>strong{min-width:145px;white-space:nowrap;word-break:normal;overflow-wrap:normal}@media(max-width:650px){.position-evaluation-list>details>summary{grid-template-columns:minmax(0,1fr) 24px}.position-evaluation-list>details>summary>strong{grid-column:1;grid-row:2;text-align:left}.position-evaluation-list>details>summary>.holding-chevron{grid-column:2;grid-row:1}}

@@ -366,7 +366,7 @@ export default function RealEstateWorkspace() {
           </div>
           <section className="property-portfolio">
             {portfolio.map((x) => (
-              <details open key={x.id}>
+              <details  key={x.id}>
                 <summary>
                   <span>
                     <em>{x.purpose.replaceAll("_", " ")}</em>

@@ -11,7 +11,7 @@ export default function ChartExitReview({symbol,accountId,price,support,resistan
  const change=holding?.average!=null&&holding.average>0&&at!=null?(at-holding.average)/holding.average*100:null;
  const reference=Number.isFinite(price)&&price>0?price:null;
  const breakEven=holding?.average!=null&&shares!=null&&shares>0&&costs!=null&&taxes!=null?holding.average+(costs+taxes)/shares:null;
- return <details className="chart-exit-review" open style={{padding:16,border:'1px solid #b6cbbf',borderRadius:12,marginBlock:16}}><summary><b>SELL / TRIM REVIEW · {symbol} · your purchase price and gain/loss</b></summary>
+ return <details className="chart-exit-review"  style={{padding:16,border:'1px solid #b6cbbf',borderRadius:12,marginBlock:16}}><summary><b>SELL / TRIM REVIEW · {symbol} · your purchase price and gain/loss</b></summary>
  {!holding?<p>No shares are recorded for this ticker in the selected account. Select the account that owns it.</p>:<>
  <section aria-label="Sale price comparison" style={{padding:14,marginBlock:12,background:'#eef5f1',borderRadius:10}}>
  <b>What would selling at these prices mean?</b>

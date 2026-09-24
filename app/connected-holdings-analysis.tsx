@@ -379,7 +379,7 @@ export default function ConnectedHoldingsAnalysis({
   }, [unique, horizon, marketOpen, accountId]); // Closed sessions require an explicit refresh and do not consume market API quota.
   return (
     <div className="connected-analysis embedded">
-      <details open><summary style={{padding:12,cursor:"pointer",fontWeight:700}}>Holdings · {unique.length} · show / hide</summary>
+      <details ><summary style={{padding:12,cursor:"pointer",fontWeight:700}}>Holdings · {unique.length} · show / hide</summary>
       <div className="analysis-controls">
         <div>
           <b>Complete {horizon} review</b>
@@ -447,9 +447,9 @@ export default function ConnectedHoldingsAnalysis({
                       };
           return (
             <details className={`holding-evaluation-accordion ${x?.state || "pending"}`} key={symbol}>
-              <summary><span className="holding-toggle-label">▾ Show / hide details</span>
+              <summary>
                 <div>
-                  <b>{symbol}</b><HoldingCostBadge symbol={symbol} accountId={String(h.account_id)} />
+                  <span className="holding-toggle-label" style={{alignSelf:"flex-start"}}>▸ Show / hide details</span><b>{symbol}</b><HoldingCostBadge symbol={symbol} accountId={String(h.account_id)} />
                   <small>
                     {h.name} · {shares.toLocaleString()} shares ·{" "}
                     {weight.toFixed(1)}% of this account

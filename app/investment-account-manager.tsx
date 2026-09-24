@@ -668,7 +668,7 @@ export default function InvestmentAccountManager({
               {busy ? "Saving…" : "Save account strategy"}
             </button>
           </div>
-          <details className="manual-ledger" open>
+          <details className="manual-ledger" >
             <summary>Record activity completed outside Northstar</summary>
             <div className="transaction-form">
               <label>

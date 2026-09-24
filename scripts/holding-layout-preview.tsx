@@ -1,0 +1,2 @@
+import React from 'react';import {createRoot} from 'react-dom/client';import ConnectedHoldingsAnalysis from '../app/connected-holdings-analysis';
+createRoot(document.getElementById('root')!).render(<ConnectedHoldingsAnalysis holdings={[{ticker:'VTI',account_id:'test',name:'Vanguard Total Stock Market ETF',quantity:44.45,market_value_cents:1694783,cost_basis_cents:1500000}]} mode="swing" onOpen={()=>{}}/>);
