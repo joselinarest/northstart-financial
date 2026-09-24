@@ -52,3 +52,15 @@
 .kids-goals-center .kids-monthly-allocation dd{margin:4px 0 0;font-size:15px;font-weight:800}
 .kids-goals-center .kids-monthly-allocation small{font-size:11px;line-height:1.5}
 @media(max-width:600px){.kids-goals-center .kids-monthly-allocation dl{grid-template-columns:1fr}.kids-goals-center .kids-monthly-allocation dl>div{display:flex;justify-content:space-between;gap:12px}.kids-goals-center .kids-monthly-allocation dd{margin:0}}
+/* Account cards compare side by side only where both have room to read. */
+.kids-goals-center .child-plan-grid{grid-template-columns:minmax(0,1fr);align-items:start}
+.kids-goals-center .child-plan-card>summary.child-account-summary{display:grid;grid-template-columns:auto minmax(0,1fr) auto auto;align-items:center;gap:12px;padding:16px;background:#f0f7f4;list-style:none;margin:0;border:0}
+.kids-goals-center .child-plan-card>summary::-webkit-details-marker{display:none}
+.kids-goals-center .child-account-summary>i{display:grid;place-items:center;width:44px;height:44px;background:#188060;border-radius:50%;color:white;font-style:normal;font-weight:900}
+.kids-goals-center .child-account-summary h3{margin:0;font-size:20px}
+.kids-goals-center .child-account-summary>div>span{display:block;color:#65766f;font-size:12px;font-weight:400}
+.kids-goals-center .child-account-summary em{font-size:10px;font-style:normal;font-weight:800}
+.kids-goals-center .child-account-toggle{font-size:22px;transition:transform .15s}
+.kids-goals-center .child-plan-card[open]>.child-account-summary .child-account-toggle{transform:rotate(180deg)}
+@media(min-width:1200px){.kids-goals-center .child-plan-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:600px){.kids-goals-center .child-plan-card>summary.child-account-summary{grid-template-columns:auto minmax(0,1fr) auto}.kids-goals-center .child-account-summary em{grid-column:2}.kids-goals-center .child-account-toggle{grid-column:3;grid-row:1/3}}
