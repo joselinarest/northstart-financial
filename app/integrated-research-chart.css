@@ -16,3 +16,4 @@
 .chart-fullscreen,.chart-fullscreen *{box-sizing:border-box}
 .chart-fullscreen :is(section,article,header,footer,div,nav,fieldset){min-width:0}
 .chart-fullscreen :is(p,b,strong,small,dd){overflow-wrap:anywhere}
+.integrated-research-chart.chart-recovery{padding:20px;border:1px solid #49675b;border-radius:12px}.chart-recovery button{min-height:44px;padding:10px 16px;background:#174c39;color:#fff;border:1px solid #6bd1a5;border-radius:8px}

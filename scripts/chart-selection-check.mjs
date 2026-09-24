@@ -1,0 +1,11 @@
+import assert from 'node:assert/strict';
+import {selectedChartBar} from '../lib/chart-selection.ts';
+const before=Array.from({length:120},(_,i)=>({time:'bar-'+i}));
+assert.equal(selectedChartBar(before,118).time,'bar-118');
+const zoomed=before.slice(-100);
+assert.equal(selectedChartBar(zoomed,118).time,'bar-119','zoom must clamp the old pointer index before rendering');
+assert.equal(selectedChartBar(zoomed,-5),zoomed[0]);
+assert.equal(selectedChartBar(zoomed,NaN),zoomed.at(-1));
+assert.equal(selectedChartBar([],118),undefined,'empty refresh must not produce an invalid candle');
+assert.equal(selectedChartBar(before.slice(0,1),118),before[0]);
+console.log('Chart selection passed: zoom, negative/stale cursor, empty refresh, single candle and invalid index.');

@@ -8,8 +8,8 @@ export default function ErrorBoundary({ error, reset }: { error: Error & { diges
     <section>
       <span>N</span>
       <p>NORTHSTAR RECOVERY</p>
-      <h1>The dashboard needs to reconnect.</h1>
-      <p>Your saved financial information was not deleted. This usually happens when the local app updates while an older tab is still open.</p>
+      <h1>This view could not be displayed.</h1>
+      <p>Your saved financial information was not deleted. Try loading this view again. If the issue repeats, report the action that triggered it.</p>
       <div><button onClick={reset}>Try again</button><button onClick={() => window.location.reload()}>Reload Northstar</button></div>
       {error.digest && <small>Reference: {error.digest}</small>}
     </section>
