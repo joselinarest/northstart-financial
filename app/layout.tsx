@@ -34,6 +34,7 @@ import './mobile-primary.css';
 import './layout-system.css';
 import './options-smart-ui.css';
 import './market-terminal-ui.css';
+import './kids-investments.css';
 import { ConfirmProvider } from './confirmation-modal';
 import PwaManager from './pwa-manager';
 import MobileOverflowDebug from './mobile-overflow-debug';

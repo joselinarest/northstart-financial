@@ -1,0 +1,22 @@
+"use client";
+import {kidsGoalSummary,type KidsLinkedAccount} from "@/lib/kids-plan-summary";
+const money=(value:unknown)=>new Intl.NumberFormat('en-US',{style:'currency',currency:'USD',minimumFractionDigits:2,maximumFractionDigits:2}).format(Number(value||0)/100);
+export default function KidsGoalOverview({goal,accounts,busy,onReview}:{goal:Record<string,any>;accounts:KidsLinkedAccount[];busy:boolean;onReview:()=>void}){
+ const summary=kidsGoalSummary({id:String(goal.id),...goal},accounts);
+ const assumptions=typeof goal.assumptions_json==='string'?(()=>{try{return JSON.parse(goal.assumptions_json)}catch{return {}}})():goal.assumptions_json||{};
+ const date=goal.calculated_at?new Date(goal.calculated_at):null;
+ const stale=summary.balanceChanged||!summary.hasProjection;
+ return <div className="kids-goal-overview">
+  <section className="kids-next-step" aria-label="Next step"><span>NEXT STEP</span><h4>{!summary.linked.length?'Link an account to this goal':stale?'Refresh this plan':goal.funding_status==='BEHIND'?'Review the monthly savings gap':'Keep the plan on track'}</h4>
+   <p>{!summary.linked.length?'Choose the correct account in Accounts & contributions below.':stale?'The saved projection does not reflect the current balance. Recalculate before using the funding estimate.':goal.funding_status==='BEHIND'?`Your plan assumes ${money(summary.monthly)} per month. The saved estimate needs ${money(goal.required_monthly_base_cents)} per month to reach this goal. Check household affordability before changing contributions.`:'Review contributions and allocation periodically. A projection alone is not a reason to trade.'}</p>
+   {stale&&<button disabled={busy} onClick={onReview}>Recalculate plan</button>}
+  </section>
+  <div className="kids-money-panels"><section><span>VALUE TODAY</span><h4>{money(summary.current)}</h4><p>Saved account values, separate from future growth.</p><dl>
+   <div><dt>Linked investments</dt><dd>{money(summary.holdings)}</dd></div><div><dt>Account cash</dt><dd>{money(summary.cash)}</dd></div><div><dt>Additional manual balance</dt><dd>{money(summary.manual)}</dd></div>
+  </dl>{summary.manual>0&&<p className="kids-attention">This extra balance is added to linked accounts. Only include money held outside those accounts.</p>}{summary.linked.length>0&&<small>Goal allocations are applied. Provider-reported account totals can differ from itemized holdings.</small>}</section>
+  <section><span>FUTURE GOAL · ESTIMATE</span><h4>{summary.hasProjection?money(goal.base_balance_cents):'Not calculated'}</h4><p>{assumptions.targetYear?`By ${assumptions.targetYear}`:'At your goal date'} · {assumptions.returnsBps?`${Number(assumptions.returnsBps[1])/100}% assumed annual return`:'Return assumptions need review'}</p><dl>
+   <div><dt>Planned monthly contribution</dt><dd>{money(summary.monthly)}</dd></div><div><dt>Estimated funding gap</dt><dd>{summary.hasProjection?money(goal.funding_gap_cents):'—'}</dd></div><div><dt>Projection status</dt><dd>{stale?'Needs recalculation':String(goal.funding_status||'Not reviewed').replaceAll('_',' ')}</dd></div>
+  </dl><small>Planned contributions are not current cash. Returns are uncertain.</small></section></div>
+  <details className="kids-projection-details"><summary>How this projection is calculated</summary><p>Starts with {money(goal.current_balance_cents)} at the last review, adds {money(summary.monthly)} each month and applies the saved return assumptions over {assumptions.months??'—'} months. Younger children can have larger projected values because there is more time to contribute and grow.</p><dl><div><dt>Starting value + future contributions</dt><dd>{summary.hasProjection?money(goal.contribution_principal_cents):'—'}</dd></div><div><dt>Estimated growth</dt><dd>{summary.hasProjection?money(goal.projected_growth_cents):'—'}</dd></div></dl><p>Last calculated: {date&&!Number.isNaN(date.getTime())?date.toLocaleString():'Not yet reviewed'}. Holdings use saved prices; refresh the account to update market values.</p></details>
+ </div>;
+}
