@@ -48,3 +48,13 @@
 .page-daily-action-plan .auto-copilot>.auto-grid{order:3;display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;padding:16px}
 .market-list-status{padding:18px;line-height:1.6;background:#f2f7f4}
 @media(max-width:800px){.page-daily-action-plan .auto-copilot>.auto-grid{grid-template-columns:minmax(0,1fr)}}
+
+/* Today uses the same document flow on desktop and mobile. The shared desktop
+   shell otherwise traps this long feed inside a viewport-height scroll panel. */
+body:has(.workspace-view.page-daily-action-plan){height:auto!important;min-height:100dvh;overflow-y:auto!important}
+.workspace-view.page-daily-action-plan{position:relative!important;inset:auto!important;height:auto!important;min-height:100dvh;overflow:visible!important}
+.workspace-view.page-daily-action-plan>.app-shell{position:relative!important;inset:auto!important;height:auto!important;max-height:none!important;overflow:visible!important}
+.workspace-view.page-daily-action-plan>.app-shell>.content.page-container{height:auto!important;max-height:none!important;overflow:visible!important;align-content:start}
+.workspace-view.page-daily-action-plan .content>.auto-copilot,
+.workspace-view.page-daily-action-plan .content>.daily-account-action-plans{visibility:visible!important;opacity:1!important;max-height:none!important;overflow:visible!important}
+.workspace-view.page-daily-action-plan .auto-copilot>.auto-grid{grid-template-columns:minmax(0,1fr)!important;max-height:none;overflow:visible}
