@@ -1,4 +1,5 @@
 "use client";
+import ChartExitReview from "./chart-exit-review";
 import HoldingCostBadge from "@/app/holding-cost-badge";
 
 import { useEffect, useMemo, useState } from "react";
@@ -279,6 +280,7 @@ export default function ChartDecisionWorkspace(props: Props) {
         </strong>
       </header>
       <HoldingCostBadge symbol={props.symbol} accountId={props.accountId} currentPrice={props.price} stop={props.stop}/>
+      <ChartExitReview key={`${props.accountId}:${props.symbol}`} symbol={props.symbol} accountId={props.accountId} price={props.price} support={props.support} resistance={props.resistance} stop={props.stop} target={props.target1} relativeVolume={props.relativeVolume} fresh={props.fresh} recommendation={finalRecommendation} error={authoritative?.error}/>
       <IntegratedResearchChart
         accountId={props.accountId}
         accountValue={props.accountValue}

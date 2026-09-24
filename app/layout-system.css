@@ -37,3 +37,12 @@ html,body{inline-size:100%;min-inline-size:0;min-block-size:100%;overflow-x:auto
  .workspace-view :where(.table-scroll,.responsive-table,.ui-responsive-table){scrollbar-gutter:stable}
 }
 @media(max-width:600px){.workspace-view .screener-head{display:grid;grid-template-columns:minmax(0,1fr);gap:12px;padding:16px}.workspace-view .screener-head em{justify-self:start;max-inline-size:100%;border-radius:14px;white-space:normal}.workspace-view .home-panel>header{display:grid;grid-template-columns:minmax(0,1fr);gap:6px;position:static;height:auto;padding:0;background:transparent;border:0}.workspace-view .home-panel>header h2,.workspace-view .home-panel>header p{margin-inline:0;max-inline-size:100%}}
+/* Today owns these mounted sections. Do not let the legacy page whitelist hide recommendations. */
+.workspace-view.page-daily-action-plan .content > .daily-account-action-plans {
+  display:block!important;visibility:visible!important;opacity:1!important;order:3;
+}
+.workspace-view.page-daily-action-plan .content > .auto-copilot {order:4}
+.workspace-view.page-daily-action-plan .content > .trade-lifecycle-panel,
+.workspace-view.page-daily-action-plan .content > .today-support-panel {
+  display:block!important;visibility:visible!important;opacity:1!important;order:5;
+}
