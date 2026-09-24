@@ -1,0 +1,30 @@
+import assert from 'node:assert/strict';
+import {allocateCash} from '../lib/domain/cash-allocation.ts';
+const input={cash:100000n,safeCapacity:100000n,reserved:0n,reserveBps:1000,maximumPositionBps:6000,fractional:false,targets:{CORE:9000,CASH:1000},holdings:[{symbol:'A',category:'CORE',value:200000n,price:10000n},{symbol:'B',category:'CORE',value:100000n,price:10000n}]};
+let p=allocateCash(input);
+assert.equal(p.deployableCents,'60000');
+assert.equal(p.rows[0].estimatedCostCents,'0','overweight security receives no additional cash');
+assert.equal(p.rows[1].estimatedCostCents,'60000');
+assert.equal(p.cashAfterCents,'40000');
+assert.equal(p.rows[1].afterBps,4000);
+assert.equal(p.rows[1].targetBps,4500);
+p=allocateCash({...input,holdings:input.holdings.map(h=>({...h,value:100000n})),reserved:20000n});
+assert.equal(p.deployableCents,'50000');
+assert.equal(p.estimatedCostCents,'40000','whole-share rounding leaves cash');
+assert.equal(p.rows[0].shares,'2');assert.equal(p.rows[1].shares,'2');
+assert.equal(allocateCash({...input,safeCapacity:0n}).estimatedCostCents,'0');
+assert.equal(allocateCash({...input,cash:0n}).estimatedCostCents,'0');
+assert.equal(allocateCash({...input,reserved:200000n}).estimatedCostCents,'0');
+assert.equal(allocateCash({...input,holdings:input.holdings.map(h=>({...h,price:0n}))}).estimatedCostCents,'0');
+assert.equal(allocateCash({...input,targets:{CORE:1000,BONDS:8000,CASH:1000}}).estimatedCostCents,'0','missing-category cash is not diverted to overweight category');
+p=allocateCash({...input,holdings:[...input.holdings,{...input.holdings[0],value:10000n}]});assert.equal(p.rows.length,2,'lots grouped before position cap');
+for(let i=1;i<=200;i++){
+ const plan=allocateCash({...input,cash:BigInt(i*137),fractional:i%2===0,holdings:input.holdings.map((h,j)=>({...h,value:BigInt(j*3333),price:BigInt(103+i*17)}))});
+ const sum=plan.rows.reduce((s,r)=>s+BigInt(r.estimatedCostCents),0n);
+ assert(sum<=BigInt(plan.deployableCents));assert.equal(sum,BigInt(plan.estimatedCostCents));
+ assert.equal(BigInt(plan.cashBeforeCents)-sum,BigInt(plan.cashAfterCents));
+ for(const r of plan.rows)assert(BigInt(r.estimatedCostCents)<=BigInt(r.gapCents));
+}
+assert.throws(()=>allocateCash({...input,targets:{CORE:9000,CASH:500}}));
+assert.throws(()=>allocateCash({...input,maximumPositionBps:NaN}));
+console.log('PASS: shared cash conservation, percentage gaps, reserves/reentry, no-cash/safety gates, missing prices/categories, lot grouping, whole/fractional rounding, 200 budget scenarios');
