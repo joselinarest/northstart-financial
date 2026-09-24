@@ -1,5 +1,6 @@
 "use client";
 import SectionAccordion from "@/app/section-accordion";
+import {useChartLinkSelection} from "@/app/use-chart-link-selection";
 import LinkedChartSetup from "@/app/linked-chart-setup";
 import {readChartSetup} from "@/lib/chart-setup-link";
 
@@ -5167,15 +5168,7 @@ export function NorthstarWorkspace({
     setQuestion(savedPrompt);
     sessionStorage.removeItem("northstar-full-analysis-prompt");
   }, [tab]);
-  useEffect(() => {
-    if (tab !== "Professional Charts") return;
-    const saved = sessionStorage.getItem("northstar-chart-symbol");
-    if (saved) {
-      setChartSymbol(saved);
-      setMarketLookup(saved);
-      sessionStorage.removeItem("northstar-chart-symbol");
-    }
-  }, [tab]);
+  useChartLinkSelection(tab,setChartSymbol,setMarketLookup,setTimeframe);
   useEffect(() => {
     if (tab !== "Portfolio" || !advisorAccountId || !advisorAccount) return;
     setPortfolioNotice(`Loading and recalculating ${advisorAccountName}…`);
