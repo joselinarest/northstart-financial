@@ -1,4 +1,5 @@
 "use client";
+import HoldingCostBadge from "@/app/holding-cost-badge";
 import { useEffect, useMemo, useState } from "react";
 import HoldingPriceLimits from "@/app/holding-price-limits";
 type H = Record<string, any>;
@@ -447,7 +448,7 @@ export default function ConnectedHoldingsAnalysis({
             <details className={`holding-evaluation-accordion ${x?.state || "pending"}`} key={symbol}>
               <summary>
                 <div>
-                  <b>{symbol}</b>
+                  <b>{symbol}</b><HoldingCostBadge symbol={symbol} accountId={String(h.account_id)} />
                   <small>
                     {h.name} · {shares.toLocaleString()} shares ·{" "}
                     {weight.toFixed(1)}% of this account

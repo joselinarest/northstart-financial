@@ -1,4 +1,5 @@
 "use client";
+import HoldingCostBadge from "@/app/holding-cost-badge";
 import { useEffect, useMemo, useState } from "react";
 
 type Holding = Record<string, any>;
@@ -868,7 +869,7 @@ export default function InvestmentCommandCenter({
                         : `${quote.changePct >= 0 ? "+" : ""}${quote.changePct.toFixed(2)}%`}
                     </td>
                     <td className="number">{quantity.toLocaleString()}</td>
-                    <td className="number">{money(average, 2)}</td>
+                    <td className="number">{item.cost_basis_cents == null ? "Not provided" : money(average, 2)}</td>
                     <td
                       className={`number ${pnl == null ? "neutral" : pnl >= 0 ? "positive" : "negative"}`}
                     >
@@ -990,7 +991,7 @@ export default function InvestmentCommandCenter({
                         : ""}{" "}
                       · {label(item.action)}
                     </b>
-                    <span>{item.reason}</span>
+                    <HoldingCostBadge symbol={item.symbol} accountId={accountId}/><span>{item.reason}</span>
                     <small>
                       {item.entry_low_cents && item.entry_high_cents
                         ? `${money(item.entry_low_cents, 2)}–${money(item.entry_high_cents, 2)}`
@@ -1054,7 +1055,7 @@ export default function InvestmentCommandCenter({
                     <b>
                       {item.symbol || "Account"} · {label(item.action_type)}
                     </b>
-                    <span>{item.rationale}</span>
+                    <HoldingCostBadge symbol={item.symbol} accountId={accountId}/><span>{item.rationale}</span>
                   </div>
                   <em>{label(item.lifecycle)}</em>
                 </li>
@@ -1091,7 +1092,7 @@ export default function InvestmentCommandCenter({
                     {Number(item.quantity) > 0 ? item.quantity : ""}
                   </b>
                   <span>
-                    {label(item.lifecycle)} · {item.confidence}%
+                    <HoldingCostBadge symbol={item.symbol} accountId={accountId}/>{label(item.lifecycle)} · {item.confidence}%
                   </span>
                 </li>
               ))}
@@ -1267,7 +1268,7 @@ export default function InvestmentCommandCenter({
                       ? ` · ${item.name}`
                       : ""}
                   </b>
-                  <span>{label(item.horizon)} base scenario</span>
+                  <HoldingCostBadge symbol={item.symbol} accountId={accountId}/><span>{label(item.horizon)} base scenario</span>
                   <strong>
                     {item.lower_cents && item.upper_cents
                       ? `${money(item.lower_cents, 2)}–${money(item.upper_cents, 2)}`

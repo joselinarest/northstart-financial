@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import dynamic from "next/dynamic";
+import HoldingCostBadge,{HoldingCostProvider} from "@/app/holding-cost-badge";
 import {
   getCognitoSession,
   isCognitoConfigured,
@@ -6151,7 +6152,7 @@ export function NorthstarWorkspace({
       </main>
     );
   return (
-    <main
+    <HoldingCostProvider holdings={connectedFinance.holdings} accountId={advisorAccountId}><main
       className={`workspace-view page-${(pathByTab[tab] || "dashboard").replace(/[^a-z-]/g, "")} ${["Account Transactions", "Bill Transactions"].includes(tab) ? "page-route-detail" : ""} ${researchDetailOpen ? "page-research-detail" : ""}`}
     >
       <RealtimeSync
@@ -9653,7 +9654,7 @@ export function NorthstarWorkspace({
                 </b>
               </span>
             </div>
-            <div id="market-flow" className="market-terminal-panel-anchor">
+            <HoldingCostBadge symbol={chartSymbol} currentPrice={chartQuote?.last || null} stop={volumeInterpretation.stop}/><div id="market-flow" className="market-terminal-panel-anchor">
               <FlowIntelligencePanel symbol={chartSymbol} />
             </div>
             <div id="market-advisor-decision" className="market-terminal-panel-anchor">
@@ -13991,6 +13992,6 @@ export function NorthstarWorkspace({
           </button>
         )}
       </nav>
-    </main>
+    </main></HoldingCostProvider>
   );
 }

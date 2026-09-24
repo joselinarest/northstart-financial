@@ -1,4 +1,5 @@
 "use client";
+import HoldingCostBadge from "./holding-cost-badge";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useConfirm } from "./confirmation-modal";
 type Item = {
@@ -229,7 +230,7 @@ export default function MarketWatchlist({
             >
               <div>
                 <b>{item.symbol}</b>
-                <em>{item.purpose}</em>
+                <em>{item.purpose}</em><HoldingCostBadge symbol={item.symbol} currentPrice={Number(quote?.price)||null} stop={item.invalidation_price}/>
               </div>
               <strong>{price ? `$${price.toFixed(2)}` : "—"}</strong>
               <span>

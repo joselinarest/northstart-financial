@@ -1,4 +1,5 @@
 "use client";
+import HoldingCostBadge from "@/app/holding-cost-badge";
 import { useEffect, useRef, useState } from "react";
 
 type Candidate = {
@@ -1164,7 +1165,7 @@ export default function AutomaticMarketCopilot({
                     <i>{index + 1}</i>
                     <span>
                       <b className="security-title">
-                        <strong>{item.symbol}</strong>
+                        <strong>{item.symbol}</strong><HoldingCostBadge symbol={item.symbol} currentPrice={item.price}/>
                         <em>{displayName}</em>
                       </b>
                       <small>

@@ -1,0 +1,11 @@
+import assert from 'node:assert/strict';
+import {holdingCost} from '../lib/holding-cost.ts';
+const rows=[{account_id:'a',ticker:'TEST',quantity:2,cost_basis_cents:20000,market_value_cents:24000},{account_id:'a',ticker:'TEST',quantity:.5,cost_basis_cents:7500,market_value_cents:6000},{account_id:'b',ticker:'TEST',quantity:1,cost_basis_cents:90000,market_value_cents:12000}];
+assert.deepEqual(holdingCost(rows,'a','test'),{shares:2.5,average:110,cost:275,storedPrice:120});
+assert.equal(holdingCost(rows,'b','TEST').average,900);
+assert.equal(holdingCost(rows,'','TEST'),null);
+assert.equal(holdingCost(rows,'a','OTHER'),null);
+assert.equal(holdingCost([...rows,{account_id:'a',ticker:'TEST',quantity:1}],'a','TEST').average,null);
+assert.equal(holdingCost([{account_id:'a',ticker:'TEST',quantity:1,cost_basis_cents:0}],'a','TEST').average,0);
+assert.equal(holdingCost([{account_id:'a',ticker:'TEST',quantity:Infinity}],'a','TEST'),null);
+console.log('PASS: weighted and fractional cost basis, account isolation, missing basis, zero cost, unowned and invalid shares');
