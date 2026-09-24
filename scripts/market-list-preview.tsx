@@ -1,0 +1,2 @@
+import React from 'react';import {createRoot} from 'react-dom/client';import AutomaticMarketCopilot from '../app/automatic-market-copilot';
+createRoot(document.getElementById('root')!).render(<div className="workspace-view page-daily-action-plan"><main className="content"><section className="daily-plan-intro">Today</section><section className="daily-account-action-plans">Account plan</section><AutomaticMarketCopilot onSelect={()=>{}} accountName="Test account" marketPhase="open"/></main></div>);

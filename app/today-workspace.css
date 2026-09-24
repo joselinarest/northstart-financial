@@ -38,3 +38,13 @@
 .page-daily-action-plan .content{font-family:var(--font-geist-sans,Arial),sans-serif}
 .page-daily-action-plan .execution-board>header>div>span{color:#98e5c4!important}
 @media(max-width:700px){.page-daily-action-plan .recommendation-card>summary>em{grid-row:1!important;grid-column:1!important}.page-daily-action-plan .recommendation-card>summary>strong{grid-row:2!important}.page-daily-action-plan .recommendation-primary-facts{grid-template-columns:repeat(2,minmax(0,1fr))!important}}
+/* Keep market stock suggestions above the account plan and setup controls. */
+.workspace-view.page-daily-action-plan .content>.auto-copilot{order:3!important;display:flex!important;flex-direction:column}
+.workspace-view.page-daily-action-plan .content>.daily-account-action-plans{order:4!important}
+.page-daily-action-plan .auto-copilot>*{order:5}
+.page-daily-action-plan .auto-copilot>header{order:0}
+.page-daily-action-plan .auto-copilot>.copilot-account-context{order:1}
+.page-daily-action-plan .auto-copilot>.auto-method,.page-daily-action-plan .auto-copilot>.auto-error,.page-daily-action-plan .auto-copilot>.market-list-status{order:2}
+.page-daily-action-plan .auto-copilot>.auto-grid{order:3;display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;padding:16px}
+.market-list-status{padding:18px;line-height:1.6;background:#f2f7f4}
+@media(max-width:800px){.page-daily-action-plan .auto-copilot>.auto-grid{grid-template-columns:minmax(0,1fr)}}

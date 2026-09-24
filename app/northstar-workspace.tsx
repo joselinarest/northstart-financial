@@ -7318,8 +7318,8 @@ export function NorthstarWorkspace({
                 {!marketClock.isOpen && clockTargetLabel && <p>Next U.S. market open: <b>{clockTargetLabel}</b></p>}
               </header>
               <nav className="today-section-links" aria-label="Today sections">
-                <a href="#today-recommendations">Account recommendations ↓</a>
-                <a href="#today-market-context">Market context ↓</a>
+                <a href="#today-market-context">Market suggestions ↓</a>
+                <a href="#today-recommendations">My account plan ↓</a>
                 <a href="#today-ai-health">AI availability ↓</a>
               </nav>
               <details className="today-how-it-works"><summary>How this plan updates</summary><p>During the session, provider data refreshes every {intradayRefreshMinutes} minutes. Background workers monitor triggers independently of this page. Closed-market plans use completed session data and require fresh confirmation before entry. {decisionAlarmEnabled ? `Review alarm: ${decisionTimeLabel}.` : "Review alarm is off; configure it in Settings."} Recommendations never place orders.</p></details>

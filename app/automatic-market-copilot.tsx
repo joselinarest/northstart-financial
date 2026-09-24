@@ -329,7 +329,7 @@ export default function AutomaticMarketCopilot({
     setLoading(true);
     fetch(
       `/api/market/candidates?strategy=${strategy}&analysisVersion=4&refresh=${Date.now()}`,
-      { cache: "no-store", headers: { "Cache-Control": "no-cache" } },
+      { cache: "no-store", headers: { "Cache-Control": "no-cache" }, signal: AbortSignal.timeout(20000) },
     )
       .then(async (response) => ({
         ok: response.ok,
@@ -542,9 +542,9 @@ export default function AutomaticMarketCopilot({
           <h2>
             {strategy === "swing"
               ? marketPhase === "open"
-                ? "Live opportunities ranked for action now"
+                ? "Market suggestions · ranked stock shortlist"
                 : "Stocks to prepare for the next market open"
-              : "Ranked investment opportunities for the selected account"}
+              : "Market suggestions · investment shortlist"}
           </h2>
           <p>
             One engine scans current provider data, checks each candidate
@@ -1012,7 +1012,8 @@ export default function AutomaticMarketCopilot({
               </>
             )}
           </div>
-          <div className="auto-grid">
+          {!(data.candidates || []).length && <div className="market-list-status" role="status"><b>{loading ? "Loading market suggestions…" : "No market candidates returned"}</b><p>{loading ? "Retrieving the latest provider scan. Stock cards appear here when it completes." : "The scan returned an empty shortlist. This is separate from the account HOLD/WAIT recommendations. Retry the live scan or check provider health."}</p></div>}
+          <div className="auto-grid" aria-label="Market stock suggestions">
             {(data.candidates || []).slice(0, 6).map((item, index) => {
               const riskPerShare = Math.max(
                   0.01,
