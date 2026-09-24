@@ -228,10 +228,11 @@ export default function MarketWatchlist({
               className={riskHit ? "risk" : targetHit ? "target" : "watching"}
               key={item.id}
             >
-              <div>
+              <div className="watch-card-heading">
                 <b>{item.symbol}</b>
-                <em>{item.purpose}</em><HoldingCostBadge symbol={item.symbol} currentPrice={Number(quote?.price)||null} stop={item.invalidation_price}/>
+                <em>{item.purpose}</em>
               </div>
+              <HoldingCostBadge symbol={item.symbol} currentPrice={Number(quote?.price)||null} stop={item.invalidation_price}/>
               <strong>{price ? `$${price.toFixed(2)}` : "—"}</strong>
               <span>
                 {quote?.changePct == null

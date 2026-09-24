@@ -569,7 +569,7 @@
 }
 .watch-add {
   display: grid;
-  grid-template-columns: 110px 160px 1fr 1fr auto;
+  grid-template-columns: 110px 160px minmax(0, 1fr) minmax(0, 1fr) auto;
   gap: 8px;
   padding: 11px 14px;
   background: #edf4f0;
@@ -584,6 +584,7 @@
   background: #fff;
   font-size: 0.62rem;
 }
+.watch-add > * { min-width: 0; }
 .watch-add button {
   background: #176d52;
   color: #fff;
@@ -591,11 +592,12 @@
 }
 .watch-grid {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 8px;
   padding: 11px;
 }
 .watch-grid article {
+  min-width: 0;
   padding: 11px;
   border: 1px solid var(--line);
   border-top: 4px solid #5984a8;
@@ -609,10 +611,17 @@
   border-top-color: #ba594d;
   background: #fff1ef;
 }
-.watch-grid article > div {
+.watch-grid article > .watch-card-heading {
   display: flex;
   justify-content: space-between;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 6px 12px;
 }
+.watch-card-heading > b { flex-shrink: 0; white-space: nowrap; }
+.watch-card-heading > em { overflow-wrap: anywhere; }
+.watch-grid article > span:not(.holding-cost-badge),
+.watch-grid article > small { display: block; margin-top: 4px; }
 .watch-grid article b {
   font-size: 0.75rem;
 }
@@ -635,6 +644,7 @@
 }
 .watch-grid article footer {
   display: flex;
+  flex-wrap: wrap;
   gap: 6px;
   padding: 0;
   text-align: left;

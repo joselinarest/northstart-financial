@@ -1,0 +1,3 @@
+import React from 'react';import {createRoot} from 'react-dom/client';import MarketWatchlist from '../app/market-watchlist';import {HoldingCostProvider} from '../app/holding-cost-badge';import {ConfirmProvider} from '../app/confirmation-modal';
+const holdings=['META','SCHD','QQQ','ORCL'].map(ticker=>({ticker,account_id:'test',quantity:2.25,cost_basis_cents:150000,market_value_cents:160000}));
+createRoot(document.getElementById('root')!).render(<ConfirmProvider><HoldingCostProvider accountId="test" holdings={holdings}><div className="page-portfolio"><MarketWatchlist accessToken="test" onOpen={symbol=>{document.body.dataset.opened=symbol}}/></div></HoldingCostProvider></ConfirmProvider>);
