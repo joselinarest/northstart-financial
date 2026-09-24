@@ -8478,7 +8478,7 @@ export function NorthstarWorkspace({
                 targetMix={portfolioMix}
               />
             )}
-          {tab === "Portfolio" && investmentAccounts.filter(account=>analysisScope===ALL_ACCOUNTS_SCOPE||String(account.id)===advisorAccountId).map(account=><section key={`growth:${account.id}`} className="card" style={{minWidth:0,padding:16}}><h2>{String(account.nickname||account.name)} · Growth history</h2><AccountGrowthChart accountId={String(account.id)} accessToken={accessToken}/></section>)}
+          {tab === "Portfolio" && investmentAccounts.filter(account=>analysisScope===ALL_ACCOUNTS_SCOPE||String(account.id)===advisorAccountId).map(account=><section key={`growth:${account.id}`} className="portfolio-account-growth card" style={{minWidth:0,padding:16}}><h2>{String(account.nickname||account.name)} · Growth history</h2><AccountGrowthChart accountId={String(account.id)} accessToken={accessToken}/></section>)}
           <section
             className={`portfolio-builder card ${tab === "Portfolio" && analysisScope !== ALL_ACCOUNTS_SCOPE ? "" : "account-scope-hidden"}`}
           >

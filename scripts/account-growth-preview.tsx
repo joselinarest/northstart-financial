@@ -1,2 +1,2 @@
 import React from 'react';import {createRoot} from 'react-dom/client';import AccountGrowthChart from '../app/account-growth-chart';
-createRoot(document.getElementById('root')!).render(<AccountGrowthChart accountId="test-account" accessToken=""/>);
+createRoot(document.getElementById('root')!).render(<main className="workspace-view page-portfolio"><div className="shell app-shell"><section className="content page-container"><section className="portfolio-account-growth card"><h2>Test account · Growth history</h2><AccountGrowthChart accountId="test-account" accessToken=""/></section></section></div></main>);
