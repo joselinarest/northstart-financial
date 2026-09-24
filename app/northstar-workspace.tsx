@@ -8299,7 +8299,7 @@ export function NorthstarWorkspace({
                   >
                     {accountHoldings.length ? (
                       <>
-                        <div className="account-holdings-heading">
+                        <details open><summary style={{padding:12,cursor:"pointer",fontWeight:700}}>Holdings and growth · show / hide</summary><div className="account-holdings-heading">
                           <div>
                             <b>Holdings and growth</b>
                             <span>
@@ -8374,7 +8374,7 @@ export function NorthstarWorkspace({
                             );
                           })}
                         </div>
-                        <div className="account-analysis-heading">
+                        </details><div className="account-analysis-heading">
                           <b>Evaluation by holding</b>
                           <span>
                             Expand one position to inspect evidence, risk and

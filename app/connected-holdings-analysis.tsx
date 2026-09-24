@@ -379,6 +379,7 @@ export default function ConnectedHoldingsAnalysis({
   }, [unique, horizon, marketOpen, accountId]); // Closed sessions require an explicit refresh and do not consume market API quota.
   return (
     <div className="connected-analysis embedded">
+      <details open><summary style={{padding:12,cursor:"pointer",fontWeight:700}}>Holdings · {unique.length} · show / hide</summary>
       <div className="analysis-controls">
         <div>
           <b>Complete {horizon} review</b>
@@ -618,6 +619,7 @@ export default function ConnectedHoldingsAnalysis({
           );
         })}
       </div>
+      </details>
     </div>
   );
 }
