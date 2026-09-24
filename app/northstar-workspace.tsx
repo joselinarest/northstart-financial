@@ -8656,6 +8656,9 @@ export function NorthstarWorkspace({
               </footer>
             </section>
             <PortfolioBalanceExplorer
+              enabled={tab === "Portfolio" && analysisScope !== ALL_ACCOUNTS_SCOPE}
+              accountId={advisorAccountId}
+              accessToken={accessToken}
               key={`portfolio-balance-explorer:${advisorAccountId}:${portfolioGoal}`}
               rows={connectedPortfolioAnalysis.rows}
               holdings={connectedPortfolioAnalysis.concentration}

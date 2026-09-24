@@ -1,3 +1,4 @@
+import {saleReadiness} from "@/lib/sale-readiness";
 import {entryOrderReady,watchEntry} from "@/lib/entry-plan";
 import type{ActionGuidance}from"@/lib/domain/action-guidance";
 import{marketDataProvider}from"@/lib/providers/alpaca-market-data";
@@ -28,6 +29,10 @@ export async function enrichRecommendationActions(input:Input){
       action.why=`INCOMPLETE — sale classification, evidence and proceeds allocation must be reviewed. ${row.reason}`;
       action.capitalSource="Cash allocation and reentry plan are missing. Open the Trade Lifecycle audit.";
       Object.assign(action.details!,{displayAction:"NO ACTION — INCOMPLETE",resultingShares:String(currentShares),estimatedCashAfterCents:String(cash),exitReason:row.sell_reason||"UNCLASSIFIED",estimatedRealizedPnlCents:null});
+    }else if(!saleReadiness(row).ready||protectedLongTermSell||thresholdBlocked){
+      action.action="DO_NOTHING";action.quantity="0";action.amountCents="0";action.priority="WATCH";
+      action.why="REVIEW ONLY — no sell order ready. Wait for current evidence, the sell trigger and account risk checks. "+row.reason;
+      Object.assign(action.details!,{displayAction:"SELL / TRIM REVIEW — WAIT",resultingShares:String(currentShares),estimatedCashAfterCents:String(cash),estimatedRealizedPnlCents:null,lifecycleAudit:audit});
     }else{
       action.action=fullExit?"SELL":"REDUCE";action.quantity=String(audit.shares);action.amountCents=String(Math.round(audit.proceeds*100));
       action.capitalSource=`${audit.allocation}. Cash ${dollars(audit.cashBefore*100)} → ${dollars(audit.cashAfter*100)}. ${plan?`Reserve ${dollars(plan.reservedCash*100)}. Rebuy approximately ${plan.estimatedShares} shares at ${dollars(plan.low*100)}–${dollars(plan.high*100)}; ${plan.trigger} Cancel below ${dollars(plan.invalidation*100)} or on thesis deterioration. Wait until ${plan.expiresAt}. Breakout alternative ${dollars(plan.breakout*100)}–${dollars(plan.breakoutLimit*100)}.`:`No rebuy: ${audit.reason}`}`;
