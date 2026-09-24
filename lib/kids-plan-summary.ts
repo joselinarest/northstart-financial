@@ -17,3 +17,13 @@ export function kidsGoalSummary(goal:KidsGoalSummaryInput,accounts:KidsLinkedAcc
  monthly:number(goal.monthly_contribution_cents),hasProjection:Boolean(goal.calculated_at)&&goal.current_balance_cents!=null,
  balanceChanged:goal.current_balance_cents!=null&&Math.abs(current-number(goal.current_balance_cents))>1};
 }
+export function monthlyHoldingPlan(monthlyCents:number,assets:{ticker:string;weightPercent:number}[],purchases:{ticker:string;amount_cents:unknown}[]=[]){
+ const budget=Math.max(0,Math.round(monthlyCents));
+ const eligible=assets.filter(a=>Number.isFinite(Number(a.weightPercent))&&Number(a.weightPercent)>0);
+ const total=eligible.reduce((sum,a)=>sum+Number(a.weightPercent),0);
+ if(!total)return [];
+ const rows=eligible.map(a=>{const exact=budget*Number(a.weightPercent)/total;return {...a,planned:Math.floor(exact),fraction:exact-Math.floor(exact)}});
+ let cents=budget-rows.reduce((sum,a)=>sum+a.planned,0);
+ for(const row of [...rows].sort((a,b)=>b.fraction-a.fraction)){if(cents--<=0)break;row.planned++}
+ return rows.map(row=>{const recorded=Math.max(0,Math.round(purchases.filter(p=>p.ticker.toUpperCase()===row.ticker.toUpperCase()).reduce((sum,p)=>sum+(Number(p.amount_cents)||0),0)));return {ticker:row.ticker,planned:row.planned,recorded,remaining:Math.max(0,row.planned-recorded)}});
+}

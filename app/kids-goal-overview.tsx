@@ -1,15 +1,17 @@
 "use client";
-import {kidsGoalSummary,type KidsLinkedAccount} from "@/lib/kids-plan-summary";
+import {kidsGoalSummary,monthlyHoldingPlan,type KidsLinkedAccount} from "@/lib/kids-plan-summary";
 const money=(value:unknown)=>new Intl.NumberFormat('en-US',{style:'currency',currency:'USD',minimumFractionDigits:2,maximumFractionDigits:2}).format(Number(value||0)/100);
-export default function KidsGoalOverview({goal,accounts,busy,onReview}:{goal:Record<string,any>;accounts:KidsLinkedAccount[];busy:boolean;onReview:()=>void}){
+export default function KidsGoalOverview({goal,accounts,busy,onReview,purchases=[]}:{goal:Record<string,any>;accounts:KidsLinkedAccount[];busy:boolean;onReview:()=>void;purchases?:{ticker:string;amount_cents:unknown}[]}){
  const summary=kidsGoalSummary({id:String(goal.id),...goal},accounts);
  const assumptions=typeof goal.assumptions_json==='string'?(()=>{try{return JSON.parse(goal.assumptions_json)}catch{return {}}})():goal.assumptions_json||{};
  const date=goal.calculated_at?new Date(goal.calculated_at):null;
+ const monthlyRows=monthlyHoldingPlan(summary.monthly,goal.portfolioModel?.assets||[],purchases);
  const stale=summary.balanceChanged||!summary.hasProjection;
  return <div className="kids-goal-overview">
   <section className="kids-next-step" aria-label="Next step"><span>NEXT STEP</span><h4>{!summary.linked.length?'Link an account to this goal':stale?'Refresh this plan':goal.funding_status==='BEHIND'?'Review the monthly savings gap':'Keep the plan on track'}</h4>
    <p>{!summary.linked.length?'Choose the correct account in Accounts & contributions below.':stale?'The saved projection does not reflect the current balance. Recalculate before using the funding estimate.':goal.funding_status==='BEHIND'?`Your plan assumes ${money(summary.monthly)} per month. The saved estimate needs ${money(goal.required_monthly_base_cents)} per month to reach this goal. Check household affordability before changing contributions.`:'Review contributions and allocation periodically. A projection alone is not a reason to trade.'}</p>
    {stale&&<button disabled={busy} onClick={onReview}>Recalculate plan</button>}
+  {monthlyRows.length>0&&<div className="kids-monthly-allocation"><h4>This month’s investment guide · {money(summary.monthly)}</h4><p>Model allocation of your monthly goal. Remaining amounts subtract recorded purchases this calendar month, not cash deposits. Verify unrecorded broker activity before investing.</p><div>{monthlyRows.map(row=><article key={row.ticker}><b>{row.ticker}</b><dl><div><dt>Monthly target</dt><dd>{money(row.planned)}</dd></div><div><dt>Recorded buys</dt><dd>{money(row.recorded)}</dd></div><div><dt>Still to invest</dt><dd>{money(row.remaining)}</dd></div></dl></article>)}</div><small>Dollar guide only. Requires available cash and a confirmed account-specific setup; no order is placed. This does not change your holdings.</small></div>}
   </section>
   <div className="kids-money-panels"><section><span>VALUE TODAY</span><h4>{money(summary.current)}</h4><p>Saved account values, separate from future growth.</p><dl>
    <div><dt>Linked investments</dt><dd>{money(summary.holdings)}</dd></div><div><dt>Account cash</dt><dd>{money(summary.cash)}</dd></div><div><dt>Additional manual balance</dt><dd>{money(summary.manual)}</dd></div>

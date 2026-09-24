@@ -1,0 +1,14 @@
+import assert from 'node:assert/strict';
+import {PGlite} from '@electric-sql/pglite';
+import {syncGoalMonthlyContribution} from '../lib/kids-contribution-settings.ts';
+const pg=new PGlite();
+await pg.exec(`CREATE TABLE child_goals(id text PRIMARY KEY,monthly_contribution_cents bigint);CREATE TABLE child_contribution_schedules(goal_id text,account_id text,amount_cents bigint,active boolean);CREATE TABLE child_contributions(goal_id text,account_id text,amount_cents bigint,expected_cents bigint,source text,status text,contribution_date date);
+INSERT INTO child_goals VALUES('owen',10000),('zoey',35000);INSERT INTO child_contribution_schedules VALUES('owen','a',35000,true),('owen','inactive',90000,false),('zoey','z',35000,true);
+INSERT INTO child_contributions VALUES('owen','a',10000,10000,'TRANSFER','EXPECTED',CURRENT_DATE),('owen','a',10000,10000,'TRANSFER','RECEIVED',CURRENT_DATE),('owen','a',10000,10000,'TRANSFER','EXPECTED',CURRENT_DATE-INTERVAL '2 months');`);
+const db={prepare(sql){let n=0;sql=sql.replace(/\?/g,()=>'$'+(++n));return {bind(...args){return {async first(){return (await pg.query(sql,args)).rows[0]},async run(){return pg.query(sql,args)}}}}}};
+assert.equal(await syncGoalMonthlyContribution(db,'owen'),35000);
+assert.equal(Number((await pg.query("SELECT monthly_contribution_cents FROM child_goals WHERE id='owen'")).rows[0].monthly_contribution_cents),35000,'reloaded goal matches saved reminder');
+const rows=(await pg.query("SELECT * FROM child_contributions ORDER BY contribution_date DESC,status")).rows;assert.equal(Number(rows[0].amount_cents),35000);assert.equal(Number(rows[1].amount_cents),10000,'completed transfer preserved');assert.equal(Number(rows[2].amount_cents),10000,'historical reminder preserved');
+await pg.exec("INSERT INTO child_contribution_schedules VALUES('owen','b',5000,true)");assert.equal(await syncGoalMonthlyContribution(db,'owen'),40000,'active account schedules are summed');
+assert.equal(Number((await pg.query("SELECT monthly_contribution_cents FROM child_goals WHERE id='zoey'")).rows[0].monthly_contribution_cents),35000,'other child unchanged');
+await pg.close();console.log('Monthly contribution regression passed: schedule saves update persisted plan; active schedules summed; pending reminders refreshed; completed transfers, history and other children preserved.');
