@@ -58,3 +58,15 @@ body:has(.workspace-view.page-daily-action-plan){height:auto!important;min-heigh
 .workspace-view.page-daily-action-plan .content>.auto-copilot,
 .workspace-view.page-daily-action-plan .content>.daily-account-action-plans{visibility:visible!important;opacity:1!important;max-height:none!important;overflow:visible!important}
 .workspace-view.page-daily-action-plan .auto-copilot>.auto-grid{grid-template-columns:minmax(0,1fr)!important;max-height:none;overflow:visible}
+/* These sections are mounted by Today's route. Never make availability depend
+   on viewport width or the legacy dashboard's direct-child whitelist. */
+.workspace-view.page-daily-action-plan .content>.daily-swing-holdings,
+.workspace-view.page-daily-action-plan .content>.options-advisor-entry,
+.workspace-view.page-daily-action-plan .content>.market-session-report,
+.workspace-view.page-daily-action-plan .content>.daily-close-review,
+.workspace-view.page-daily-action-plan .content>.close-review-skeleton,
+.workspace-view.page-daily-action-plan .content>.close-review-empty{
+ display:block!important;visibility:visible!important;opacity:1!important;order:6;
+}
+.workspace-view.page-daily-action-plan .content>.daily-swing-holdings{order:5}
+.page-daily-action-plan .daily-account-action-plans>details>summary i{display:block!important}
