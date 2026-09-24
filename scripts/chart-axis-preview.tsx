@@ -1,0 +1,2 @@
+import React from 'react';import {createRoot} from 'react-dom/client';import Chart from '../app/integrated-research-chart';
+createRoot(document.getElementById('root')!).render(<Chart accountId="test" accountValue={25000} cashAvailable={1000} symbol="TEST" entryLow={109} entryHigh={111} stop={105} target1={120} target2={125} support={108} resistance={115} confidence={70} action="WAIT" strategy="swing"/>);
