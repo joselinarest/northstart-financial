@@ -1,4 +1,5 @@
 "use client";
+import SectionAccordion from "@/app/section-accordion";
 import LinkedChartSetup from "@/app/linked-chart-setup";
 import {readChartSetup} from "@/lib/chart-setup-link";
 
@@ -7372,7 +7373,7 @@ export function NorthstarWorkspace({
             </section>
           )}
           {tab === "Daily Action Plan" && (
-            <section id="today-recommendations" className="daily-account-action-plans selected-account-only">
+            <details open id="today-recommendations" className="daily-account-action-plans selected-account-only"><summary style={{padding:16,cursor:"pointer",fontWeight:700}}>Account recommendations · show / hide</summary>
               <header>
                 <span>SELECTED INVESTMENT ACCOUNT · ACCOUNT-SPECIFIC GUIDANCE</span>
                 <h2>{advisorAccountName}</h2>
@@ -7399,22 +7400,22 @@ export function NorthstarWorkspace({
                   </button>
                 </div>
               )}
-            </section>
+            </details>
           )}
           {tab === "Daily Action Plan" && (
-            <MarketSessionReport marketOpen={marketPhase === "open"} />
+            <SectionAccordion title="Market session report"><MarketSessionReport marketOpen={marketPhase === "open"} /></SectionAccordion>
           )}
           {tab === "Daily Action Plan" && (
-            <DailyCloseReview
+            <SectionAccordion title="Daily close review"><DailyCloseReview
               marketOpen={marketPhase === "open"}
               onOpen={(symbol) =>
                 navigatePath(
                   `/workspace/research/${encodeURIComponent(symbol.toLowerCase())}`,
                 )
               }
-            />
+            /></SectionAccordion>
           )}
-          {tab === "Daily Action Plan" && advisorAccountId && <TradeLifecyclePanel accountId={advisorAccountId} accessToken={accessToken} />}
+          {tab === "Daily Action Plan" && advisorAccountId && <SectionAccordion title="Trade lifecycle and saved plans"><TradeLifecyclePanel accountId={advisorAccountId} accessToken={accessToken} /></SectionAccordion>}
           {tab === "Daily Action Plan" && <AIHealthPanel accessToken={accessToken} />}
 
 
@@ -7461,7 +7462,7 @@ export function NorthstarWorkspace({
             />
           )}
           {tab === "Daily Action Plan" && advisorHoldings.length > 0 && (
-            <section className="daily-swing-holdings card">
+            <details open className="daily-swing-holdings card"><summary style={{padding:16,cursor:"pointer",fontWeight:700}}>Current holdings analysis · show / hide</summary>
               <header>
                 <span>SELECTED INVESTMENT ACCOUNT · CURRENT HOLDINGS</span>
                 <h2>
@@ -7486,7 +7487,7 @@ export function NorthstarWorkspace({
                   navigate("Professional Charts");
                 }}
               />
-            </section>
+            </details>
           )}
           {tab === "Prepare Trade" && advisorStrategy === "swing" && (
             <AutomaticMarketCopilot

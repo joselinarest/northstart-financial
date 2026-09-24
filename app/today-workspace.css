@@ -41,13 +41,13 @@
 /* Keep market stock suggestions above the account plan and setup controls. */
 .workspace-view.page-daily-action-plan .content>.auto-copilot{order:3!important;display:flex!important;flex-direction:column}
 .workspace-view.page-daily-action-plan .content>.daily-account-action-plans{order:4!important}
-.page-daily-action-plan .auto-copilot>*{order:5}
-.page-daily-action-plan .auto-copilot>header{order:0}
-.page-daily-action-plan .auto-copilot>.copilot-account-context{order:1}
-.page-daily-action-plan .auto-copilot>.auto-method,.page-daily-action-plan .auto-copilot>.auto-error,.page-daily-action-plan .auto-copilot>.market-list-status{order:2}
-.page-daily-action-plan .auto-copilot>.auto-grid{order:3;display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;padding:16px}
+.page-daily-action-plan :is(.auto-copilot,#market-suggestions-body)>*{order:5}
+.page-daily-action-plan :is(.auto-copilot,#market-suggestions-body)>header{order:0}
+.page-daily-action-plan :is(.auto-copilot,#market-suggestions-body)>.copilot-account-context{order:1}
+.page-daily-action-plan :is(.auto-copilot,#market-suggestions-body)>.auto-method,.page-daily-action-plan :is(.auto-copilot,#market-suggestions-body)>.auto-error,.page-daily-action-plan :is(.auto-copilot,#market-suggestions-body)>.market-list-status{order:2}
+.page-daily-action-plan :is(.auto-copilot,#market-suggestions-body)>.auto-grid{order:3;display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;padding:16px}
 .market-list-status{padding:18px;line-height:1.6;background:#f2f7f4}
-@media(max-width:800px){.page-daily-action-plan .auto-copilot>.auto-grid{grid-template-columns:minmax(0,1fr)}}
+@media(max-width:800px){.page-daily-action-plan :is(.auto-copilot,#market-suggestions-body)>.auto-grid{grid-template-columns:minmax(0,1fr)}}
 
 /* Today uses the same document flow on desktop and mobile. The shared desktop
    shell otherwise traps this long feed inside a viewport-height scroll panel. */
@@ -57,7 +57,7 @@ body:has(.workspace-view.page-daily-action-plan){height:auto!important;min-heigh
 .workspace-view.page-daily-action-plan>.app-shell>.content.page-container{height:auto!important;max-height:none!important;overflow:visible!important;align-content:start}
 .workspace-view.page-daily-action-plan .content>.auto-copilot,
 .workspace-view.page-daily-action-plan .content>.daily-account-action-plans{visibility:visible!important;opacity:1!important;max-height:none!important;overflow:visible!important}
-.workspace-view.page-daily-action-plan .auto-copilot>.auto-grid{grid-template-columns:minmax(0,1fr)!important;max-height:none;overflow:visible}
+.workspace-view.page-daily-action-plan :is(.auto-copilot,#market-suggestions-body)>.auto-grid{grid-template-columns:minmax(0,1fr)!important;max-height:none;overflow:visible}
 /* These sections are mounted by Today's route. Never make availability depend
    on viewport width or the legacy dashboard's direct-child whitelist. */
 .workspace-view.page-daily-action-plan .content>.daily-swing-holdings,

@@ -530,8 +530,9 @@ export default function AutomaticMarketCopilot({
       tag: `northstar-${accountScope}-${first.symbol}`,
     });
   }, [data.asOf, strategy, accountName, accountScope, holdings]);
+  const [sectionOpen,setSectionOpen]=useState(true);
   return (
-    <section id="today-market-context" className="auto-copilot">
+    <section id="today-market-context" className="auto-copilot"><button type="button" aria-expanded={sectionOpen} aria-controls="market-suggestions-body" onClick={()=>setSectionOpen(v=>!v)} style={{padding:16,cursor:"pointer",fontWeight:700,order:-10}}>Market suggestions · {sectionOpen?"hide":"show"}</button><div id="market-suggestions-body" style={{display:sectionOpen?"contents":"none"}}>
       <header>
         <div>
           <span>
@@ -1440,6 +1441,6 @@ export default function AutomaticMarketCopilot({
         with fundamentals, valuation, filings, diversification and suitability.
         Northstar never places an order.
       </footer>
-    </section>
+    </div></section>
   );
 }
