@@ -30,7 +30,7 @@ const examples=[
 
 export default function ChartPatternGallery({symbol,timeframe,patterns,onSelect,bars=[],action='WAIT'}:{symbol:string;timeframe:string;patterns:PatternEvidence[];onSelect:(id:string)=>void;bars?:PatternBar[];action?:string}){
  const [filter,setFilter]=useState('ALL');
- return <section className="pattern-gallery" aria-label={`${symbol} visual pattern gallery`}>
+ return <section tabIndex={-1} className="pattern-gallery" aria-label={`${symbol} visual pattern gallery`}>
   <h3>{symbol} · Buy / sell pattern gallery</h3>
   <p><strong>Current recommendation: {action}.</strong> Pattern scenarios are evidence for review, not independent trade instructions or guaranteed predictions.</p>
   <h4>Detected setups for {symbol} · {timeframe}</h4>

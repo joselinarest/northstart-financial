@@ -9447,6 +9447,7 @@ export function NorthstarWorkspace({
             <nav className="market-terminal-tabs" aria-label="Stock research workspace">
               <a href="#market-quote">Quote</a>
               <a href="#market-price-chart">Chart</a>
+              <a href="#market-pattern-gallery">Pattern Gallery</a>
               <a href="#market-advisor-decision">Advisor decision</a>
               <a href="#market-flow">Flow</a>
               <button type="button" onClick={() => navigate("Options Advisor")}>Options</button>
