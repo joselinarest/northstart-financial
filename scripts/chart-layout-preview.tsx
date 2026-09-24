@@ -1,0 +1,2 @@
+import React from 'react';import {createRoot} from 'react-dom/client';import LinkedChartSetup from '../app/linked-chart-setup';
+createRoot(document.getElementById('root')!).render(<main><div style={{height:300}}>Chart context</div><section className="chart-workspace card" id="market-charts"><LinkedChartSetup symbol="AMD"/><nav className="market-terminal-tabs"><a href="#chart">Quote</a><a href="#chart">Chart</a><a href="#chart">Pattern Gallery</a></nav><div id="chart" style={{height:1200}}>Chart</div></section></main>);

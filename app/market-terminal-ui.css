@@ -1,4 +1,9 @@
 /* Research-terminal presentation inspired by proven market-workspace patterns. */
+.chart-workspace .linked-chart-setup{position:static;display:block;min-width:0;width:auto;height:auto;margin:16px;padding:16px;border:1px solid #b9cec4;border-radius:12px;background:#f4faf7;color:#183b2e;overflow-wrap:anywhere;letter-spacing:normal;text-transform:none;font:400 14px/1.6 system-ui,sans-serif}
+.chart-workspace .linked-chart-setup h3{margin:0 0 12px;color:#183b2e;font-size:18px;line-height:1.4;letter-spacing:normal}
+.chart-workspace .linked-chart-setup p{margin:12px 0;color:#294c3f;font-size:14px;line-height:1.6;letter-spacing:normal;text-transform:none}
+.chart-workspace .linked-chart-setup small{display:block;color:#496258;font-size:13px;line-height:1.6;letter-spacing:normal}
+.chart-workspace .market-terminal-tabs{position:relative;top:auto;z-index:auto}
 .market-terminal-tabs{position:sticky;top:70px;z-index:14;display:flex;align-items:center;gap:2px;padding:8px 12px;border-bottom:1px solid #263f35;background:#10281f;color:#dceae4;overflow-x:auto;scrollbar-width:thin}
 .market-terminal-tabs a,.market-terminal-tabs button{flex:0 0 auto;min-height:34px;padding:8px 12px;border:0;border-radius:6px;background:transparent;color:inherit;font:750 11px/1.1 var(--font-geist-sans),system-ui;text-decoration:none;white-space:nowrap;cursor:pointer}
 .market-terminal-tabs a:hover,.market-terminal-tabs a:focus-visible,.market-terminal-tabs button:hover,.market-terminal-tabs button:focus-visible{outline:none;background:#245b48;color:#fff}
