@@ -1,3 +1,4 @@
+import {recommendationAvailability} from "@/lib/recommendation-availability";
 import{workspace}from"@/lib/db";
 import{buildActionGuidance,type ActionGuidance,type ActionPriority,type ActionType}from"@/lib/domain/action-guidance";
 import{calculatePortfolio,strategyTarget,type AllocationCategory}from"@/lib/domain/portfolio";
@@ -28,6 +29,7 @@ const[holdings,targets,liabilities,spending,liquid]=await Promise.all([db.prepar
   // Unclassified derived exits must not bypass the persisted lifecycle policy.
   for(const action of [...guidance.today,...guidance.queue])if(['SELL','REDUCE','TAKE_PROFIT'].includes(action.action)&&!action.details?.lifecycleAudit){action.action='DO_NOTHING';action.quantity='0';action.amountCents='0';action.why=`INCOMPLETE — lifecycle audit required. ${action.why}`;action.capitalSource='Review the Trade Lifecycle plan before allocating sale proceeds.';}
   guidance.queue=guidance.queue.map((action,index)=>({...action,rank:index+1}));guidance.today=guidance.today.map((action,index)=>({...action,rank:index+1}));
-  return Response.json({guidance,portfolio,target,householdSafety:{highInterestDebtCents:debt.toString(),reserveGapCents:reserveGap.toString(),safeInvestmentCapacityCents:safe.toString()}},{headers:{"Cache-Control":"private, no-store"}})
- }catch(error){if(error instanceof Response)return error;return Response.json({error:error instanceof Error?error.message:"Action guidance unavailable"},{status:500})}
+  const latestAnalyses=await db.prepare("SELECT DISTINCT ON (r.security_id) s.ticker symbol,r.action,r.actionable,r.reason,r.expires_at,r.created_at FROM recommendations r JOIN securities s ON s.id=r.security_id WHERE r.account_id=? AND r.household_id=? ORDER BY r.security_id,r.created_at DESC").bind(accountId,householdId).all<any>();
+  return Response.json({guidance,analysisStatus:recommendationAvailability(latestAnalyses.results.map(row=>({...row,created_at:new Date(row.created_at).toISOString(),expires_at:new Date(row.expires_at).toISOString()}))),portfolio,target,householdSafety:{highInterestDebtCents:debt.toString(),reserveGapCents:reserveGap.toString(),safeInvestmentCapacityCents:safe.toString()}},{headers:{"Cache-Control":"private, no-store"}})
+ }catch(error){if(error instanceof Response)return error;if((error as {code?:string})?.code==="53300")return Response.json({error:"The database is at connection capacity. The action plan could not load. Retry shortly; this does not mean there are no opportunities.",code:"DATABASE_BUSY"},{status:503,headers:{"Retry-After":"15"}});return Response.json({error:error instanceof Error?error.message:"Action guidance unavailable"},{status:500})}
 }

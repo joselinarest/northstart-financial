@@ -7416,9 +7416,6 @@ export function NorthstarWorkspace({
             </section>
           )}
           {tab === "Daily Action Plan" && (
-            <MarketSessionReport marketOpen={marketPhase === "open"} />
-          )}
-          {tab === "Daily Action Plan" && (
             <section className="daily-account-action-plans selected-account-only">
               <header>
                 <span>SELECTED INVESTMENT ACCOUNT · ACCOUNT-SPECIFIC GUIDANCE</span>
@@ -7447,6 +7444,9 @@ export function NorthstarWorkspace({
                 </div>
               )}
             </section>
+          )}
+          {tab === "Daily Action Plan" && (
+            <MarketSessionReport marketOpen={marketPhase === "open"} />
           )}
           {tab === "Daily Action Plan" && (
             <DailyCloseReview

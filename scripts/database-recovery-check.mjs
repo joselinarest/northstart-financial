@@ -2,12 +2,12 @@ import assert from 'node:assert/strict';
 import vm from 'node:vm';
 import {createRequire} from 'node:module';
 import {build} from 'esbuild';
-import {acquireDatabaseClient} from '../lib/database-recovery.ts';
+import {acquireDatabaseClient,acquireHealthyDatabaseClient} from '../lib/database-recovery.ts';
 let attempts=0;await acquireDatabaseClient(async()=>{if(++attempts===1)throw Error('Connection terminated due to connection timeout');return {}},async()=>{});assert.equal(attempts,2,'connection acquisition recovers before SQL is sent');
 const require=createRequire(import.meta.url);
 const built=await build({entryPoints:['lib/db.ts'],bundle:true,write:false,platform:'node',format:'cjs',packages:'external',plugins:[{name:'isolate-services',setup(b){b.onResolve({filter:/^@\/(lib\/(auth|runtime-secrets|migrations)|db\/schema)$/},args=>({path:args.path,namespace:'stub'}));b.onLoad({filter:/.*/,namespace:'stub'},()=>({contents:'export const schemaStatements=[]; export async function requireUser(){}; export async function loadRuntimeSecrets(){}; export async function runMigrations(){};',loader:'js'}));}}]});
 let queries=[],releases=[],queryError=null,rollbackError=false,fetches=0,poolOptions;
-const client={async query(sql){queries.push(sql);if(sql==='ROLLBACK'&&rollbackError)throw Error('rollback lost connection');if(sql!=='ROLLBACK'&&sql!=='BEGIN'&&queryError)throw queryError;return {rows:[],rowCount:0}},release(discard){releases.push(discard)}};
+const client={async query(sql){queries.push(sql);if(sql==='ROLLBACK'&&rollbackError)throw Error('rollback lost connection');if(sql!=='ROLLBACK'&&sql!=='BEGIN'&&sql!=='SELECT 1'&&queryError)throw queryError;return {rows:[],rowCount:0}},release(discard){releases.push(discard)}};
 class Pool{constructor(options){poolOptions=options}on(){}async connect(){return client}}
 const module={exports:{}};const sandbox={module,require:name=>name==='pg'?{Pool}:require(name),process:{env:{DATABASE_URL:'postgresql://test:test@database.example/test',NODE_ENV:'production',AUTO_MIGRATE_DATABASE:'false'}},URL,AbortSignal,console,fetch:async()=>{if(++fetches===1)throw Error('certificate download timeout');return {ok:true,text:async()=> '-----BEGIN CERTIFICATE-----\nfixture'}}};
 vm.runInNewContext(built.outputFiles[0].text,sandbox);const exports=module.exports;
@@ -21,3 +21,10 @@ for(const kind of ['transaction','batch']){
  assert.deepEqual(releases,[true],'broken client discarded exactly once');assert.equal(queries.filter(s=>s.startsWith('UPDATE')).length,1,'ambiguous writes never replayed');
 }
 console.log('Database recovery passed: certificate retry/cache, verified TLS, keepalive, original error preserved, broken client discarded once, no write replay.');
+
+let discarded=0,checks=0;
+const healthy={query:async()=>{},release:()=>{}};
+const recovered=await acquireHealthyDatabaseClient(async()=>++checks===1?{query:async()=>{throw Object.assign(Error('idle session ended'),{code:'57P05'})},release:destroy=>{assert.equal(destroy,true);discarded++}}:healthy);
+assert.equal(recovered,healthy);assert.equal(discarded,1);assert.equal(checks,2);
+assert.equal(poolOptions.options,'-c idle_session_timeout=60000 -c idle_in_transaction_session_timeout=60000');
+console.log('PASS: server-side idle limits, dead pooled socket discarded and reacquired before business SQL.');

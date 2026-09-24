@@ -1,0 +1,4 @@
+import assert from 'node:assert/strict';
+import {recommendationAvailability as status} from '../lib/recommendation-availability.ts';
+const now=Date.parse('2026-09-24T14:00:00Z'),row={symbol:'TEST',action:'WAIT',actionable:false,reason:'Wait for confirmation',expires_at:'2026-09-24T15:00:00Z',created_at:'2026-09-24T13:00:00Z'};
+assert.equal(status([],now).state,'EMPTY');assert.equal(status([row],now).state,'WAIT');assert.equal(status([{...row,reason:'Fundamental data unavailable (FINNHUB_429)'}],now).state,'BLOCKED');assert.equal(status([{...row,expires_at:'2026-09-23T15:00:00Z'}],now).state,'STALE');assert.equal(status([{...row,action:'SELL',actionable:true}],now).state,'AVAILABLE');assert.equal(status([{...row,action:'SELL',actionable:false}],now).readyCount,0);console.log('PASS recommendation availability: empty, waiting, provider blocked, expired, actionable and gated sale');
