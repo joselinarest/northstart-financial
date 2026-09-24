@@ -1,4 +1,5 @@
 "use client";
+import AccountNextOpenSummary from "./account-next-open-summary";
 import SectionAccordion from "@/app/section-accordion";
 import {useChartLinkSelection} from "@/app/use-chart-link-selection";
 import LinkedChartSetup from "@/app/linked-chart-setup";
@@ -7400,7 +7401,7 @@ export function NorthstarWorkspace({
             <SectionAccordion title="Market session report"><MarketSessionReport marketOpen={marketPhase === "open"} /></SectionAccordion>
           )}
           {tab === "Daily Action Plan" && (
-            <SectionAccordion title="Daily close review"><DailyCloseReview
+            <SectionAccordion title="Daily close review">{marketPhase !== "open" && investmentAccounts.filter(account => analysisScope === ALL_ACCOUNTS_SCOPE || String(account.id) === advisorAccountId).map(account => <AccountNextOpenSummary key={String(account.id)} accountId={String(account.id)} accountName={String(account.nickname || account.name)} accessToken={accessToken} />)}<DailyCloseReview
               marketOpen={marketPhase === "open"}
               onOpen={(symbol) =>
                 navigatePath(

@@ -447,7 +447,7 @@ export default function ConnectedHoldingsAnalysis({
                       };
           return (
             <details className={`holding-evaluation-accordion ${x?.state || "pending"}`} key={symbol}>
-              <summary>
+              <summary><span className="holding-toggle-label">▾ Show / hide details</span>
                 <div>
                   <b>{symbol}</b><HoldingCostBadge symbol={symbol} accountId={String(h.account_id)} />
                   <small>
