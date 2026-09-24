@@ -27,3 +27,10 @@ export function monthlyHoldingPlan(monthlyCents:number,assets:{ticker:string;wei
  for(const row of [...rows].sort((a,b)=>b.fraction-a.fraction)){if(cents--<=0)break;row.planned++}
  return rows.map(row=>{const recorded=Math.max(0,Math.round(purchases.filter(p=>p.ticker.toUpperCase()===row.ticker.toUpperCase()).reduce((sum,p)=>sum+(Number(p.amount_cents)||0),0)));return {ticker:row.ticker,planned:row.planned,recorded,remaining:Math.max(0,row.planned-recorded)}});
 }
+export function monthlyCashAction(monthly:number,recorded:number,cash:number|null,rows:{ticker:string;remaining:number}[]){
+ const remaining=Math.max(0,Math.round(monthly)-Math.max(0,Math.round(recorded)));
+ const available=cash!=null&&Number.isFinite(cash)&&cash>=0?Math.round(cash):null;
+ // Redistribute only the remaining monthly budget, never spend extra to repair an overweight purchase.
+ const allocations=monthlyHoldingPlan(remaining,rows.map(r=>({ticker:r.ticker,weightPercent:r.remaining})));
+ return {remaining,cash:available,deposit:available==null?null:Math.max(0,remaining-available),allocations};
+}
