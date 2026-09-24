@@ -125,7 +125,7 @@ export async function rankCandidatesForAccount(
               risk * 0.1,
       );
       const decision=central.find(x=>x.ticker===ticker),entry=parse(decision?.checks_json,{}).aiEvidence?.entryPlan;
-      const confirmed=decision?.actionable===true&&Date.parse(decision?.expires_at)>Date.now()&&['BUY','ADD','REENTER'].includes(decision.action)&&entryOrderReady(entry);
+      const confirmed=decision?.actionable===true&&Date.parse(decision?.expires_at)>Date.now()&&['BUY','ACCUMULATE','STRONG_BUY','BUY_PARTIAL','ADD','REENTER'].includes(decision.action)&&entryOrderReady(entry);
       const researchComplete =
           Date.now()-Date.parse(row.source_as_of)<36*3600000 &&
           Number(String(parse(row.evidence,parse(row.evidence_json,{})).fundamentalCoverage||"0").split("/")[0])>=4 &&
@@ -156,7 +156,7 @@ export async function rankCandidatesForAccount(
           existingWeight <= 8 &&
           cash >= currentPrice,
         conditionalBuy =
-          Boolean(entry)&&parse(decision?.checks_json,{}).aiEvidence?.providerStatus==="AVAILABLE"&&Date.parse(decision?.expires_at)>Date.now()&&
+          Boolean(entry)&&['BUY','ACCUMULATE','STRONG_BUY','BUY_PARTIAL','ADD','REENTER'].includes(decision?.action)&&parse(decision?.checks_json,{}).aiEvidence?.providerStatus==="AVAILABLE"&&Date.parse(decision?.expires_at)>Date.now()&&
           researchComplete &&
           score >= 76 &&
           confidence >= 65 &&

@@ -5,9 +5,9 @@ export async function registerDiscoveryUniverse(db:PostgresDatabase,assets:any[]
  await db.transaction(async tx=>{await tx.prepare(`INSERT INTO discovery_queue(symbol,asset_json) SELECT x->>'symbol',x FROM jsonb_array_elements(?::jsonb) x ON CONFLICT(symbol) DO UPDATE SET asset_json=EXCLUDED.asset_json,active=TRUE`).bind(JSON.stringify(assets)).run();await tx.prepare(`UPDATE discovery_queue SET active=FALSE WHERE NOT(symbol=ANY(?::text[]))`).bind(assets.map(x=>x.symbol)).run();await tx.prepare(`INSERT INTO discovery_control(id,refreshed_at) VALUES('directory',CURRENT_TIMESTAMP) ON CONFLICT(id) DO UPDATE SET refreshed_at=CURRENT_TIMESTAMP`).run()});
 }
 export async function prioritizeDiscovery(db:PostgresDatabase){
- await db.prepare(`UPDATE discovery_queue SET priority=CASE WHEN symbol IN(SELECT s.ticker FROM holdings h JOIN securities s ON s.id=h.security_id WHERE h.quantity>0) THEN GREATEST(priority,150) ELSE priority END`).run();
+ await db.prepare(`UPDATE discovery_queue SET priority=150 WHERE priority<150 AND symbol IN(SELECT s.ticker FROM holdings h JOIN securities s ON s.id=h.security_id WHERE h.quantity>0)`).run();
  // Watchlist schema is shared by all households; priority never exposes household data.
- await db.prepare(`UPDATE discovery_queue SET priority=GREATEST(priority,120) WHERE symbol IN(SELECT symbol FROM market_watchlist)`).run();
+ await db.prepare(`UPDATE discovery_queue SET priority=120 WHERE priority<120 AND symbol IN(SELECT symbol FROM market_watchlist)`).run();
 }
 export async function claimDiscovery(db:PostgresDatabase,kind:'SCREEN'|'RESEARCH',limit:number){
  const screen=kind==='SCREEN',due=screen?'next_screen_at':'next_research_at',eligible=screen?'TRUE':"seed_json IS NOT NULL AND stage IN ('RESEARCH_PENDING','RESEARCH_INCOMPLETE')";
