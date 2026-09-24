@@ -1,4 +1,6 @@
 "use client";
+import LinkedChartSetup from "@/app/linked-chart-setup";
+import {readChartSetup} from "@/lib/chart-setup-link";
 
 import CapitalRotationPanel from "./capital-rotation-panel";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -1765,6 +1767,8 @@ export function NorthstarWorkspace({
     {},
   );
   const applyWorkspacePath = (pathname: string, search = "") => {
+    const linkedSetup=pathname==='/workspace/charts'?readChartSetup(search):null;
+    if(linkedSetup){setChartSymbol(linkedSetup.symbol);setTimeframe('5m');}
     const billMatch = pathname.match(/^\/workspace\/bills\/([^/]+)\/?$/);
     if (billMatch) {
       const accountId = new URLSearchParams(search).get("accountId");
@@ -2502,7 +2506,8 @@ export function NorthstarWorkspace({
     [connectedFinance.accounts, connectedFinance.holdings],
   );
   useEffect(() => {
-    const saved = localStorage.getItem("northstar-analysis-scope");
+    const linked=location.pathname==="/workspace/charts"?readChartSetup(location.search):null;
+    const saved = linked?.accountId||localStorage.getItem("northstar-analysis-scope");
     if (
       saved === ALL_ACCOUNTS_SCOPE ||
       investmentAccounts.some((account) => String(account.id) === saved)
@@ -9389,6 +9394,7 @@ export function NorthstarWorkspace({
             ))}
           </div>
           <section className="chart-workspace card" id="market-charts">
+            <LinkedChartSetup symbol={chartSymbol}/>
             <div className="chart-head">
               <div>
                 <p>PROFESSIONAL MARKET CHARTS</p>

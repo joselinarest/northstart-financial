@@ -1,4 +1,5 @@
 "use client";
+import {chartSetupLink} from "@/lib/chart-setup-link";
 import HoldingCostBadge from "@/app/holding-cost-badge";
 import { useEffect, useRef, useState } from "react";
 
@@ -980,7 +981,7 @@ export default function AutomaticMarketCopilot({
                     onChange={(e) => setHoldingPeriod(e.target.value)}
                   >
                     <option>1–3 trading days</option>
-                    <option>2–10 trading days</option>
+                    <option value="2–10 trading days">2–10 trading days · Swing default</option>
                     <option>2–6 weeks</option>
                     <option>Until invalidation or target</option>
                   </select>
