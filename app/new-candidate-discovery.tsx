@@ -118,7 +118,7 @@ export default function NewCandidateDiscovery({
     setBusy(true);
     try {
       const response = await fetch("/api/market/candidates/discovery", {
-          method: "POST",
+          method: "POST", headers:{"Content-Type":"application/json"},body:JSON.stringify({symbol:submitted||undefined}),
         }),
         data = await response.json();
       if (!response.ok) throw new Error(data.error || "Could not queue scan");
@@ -144,25 +144,25 @@ export default function NewCandidateDiscovery({
           </p>
         </div>
         <button disabled={busy} onClick={queue}>
-          {busy ? "Queueing…" : "Refresh market scan"}
+          {busy ? "Queueing…" : submitted ? `Research ${submitted}` : "Resume market scan"}
         </button>
       </header>
       <section className="candidate-coverage">
         <span>
-          <small>Universe scanned</small>
-          <b>{fmt(scan?.universeSize, 0)}</b>
+          <small>Eligible universe</small>
+          <b>{fmt(scan?.coverage?.eligible, 0)}</b>
         </span>
         <span>
-          <small>Companies evaluated</small>
-          <b>{fmt(scan?.companiesEvaluated, 0)}</b>
+          <small>Price screened</small>
+          <b>{fmt(scan?.coverage?.screened, 0)}</b>
         </span>
         <span>
-          <small>Accepted</small>
-          <b>{fmt(scan?.candidatesAccepted, 0)}</b>
+          <small>Deeply researched</small>
+          <b>{fmt(scan?.coverage?.researched, 0)}</b>
         </span>
         <span>
-          <small>Rejected</small>
-          <b>{fmt(scan?.candidatesRejected, 0)}</b>
+          <small>Research pending / incomplete</small>
+          <b>{fmt(Number(scan?.coverage?.research_pending||0)+Number(scan?.coverage?.incomplete||0), 0)}</b>
         </span>
         <span>
           <small>Last scan</small>

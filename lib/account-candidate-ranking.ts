@@ -1,4 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
+import {entryOrderReady} from "@/lib/entry-plan";
 import type { PostgresDatabase } from "@/lib/db";
 type J = Record<string, any>;
 const clamp = (value: number) => Math.max(0, Math.min(100, Math.round(value)));
@@ -59,6 +60,7 @@ export async function rankCandidatesForAccount(
       (sectorWeights[sector] || 0) +
       (Number(holding.value_cents || 0) / total) * 100;
   }
+  const central=(await db.prepare("SELECT DISTINCT ON(s.ticker) s.ticker,r.* FROM recommendations r JOIN securities s ON s.id=r.security_id WHERE r.account_id=? AND r.household_id=? ORDER BY s.ticker,r.created_at DESC").bind(accountId,householdId).all<J>()).results;
   const ranked = rows
     .map((row) => {
       const ticker = String(row.symbol || row.ticker).toUpperCase(),
@@ -122,7 +124,11 @@ export async function rankCandidatesForAccount(
               technical * 0.08 -
               risk * 0.1,
       );
+      const decision=central.find(x=>x.ticker===ticker),entry=parse(decision?.checks_json,{}).aiEvidence?.entryPlan;
+      const confirmed=decision?.actionable===true&&Date.parse(decision?.expires_at)>Date.now()&&['BUY','ADD','REENTER'].includes(decision.action)&&entryOrderReady(entry);
       const researchComplete =
+          Date.now()-Date.parse(row.source_as_of)<36*3600000 &&
+          Number(String(parse(row.evidence,parse(row.evidence_json,{})).fundamentalCoverage||"0").split("/")[0])>=4 &&
           currentPrice > 0 &&
           entryLow > 0 &&
           invalidation > 0 &&
@@ -136,7 +142,7 @@ export async function rankCandidatesForAccount(
           currentPrice >= entryLow * 0.98 &&
           (!entryHigh || currentPrice <= entryHigh),
         buyNow =
-          researchComplete &&
+          confirmed && researchComplete &&
           score >= 84 &&
           confidence >= 75 &&
           quality >= 65 &&
@@ -150,6 +156,7 @@ export async function rankCandidatesForAccount(
           existingWeight <= 8 &&
           cash >= currentPrice,
         conditionalBuy =
+          Boolean(entry)&&parse(decision?.checks_json,{}).aiEvidence?.providerStatus==="AVAILABLE"&&Date.parse(decision?.expires_at)>Date.now()&&
           researchComplete &&
           score >= 76 &&
           confidence >= 65 &&
@@ -224,13 +231,14 @@ export async function rankCandidatesForAccount(
         research_complete: researchComplete,
         decision_condition: decisionCondition,
         suggested_shares:
-          action === "BUY NOW" || action === "BUY IF" ? affordableShares : 0,
+          action === "BUY NOW" || action === "BUY IF" ? Math.min(affordableShares,entry?.shares||0) : 0,
         estimated_cost:
-          action === "BUY NOW" || action === "BUY IF"
-            ? affordableShares *
-              (action === "BUY IF" ? triggerPrice : currentPrice)
+          action === "BUY NOW"
+            ? Math.min(affordableShares,entry?.shares||0) *
+              Number(entry?.orderPrice||currentPrice)
             : 0,
         current_price: currentPrice,
+        entry_plan:entry||null,
         trigger_price: action === "BUY IF" ? triggerPrice : currentPrice,
         invalidation_price: invalidation,
         account_strategy: strategy,

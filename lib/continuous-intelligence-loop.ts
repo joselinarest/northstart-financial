@@ -1,3 +1,4 @@
+import {measureRotationReviews,reviewAccountRotation} from "@/lib/capital-rotation-service";
 import {queueLifecycleTickers} from "@/lib/lifecycle-work-queue";
 import {id,type PostgresDatabase} from "@/lib/db";
 import {type DecisionStrategy} from "@/lib/ai-investment-decision-engine";
@@ -39,6 +40,8 @@ export async function runAccountIntelligenceLoop(db:PostgresDatabase,input:{hous
   const model=await db.prepare(`SELECT version,strategy,status,calibration_factor,validation_results_json FROM ai_model_versions WHERE strategy=? ORDER BY CASE status WHEN 'CHAMPION' THEN 0 WHEN 'CHALLENGER' THEN 1 ELSE 2 END,created_at DESC LIMIT 1`).bind(decisionStrategy(account.strategy)).first<Record<string,any>>();
   await stage(db,runId,'LEARN',model?'SUCCEEDED':'SKIPPED',measured,model?1:0,{modelVersion:model?.version||null,status:model?.status||'NO_APPROVED_MODEL',calibrationFactor:model?.calibration_factor||null,policy:'No automatic production mutation'});
   const tickerJobsQueued=await queueLifecycleTickers(db,input.householdId,input.accountId,input.cycleKey);
+  await reviewAccountRotation(db,input.householdId,input.accountId);
+  await measureRotationReviews(db,input.householdId,input.accountId);
   await refreshInvestmentNotificationCoverage(db,input.householdId);
   await stage(db,runId,'REANALYZE','SUCCEEDED',1,1,{nextCycle:'queued per ticker; execution tracked in background_jobs',accountId:account.id,tickerJobsQueued});
   const degraded=Boolean(providerError||account.investment_sync_error||syncStale||unmapped);

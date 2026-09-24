@@ -1,0 +1,10 @@
+import assert from 'node:assert/strict';
+import {registerHooks} from 'node:module';
+const stub=s=>`data:text/javascript,${encodeURIComponent(s)}`;
+registerHooks({resolve(s,c,next){if(s==='@/lib/db')return{url:stub('export const id=p=>p+crypto.randomUUID()'),shortCircuit:true};if(s==='@/lib/runtime-secrets')return{url:stub('export async function loadRuntimeSecrets(){}'),shortCircuit:true};if(s.startsWith('@/lib/'))return{url:new URL('../lib/'+s.slice(6)+'.ts',import.meta.url).href,shortCircuit:true};if(s==='./work-budget')return{url:new URL('../lib/work-budget.ts',import.meta.url).href,shortCircuit:true};return next(s,c)}});
+const {barsFor}=await import('../lib/market-discovery-engine.ts');let calls=[];
+globalThis.fetch=async url=>{calls.push(String(url));return calls.length===1?Response.json({bars:{AAA:[{t:'2026-01-01',c:10}]},next_page_token:'next'}):Response.json({bars:{AAA:[{t:'2026-01-02',c:11}],BBB:[{t:'2026-01-02',c:20}]},next_page_token:null})};
+const data=await barsFor(['AAA','BBB'],{});assert.equal(calls.length,2);assert.match(calls[1],/page_token=next/);assert.equal(data.AAA.length,2);assert.equal(data.BBB[0].c,20);
+calls=[];globalThis.fetch=async()=>{calls.push(1);return calls.length===1?Response.json({bars:{AAA:[]},next_page_token:'next'}):new Response('',{status:429})};await assert.rejects(barsFor(['AAA','BBB'],{}),/ALPACA_BARS_429/);
+globalThis.fetch=async()=>Response.json({bars:{},next_page_token:'loop'});await assert.rejects(barsFor(['AAA'],{}),/ALPACA_REPEATED_PAGE/);
+console.log('PASS: paginated candles include later symbols; incomplete/error pages never return false empty coverage; repeated-token guard');

@@ -1,4 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
+import { discoveryCoverage,queueDiscoveryRefresh } from "@/lib/discovery-queue";
 import { id, workspace } from "@/lib/db";
 import { listMarketDiscoveries } from "@/lib/market-discovery-engine";
 import { rankCandidatesForAccount } from "@/lib/account-candidate-ranking";
@@ -69,6 +70,7 @@ export async function GET(request: Request) {
                 "Run or refresh the market-wide scan, then evaluate current provider fundamentals, valuation, technical setup and selected-account fit.",
             }
         : null;
+    if(lookup && !exact){const entry=await db.prepare("SELECT stage,error_code,last_screened_at,last_researched_at FROM discovery_queue WHERE symbol=? AND active").bind(search).first<Row>();if(entry){lookup.status=entry.stage;lookup.reason=entry.error_code||`Screened: ${entry.last_screened_at||"pending"}; deep research: ${entry.last_researched_at||"pending"}`;}}
     return Response.json(
       {
         ...result,
@@ -76,6 +78,7 @@ export async function GET(request: Request) {
         candidates: ranked.candidates,
         lookup,
         scan: {
+          coverage: await discoveryCoverage(db),
           status: result.run?.status || "NEVER_RUN",
           lastSuccessfulScan: result.lastSuccessfulScan,
           universeSize: Number(result.run?.universe_size || 0),
@@ -107,8 +110,11 @@ export async function GET(request: Request) {
 }
 export async function POST(request: Request) {
   try {
-    const { db } = await workspace(request),
-      bucket = new Date().toISOString().slice(0, 16),
+    const { db } = await workspace(request);
+    const body=await request.json().catch(()=>({})),symbol=String(body.symbol||"").trim().toUpperCase();
+    if(symbol&&!/^[A-Z][A-Z0-9.-]{0,14}$/.test(symbol))return Response.json({error:"Invalid ticker"},{status:400});
+    if(symbol&&!await queueDiscoveryRefresh(db,symbol))return Response.json({error:"Ticker is not in the eligible provider directory. Refresh the directory or verify the ticker."},{status:422});
+    const bucket = new Date().toISOString().slice(0, 16),
       job = await db
         .prepare(
           "INSERT INTO background_jobs(id,job_type,idempotency_key,payload_json) VALUES(?,'MARKET_DISCOVERY',?,?::jsonb) ON CONFLICT(idempotency_key) DO NOTHING RETURNING id",

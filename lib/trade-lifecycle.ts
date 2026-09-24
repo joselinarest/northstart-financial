@@ -117,13 +117,13 @@ export function monitorReentry(plan: ReentryPlan, p: PositionState, e: Evidence,
   const cost = money(shares*e.price*(1+a.slippageBps/10000)+a.commission);
   return {plan:next,shares,price:e.price,alert:shares > 0 && plan.status !== "READY" ? `${p.ticker} REENTRY READY — Buy ${shares} shares at or below $${e.price.toFixed(2)} if support holds and volume confirms. Estimated cost $${cost.toFixed(2)}. Cash after $${money(a.cash-cost).toFixed(2)}.` : null};
 }
-export type RotationCandidate = {ticker:string; expectedReturn:number; downside:number; costs:number; valuation:boolean; technical:boolean; fundamentals:boolean; accountFit:boolean; concentration:boolean; asOf:string};
+export type RotationCandidate = {horizonDays?:number;modelVersion?:string;strategyVersion?:string;ticker:string; expectedReturn:number; downside:number; costs:number; valuation:boolean; technical:boolean; fundamentals:boolean; accountFit:boolean; concentration:boolean; asOf:string};
 export function compareCapital(cashReturn: number, original: RotationCandidate | null, candidates: RotationCandidate[], now=Date.now()) {
   if(!original)return {choice:"HOLD CASH" as const,ticker:null,reason:"Original-position return and risk estimates are missing; rotation cannot be justified against HOLD or rebuy."};
   const eligible = (x: RotationCandidate) => x.valuation && x.technical && x.fundamentals && x.accountFit && x.concentration && x.downside>0 && now-Date.parse(x.asOf)>=0 && now-Date.parse(x.asOf)<86400000;
   const score = (x: RotationCandidate) => (x.expectedReturn-x.costs)/x.downside;
   const baseline = Math.max(cashReturn, original && eligible(original) ? score(original) : cashReturn);
-  const replacement = candidates.filter(eligible).filter(x=>x.ticker!==original?.ticker).sort((a,b)=>score(b)-score(a))[0];
+  const replacement = candidates.filter(eligible).filter(x=>x.ticker!==original?.ticker&&x.horizonDays===original.horizonDays&&x.modelVersion===original.modelVersion&&x.strategyVersion===original.strategyVersion).sort((a,b)=>score(b)-score(a))[0];
   if (replacement && score(replacement) > baseline+.25) return {choice:"ROTATE" as const,ticker:replacement.ticker,reason:"Replacement risk-adjusted return exceeds cash and original by >0.25 after taxes and transaction costs."};
   return {choice:original && eligible(original) && score(original)>cashReturn ? "REBUY SAME STOCK LATER" as const : "HOLD CASH" as const,ticker:original?.ticker ?? null,reason:"No replacement clears the material improvement threshold; retain cash or the existing reentry reservation."};
 }

@@ -47,6 +47,8 @@ export async function runCentralDecision(input:DecisionInput,{db,persist=true,ai
     request={snapshotId:result.snapshotId!,schemaVersion:AI_SCHEMA_VERSION,model,snapshot,candidateIds:candidates.map(c=>c.id),evidenceIds:input.evidence.map(e=>e.label)};
     try {
       const raw=await provider.analyze(request);requestId=raw.requestId;response=validateAIReasoning(raw.output,request);
+      const scenarios=input.features.rotationScenarios as {horizonDays:number;price:number;bull:number;base:number;bear:number}|null;
+      if(scenarios&&Object.values(scenarios).every(v=>typeof v==='number'&&Number.isFinite(v)&&v>0)&&scenarios.bull>scenarios.price&&scenarios.bear<scenarios.price){result.returnEstimate={horizonDays:scenarios.horizonDays,price:scenarios.price,expectedReturn:(response.scenarios.bull*scenarios.bull+response.scenarios.base*scenarios.base+response.scenarios.bear*scenarios.bear)/100/scenarios.price-1,downside:(scenarios.price-scenarios.bear)/scenarios.price,asOf:input.dataTimestamp};}
       const c=candidates.find(c=>c.id===response!.candidateId)!;
       if(c.instrument!==response.instrument)throw new Error("AI_INSTRUMENT_MISMATCH");
       const confidence=Math.round(response.confidence*Math.max(.5,Math.min(1,Number(champion.calibration_factor)))*q.score/100);

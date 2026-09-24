@@ -1,5 +1,6 @@
 "use client";
 
+import CapitalRotationPanel from "./capital-rotation-panel";
 import { useEffect, useMemo, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import HoldingCostBadge,{HoldingCostProvider} from "@/app/holding-cost-badge";
@@ -7307,6 +7308,7 @@ export function NorthstarWorkspace({
           {tab === "Real Estate" && (
             <RealEstateCommandCenter accessToken={accessToken} />
           )}
+          {tab === "Daily Action Plan" && <CapitalRotationPanel accountId={advisorAccount ? String(advisorAccount.id) : ""} />}
           {tab === "Daily Action Plan" && (
             <section className="daily-plan-intro card">
               <header>

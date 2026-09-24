@@ -1,0 +1,15 @@
+import assert from 'node:assert/strict';
+import {compareRotation} from '../lib/capital-rotation-review.ts';
+const now=Date.now(),e={ticker:'OLD',price:100,asOf:new Date(now).toISOString(),horizonDays:14,expectedReturn:.05,downside:.1,thesisValid:true,valuationValid:true,accountFit:true,modelVersion:'m1',strategyVersion:'s1'};
+const input={original:e,replacement:{...e,ticker:'NEW',expectedReturn:.3,price:50},sharesOwned:20,sharesToSell:5,averageCost:80,cash:100,taxRate:.2,slippageBps:10,commission:1,riskBudget:30,positionCapacity:600,cashReserve:50,saleConfirmed:true,entryConfirmed:true,orderPrice:50,stop:45,targets:[65],confirmedBuyShares:10,rebuyPlan:null,now};
+let result=compareRotation(input);assert.equal(result.status,'REVIEW_READY');assert.equal(result.proposal.buyShares,6);assert.equal(result.proposal.estimatedTax,20);assert.equal(result.proposal.cashAfter,277.2);assert.equal(result.executionAllowed,false);
+assert.equal(compareRotation({...input,replacement:{...input.replacement,expectedReturn:.06}}).action,'HOLD');
+for(const key of ['taxRate','averageCost','slippageBps','riskBudget','positionCapacity'])assert.equal(compareRotation({...input,[key]:null}).status,'INSUFFICIENT_DATA',key);
+assert.equal(compareRotation({...input,entryConfirmed:false}).status,'MONITOR');assert.equal(compareRotation({...input,saleConfirmed:false}).status,'MONITOR');
+assert.equal(compareRotation({...input,orderPrice:null}).proposal,null,'trigger is not an order price');
+assert.equal(compareRotation({...input,replacement:{...input.replacement,horizonDays:365}}).status,'INSUFFICIENT_DATA');
+assert.equal(compareRotation({...input,replacement:{...input.replacement,asOf:new Date(now-6*60000).toISOString()}}).status,'INSUFFICIENT_DATA');
+assert.equal(compareRotation({...input,replacement:{...input.replacement,accountFit:false}}).action,'HOLD');
+assert.equal(compareRotation({...input,riskBudget:0}).status,'RISK_BLOCKED');
+assert.equal(compareRotation({...input,rebuyPlan:{high:80,invalidation:79,expiresAt:new Date(now+60000).toISOString()}}).action,'HOLD','better conditional rebuy beats rotation');
+console.log('PASS: HOLD baseline, explicit tax/cost/data gates, comparable horizons, confirmation separation, exact risk/cash sizing, rebuy comparison, no execution');

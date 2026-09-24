@@ -121,6 +121,8 @@ broken=false;await pg.exec("UPDATE investment_theses SET state='INTACT'");now=Da
 await runTradeLifecycle(db,'h','a',{provider,research,aiProvider});
 cancelled=(await pg.query("SELECT * FROM trade_lifecycle_exits WHERE exit_transaction_id='sell-cancel'")).rows[0];
 assert.equal(cancelled.status,'CLOSED','cancelled plan does not silently revive after recovery');
+await pg.exec("UPDATE position_states SET state_json=jsonb_set(state_json,'{target1}','120'::jsonb)");
+await runTradeLifecycle(db,'h','a',{provider,research,aiProvider});
 await seedExit('sell-rotate');
 await pg.exec("INSERT INTO securities VALUES('msft','MSFT','equity')");
 await pg.query("INSERT INTO recommendations(id,household_id,account_id,security_id,action,actionable,confidence,expires_at,evidence_as_of,targets_json,invalidation_cents,checks_json,created_at) VALUES('replacement','h','a','msft','BUY',true,85,$1,$2,'[20000]',9000,$3,current_timestamp)",[new Date(Date.now()+86400000).toISOString(),new Date().toISOString(),JSON.stringify({technical:{price:100,state:'BULLISH'},fundamentalThesis:{thesisStatus:'INTACT',valuationAttractiveness:70},portfolioFit:{state:'GOOD'}})]);
@@ -128,7 +130,8 @@ const originalRun=(await pg.query("SELECT * FROM ai_decision_runs WHERE status='
 const replacementCandidate={id:'lifecycle',action:'BUY_IF',shares:2,entry:100,trigger:100,stop:90,targets:[200],cost:200,proceeds:0,cashBefore:3000,cashAfter:2800,thesisStatus:'VALID',sellReason:null,reentryPlan:null,instrument:'SHARES',eligible:true,reason:'Verified replacement candidate'};
 const {watchEntry}=await import('../lib/entry-plan.ts');
 replacementCandidate.entryPlan={...watchEntry({trigger:99,stop:90,targets:[200],shares:2}),classification:'LIMIT ENTRY',status:'CONFIRMED',orderType:'LIMIT',orderPrice:100,confirmedAt:new Date().toISOString()};
-const replacementAI=await (await import('../lib/ai-decision-core.ts')).runCentralDecision({householdId:'h',accountId:'a',accountName:'test',strategy:'SWING_SHARES',ticker:'MSFT',requestType:'TEST',features:{price:100},evidence:originalRun.evidence_json,dataTimestamp:new Date().toISOString(),requiredFacts:[],candidates:[replacementCandidate]},{db,aiProvider});
+const replacementAI=await (await import('../lib/ai-decision-core.ts')).runCentralDecision({householdId:'h',accountId:'a',accountName:'test',strategy:'SWING_SHARES',ticker:'MSFT',requestType:'TEST',features:{price:100,rotationScenarios:{horizonDays:14,price:100,bull:200,base:100,bear:90}},evidence:originalRun.evidence_json,dataTimestamp:new Date().toISOString(),requiredFacts:[],candidates:[replacementCandidate]},{db,aiProvider});
+assert.ok(Math.abs(replacementAI.returnEstimate.expectedReturn-.27)<1e-9,'scenario-weighted return is distinct from confidence');
 await pg.query("UPDATE recommendations SET checks_json=jsonb_set(checks_json,'{aiEvidence}',$1::jsonb),actionable=true WHERE id='replacement'",[JSON.stringify(replacementAI)]);
 await runTradeLifecycle(db,'h','a',{provider,research,aiProvider});
 let rotation=(await pg.query("SELECT * FROM trade_lifecycle_exits WHERE exit_transaction_id='sell-rotate'")).rows[0];

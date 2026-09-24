@@ -1114,4 +1114,20 @@ export const migrations: readonly Migration[] = [
   ]},
   {id:"0044_worker_run_lease",description:"Durable whole-worker concurrency control",statements:[
     `CREATE TABLE worker_run_leases(name TEXT PRIMARY KEY,owner TEXT NOT NULL,expires_at TIMESTAMPTZ NOT NULL)`,
-  ]},] as const;
+  ]},
+ {id:"0045_discovery_queue_rotation",description:"Persistent discovery coverage, provider budgets and pre-sale rotation reviews",statements:[
+  `CREATE TABLE discovery_control(id TEXT PRIMARY KEY,refreshed_at TIMESTAMPTZ,cooldown_until TIMESTAMPTZ,last_error TEXT)`,
+  `CREATE TABLE discovery_queue(symbol TEXT PRIMARY KEY,asset_json JSONB NOT NULL,active BOOLEAN NOT NULL DEFAULT TRUE,priority INTEGER NOT NULL DEFAULT 0,stage TEXT NOT NULL DEFAULT 'NOT_SCANNED',seed_json JSONB,last_screened_at TIMESTAMPTZ,last_researched_at TIMESTAMPTZ,next_screen_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,next_research_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,lease_until TIMESTAMPTZ,error_code TEXT,updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP)`,
+  `CREATE INDEX discovery_queue_screen ON discovery_queue(next_screen_at,priority) WHERE active`,
+  `CREATE INDEX discovery_queue_research ON discovery_queue(next_research_at,priority) WHERE active AND seed_json IS NOT NULL`,
+  `CREATE TABLE discovery_provider_cache(cache_key TEXT PRIMARY KEY,payload_json JSONB NOT NULL,fetched_at TIMESTAMPTZ NOT NULL,expires_at TIMESTAMPTZ NOT NULL)`,
+  `CREATE TABLE rotation_reviews(id TEXT PRIMARY KEY,household_id TEXT NOT NULL REFERENCES households(id),account_id TEXT NOT NULL REFERENCES accounts(id),ticker TEXT NOT NULL,cycle_key TEXT NOT NULL,snapshot_json JSONB NOT NULL,outcome_json JSONB,created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,UNIQUE(account_id,ticker,cycle_key))`,
+  `CREATE INDEX rotation_reviews_account ON rotation_reviews(account_id,created_at DESC)`,
+ ]}, {id:"0046_ai_event_job_type",description:"Allow central per-ticker AI review jobs in the durable queue",statements:[
+ `ALTER TABLE background_jobs DROP CONSTRAINT IF EXISTS background_jobs_job_type_check`,
+ `ALTER TABLE background_jobs ADD CONSTRAINT background_jobs_job_type_check CHECK(job_type IN ('PLAID_SYNC','PLAID_INVESTMENT_SYNC','NOTIFICATION_DELIVERY','MARKET_INTELLIGENCE','MARKET_DISCOVERY','DAILY_CLOSE_REVIEW','OVERNIGHT_OUTLOOK_REFRESH','TACTICAL_REENTRY_MONITOR','OPTIONS_FLOW','INVESTMENT_COVERAGE_AUDIT','ACCOUNT_INTELLIGENCE_LOOP','KIDS_PLAN_REVIEW','AI_EVENT_REVIEW'))`,
+ ]}, {id:"0047_active_analysis_queue_indexes",description:"Bound active-job deduplication and account decision lookup cost",statements:[
+ `CREATE INDEX IF NOT EXISTS background_jobs_active_scope ON background_jobs(job_type,household_id,(payload_json->>'accountId'),(payload_json->>'symbol')) WHERE status IN ('QUEUED','RUNNING','FAILED')`,
+ `CREATE INDEX IF NOT EXISTS recommendations_account_security_latest ON recommendations(account_id,security_id,created_at DESC)`,
+ `CREATE INDEX IF NOT EXISTS rotation_reviews_pending_outcomes ON rotation_reviews(account_id,created_at) WHERE outcome_json IS NULL AND snapshot_json->>'status'='REVIEW_READY'`,
+ ]},] as const;

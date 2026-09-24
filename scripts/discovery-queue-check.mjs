@@ -1,0 +1,18 @@
+import assert from 'node:assert/strict';
+import {registerHooks} from 'node:module';
+import {PGlite} from '@electric-sql/pglite';
+import {migrations} from '../db/migrations.ts';
+registerHooks({resolve(s,c,next){if(s==='./work-budget')return{url:new URL('../lib/work-budget.ts',import.meta.url).href,shortCircuit:true};return next(s,c)}});
+const {claimDiscovery,discoveryCoverage,registerDiscoveryUniverse,queueDiscoveryRefresh,discoveryFinnhub}=await import('../lib/discovery-queue.ts');
+const pg=new PGlite();await pg.exec('CREATE TABLE households(id text primary key);CREATE TABLE accounts(id text primary key);');for(const sql of migrations.find(x=>x.id==='0045_discovery_queue_rotation').statements)await pg.exec(sql);
+const wrap=client=>({prepare(sql){let values=[];return{bind(...v){values=v;return this},async all(){let n=0;return{results:(await client.query(sql.replace(/\?/g,()=>`$${++n}`),values)).rows}},async first(){return(await this.all()).results[0]||null},async run(){return this.all()}}},transaction:fn=>client===pg?pg.transaction(tx=>fn(wrap(tx))):fn(wrap(client))});const db=wrap(pg);
+await registerDiscoveryUniverse(db,['AAA','BBB','CCC','DDD','EEE','FFF'].map(symbol=>({symbol,name:symbol})));
+await queueDiscoveryRefresh(db,'EEE');await queueDiscoveryRefresh(db,'FFF');
+const first=await claimDiscovery(db,'SCREEN',2);assert.equal(first[0].symbol,'EEE');assert.equal(first[1].symbol,'AAA');
+const second=await claimDiscovery(db,'SCREEN',2);assert.equal(second[0].symbol,'FFF');assert.equal(second[1].symbol,'BBB');assert(!second.some(x=>first.some(y=>x.symbol===y.symbol)));
+await pg.exec("UPDATE discovery_queue SET lease_until=CURRENT_TIMESTAMP-INTERVAL '1 minute' WHERE symbol='AAA'");assert((await claimDiscovery(db,'SCREEN',2)).some(x=>x.symbol==='AAA'),'expired lease resumes after crash');
+await registerDiscoveryUniverse(db,['AAA','BBB','CCC','DDD','EEE','FFF'].map(symbol=>({symbol,name:symbol})));assert.equal((await discoveryCoverage(db)).eligible,6,'repeat directory sync idempotent');
+await pg.exec("UPDATE discovery_queue SET seed_json='{}',stage='RESEARCH_PENDING',lease_until=NULL WHERE symbol IN ('AAA','BBB')");assert.equal((await claimDiscovery(db,'RESEARCH',2)).length,2);
+let requests=0;globalThis.fetch=async()=>{requests++;return Response.json({metric:{pe:25}})};const cached=await discoveryFinnhub(db,'/test',60);const again=await discoveryFinnhub(db,'/test',60);assert.equal(requests,1);assert.equal(cached.asOf,again.asOf,'cache does not invent a new timestamp');
+globalThis.fetch=async()=>{requests++;return new Response('',{status:429})};await assert.rejects(discoveryFinnhub(db,'/limit',60),/FINNHUB_429/);const before=requests;await assert.rejects(discoveryFinnhub(db,'/other',60),/COOLDOWN/);assert.equal(requests,before,'rate-limited provider is not hammered');
+console.log('PASS: persisted coverage, fair claims, lease recovery, no duplicate claims, directory idempotency, cached timestamps, 429 cooldown');await pg.close();

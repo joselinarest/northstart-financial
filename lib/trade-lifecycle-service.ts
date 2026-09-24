@@ -22,8 +22,9 @@ const round = (n:number) => Math.round(n*100)/100;
 function rotationCandidate(row:Row,risk:AccountRisk):RotationCandidate|null{
   const c=json(row.checks_json),p=Number(c.technical?.price),target=Number(json(row.targets_json)?.[0])/100,stop=Number(row.invalidation_cents)/100;
   if(!p||!target||!stop||target<=p||stop>=p||risk.taxRate===null)return null;
-  const confidence=Math.min(.85,Number(row.confidence||0)/100),up=(target-p)/p,down=(p-stop)/p;
-  return {ticker:row.ticker,expectedReturn:confidence*up-(1-confidence)*down,downside:down,costs:Math.max(0,up)*risk.taxRate+risk.slippageBps/10000*2+risk.commission/Math.max(1,risk.cash),valuation:Number(c.fundamentalThesis?.valuationAttractiveness)>=55,technical:c.technical?.state==="BULLISH",fundamentals:["VALID","INTACT","STRONG"].includes(c.fundamentalThesis?.thesisStatus),accountFit:row.actionable===true,concentration:c.portfolioFit?.state==="GOOD",asOf:new Date(row.evidence_as_of).toISOString()};
+  const estimate=c.aiEvidence?.returnEstimate;
+  if(c.aiEvidence?.providerStatus!=="AVAILABLE"||!estimate||![estimate.expectedReturn,estimate.downside,estimate.price].every(Number.isFinite)||estimate.downside<=0)return null;
+  return {ticker:row.ticker,horizonDays:estimate.horizonDays,modelVersion:c.aiEvidence.modelVersion,strategyVersion:c.aiEvidence.strategyVersion,expectedReturn:estimate.expectedReturn,downside:estimate.downside,costs:Math.max(0,estimate.expectedReturn)*risk.taxRate+risk.slippageBps/10000*2+risk.commission/Math.max(1,risk.cash),valuation:Number(c.fundamentalThesis?.valuationAttractiveness)>=55,technical:c.technical?.state==="BULLISH",fundamentals:["VALID","INTACT","STRONG"].includes(c.fundamentalThesis?.thesisStatus),accountFit:row.actionable===true,concentration:c.portfolioFit?.state==="GOOD",asOf:estimate.asOf};
 }
 
 async function event(db:PostgresDatabase, account:string, security:string, key:string, type:string, snapshot:unknown) {
@@ -122,7 +123,8 @@ export async function runTradeLifecycle(db:PostgresDatabase, householdId:string,
           const monitored=monitorReentry(plan,position,evidence,risk),status=monitored.plan.status;
           const candidateRows=(await tx.prepare("SELECT DISTINCT ON (r.security_id) r.*,s.ticker FROM recommendations r JOIN securities s ON s.id=r.security_id WHERE r.account_id=? AND r.actionable=TRUE AND r.action IN ('BUY','ACCUMULATE','STRONG_BUY','BUY_PARTIAL') AND r.expires_at>CURRENT_TIMESTAMP ORDER BY r.security_id,r.created_at DESC").bind(accountId).all<Row>()).results;
           const candidates:RotationCandidate[]=candidateRows.map(row=>rotationCandidate(row,risk)).filter((v):v is RotationCandidate=>v!==null);
-          const original=rec?rotationCandidate({...rec,ticker:security.ticker,actionable:evidence.thesis==="VALID"},risk):null;
+          const originalRow=await tx.prepare("SELECT * FROM recommendations WHERE account_id=? AND security_id=? AND checks_json->'aiEvidence'->'returnEstimate' IS NOT NULL AND expires_at>CURRENT_TIMESTAMP ORDER BY created_at DESC LIMIT 1").bind(accountId,security.security_id).first<Row>();
+          const original=originalRow?rotationCandidate({...originalRow,ticker:security.ticker,actionable:evidence.thesis==="VALID"},risk):null;
           const allocation:Row=["WATCH","READY"].includes(status)?compareCapital(Number(policy.cashExpectedReturn||0),original,candidates):{choice:"HOLD CASH",ticker:null,reason:monitored.plan.reason};
           if(allocation.choice==="ROTATE"){
             const candidate=candidateRows.find(r=>r.ticker===allocation.ticker),c=json(candidate?.checks_json),entry=Number(c.technical?.price),stop=Number(candidate?.invalidation_cents)/100;
