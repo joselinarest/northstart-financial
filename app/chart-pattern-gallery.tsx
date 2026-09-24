@@ -1,5 +1,6 @@
 "use client";
-import {useState} from 'react';
+import {useEffect,useMemo,useState} from 'react';
+import {patternHistory} from '@/lib/pattern-history';
 import type {PatternEvidence,PatternBar} from '@/lib/pattern-evidence';
 
 function DetectedPatternImage({pattern,bars}:{pattern:PatternEvidence;bars:PatternBar[]}){
@@ -19,6 +20,23 @@ function DetectedPatternImage({pattern,bars}:{pattern:PatternEvidence;bars:Patte
  </svg>;
 }
 
+function HoldingPatternHistory({symbol}:{symbol:string}){
+ const [attempt,setAttempt]=useState(0),[requested,setRequested]=useState(false),[bars,setBars]=useState<PatternBar[]>([]),[status,setStatus]=useState(''),[visible,setVisible]=useState(12);
+ useEffect(()=>{
+  if(!requested)return;
+  const controller=new AbortController();setBars([]);setStatus('Loading earliest available weekly history…');
+  fetch(`/api/market/bars?symbol=${encodeURIComponent(symbol)}&range=MAX`,{signal:controller.signal}).then(async response=>{const data=await response.json();if(!response.ok)throw new Error(data.error||'History unavailable');if(!Array.isArray(data.bars))throw new Error('Provider returned no candle history');if(controller.signal.aborted)return;setBars(data.bars.filter((b:PatternBar)=>Date.parse(b.time)+7*86400000<=Date.now()));setStatus('Loaded provider history. The unfinished weekly candle is excluded.');}).catch(error=>{if(!controller.signal.aborted)setStatus(error instanceof Error?error.message:'History unavailable');});
+  return()=>controller.abort();
+ },[requested,symbol,attempt]);
+ const history=useMemo(()=>patternHistory(bars,'1Week'),[bars]);
+ return <section className="holding-pattern-history"><h4>{symbol} · Pattern timeline from earliest available history</h4><p>Stock / ETF market history, not your purchase date. Weekly candles give the longest view. Patterns are replayed using only information available at the time; the first 24 candles provide context. Historical signals are not current orders.</p>
+  <button type="button" onClick={()=>{setRequested(true);setAttempt(n=>n+1);setVisible(12)}} disabled={requested&&status.startsWith("Loading")}>Load all available history for {symbol}</button>
+  {requested&&<><p role="status">{status}</p>{bars.length>0&&<p><strong>Coverage: {bars[0].time.slice(0,10)} through {bars.at(-1)!.time.slice(0,10)}</strong> · {bars.length} completed weekly candles · {history.length} pattern episodes. This may not reach the listing date or today; it is the provider’s available completed history.</p>}{bars.length>0&&!history.length&&<p>No qualifying pattern episodes found in this history.</p>}
+  <div className="pattern-gallery-grid">{history.slice(0,visible).map(p=><article className="pattern-gallery-card" key={p.id} style={{padding:14}}><h4>{p.name} · {p.endTime.slice(0,10)}</h4><DetectedPatternImage pattern={p} bars={bars}/><p><strong>Historical {p.direction==='UP'?'buy setup':p.direction==='DOWN'?'sell / trim warning':'neutral setup'}</strong> · {p.validation} at detection.</p><p>Trigger ${p.confirmationLevel.toFixed(2)} · invalidation ${p.invalidationLevel.toFixed(2)} · volume {p.volumeConfirmation}. These are historical levels, not an order to place today.</p><details><summary>Evidence missing at that time</summary><p>{p.missingConfirmation.join('; ')||'Pattern checks passed; independent account review still required.'}</p></details></article>)}</div>
+  {history.length>visible&&<button type="button" onClick={()=>setVisible(n=>n+12)}>Show next 12 episodes ({visible} of {history.length})</button>}</>}
+ </section>;
+}
+
 const examples=[
  {name:'Bull Flag',side:'UP',points:'10,105 40,80 65,25 90,40 110,33 130,52 155,44 180,60 205,40 240,15',level:35,confirm:'Wait for a close above the flag resistance with stronger volume.',cancel:'Cancel if flag support breaks before confirmation.'},
  {name:'Double Bottom',side:'UP',points:'10,25 45,100 75,55 110,30 145,100 175,60 205,30 240,12',level:30,confirm:'Wait for a close above the middle peak (neckline), then a supported retest.',cancel:'Cancel if price breaks below either bottom.'},
@@ -33,6 +51,7 @@ export default function ChartPatternGallery({symbol,timeframe,patterns,onSelect,
  return <section tabIndex={-1} className="pattern-gallery" aria-label={`${symbol} visual pattern gallery`}>
   <h3>{symbol} · Buy / sell pattern gallery</h3>
   <p><strong>Current recommendation: {action}.</strong> Pattern scenarios are evidence for review, not independent trade instructions or guaranteed predictions.</p>
+  <HoldingPatternHistory key={symbol} symbol={symbol}/>
   <h4>Detected setups for {symbol} · {timeframe}</h4>
   {!patterns.length&&<p>No qualifying pattern detected. WAIT for sufficient completed candles and confirmation; the example gallery below is educational.</p>}
   <div className="pattern-gallery-grid">{patterns.filter(p=>filter==='ALL'||p.direction===filter).map(p=><article className="pattern-gallery-card" key={p.id} style={{padding:14}}>
