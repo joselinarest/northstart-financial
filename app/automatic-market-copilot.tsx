@@ -1036,42 +1036,12 @@ export default function AutomaticMarketCopilot({
                   },
                 ];
               return (
-                <article id={`candidate-${item.symbol}`} key={item.symbol}>
-                  <div className="auto-rank">
-                    <i>{index + 1}</i>
-                    <span>
-                      <b className="security-title">
-                        <strong>{item.symbol}</strong><HoldingCostBadge symbol={item.symbol} accountId={accountId} currentPrice={item.price}/>
-                        <em>{displayName}</em>
-                      </b>
-                      <small>
-                        ${item.price.toFixed(2)} ·{" "}
-                        {item.dayChange >= 0 ? "+" : ""}
-                        {item.dayChange.toFixed(2)}%
-                      </small>
-                    </span>
-                    <strong>
-                      {item.score}
-                      <small>/100</small>
-                    </strong>
-                  </div>
-                  <button type="button" className="holding-toggle-label" aria-expanded={!(collapsedCards[item.symbol]??false)} aria-controls={`candidate-details-${item.symbol}`} onClick={()=>setCollapsedCards(previous=>({...previous,[item.symbol]:!(previous[item.symbol]??false)}))}>{(collapsedCards[item.symbol]??false)?'▸ Show':'▾ Hide'} {item.symbol} details</button>
+                <article className="shortlist-card" id={`candidate-${item.symbol}`} key={item.symbol}>
+<div className="shortlist-heading"><span className="shortlist-rank">{index+1}</span><div className="shortlist-identity"><strong>{item.symbol}</strong><span>{displayName}</span></div><div className="shortlist-score"><b>{item.score}<small>/100</small></b><span>Research score</span></div></div>
+<div className="shortlist-quote"><strong>${item.price.toFixed(2)}</strong><span className={item.dayChange>=0?"position-gain":"position-loss"}>{item.dayChange>=0?"↑ +":"↓ "}{item.dayChange.toFixed(2)}% today</span><span className="shortlist-ownership">{isOwned?"CURRENT HOLDING":"NOT OWNED · RESEARCH CANDIDATE"}</span></div>
+<div className={"shortlist-action "+(/Reduce|Avoid/.test(suggestedAction)?"review":/No action/.test(suggestedAction)?"hold":"watch")}><b>{actionLabel(suggestedAction)}</b><span>Research signal · confirm the account trade plan before acting</span></div>
+<HoldingCostBadge compact symbol={item.symbol} accountId={accountId} currentPrice={item.price}/>                  <button type="button" className="holding-toggle-label" aria-expanded={!(collapsedCards[item.symbol]??false)} aria-controls={`candidate-details-${item.symbol}`} onClick={()=>setCollapsedCards(previous=>({...previous,[item.symbol]:!(previous[item.symbol]??false)}))}>{(collapsedCards[item.symbol]??false)?'▸ Show':'▾ Hide'} {item.symbol} details</button>
                   <div id={`candidate-details-${item.symbol}`} style={{display:(collapsedCards[item.symbol]??false)?'none':'contents'}}>
-                  <em
-                    className={
-                      [
-                        "Prepare conditional buy",
-                        "Add / buy more plan",
-                        "Buy research",
-                      ].includes(suggestedAction)
-                        ? "research"
-                        : suggestedAction === "No action — monitor"
-                          ? "watch"
-                          : "avoid"
-                    }
-                  >
-                    {actionLabel(suggestedAction)}
-                  </em>
                   <h3>{item.setup}</h3>
                   <div
                     className={`decision-stability ${item.rawBuy === item.stableBuy ? "stable" : "confirming"}`}
