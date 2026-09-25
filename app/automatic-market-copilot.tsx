@@ -531,7 +531,7 @@ export default function AutomaticMarketCopilot({
     });
   }, [data.asOf, strategy, accountName, accountScope, holdings]);
   const [collapsedCards,setCollapsedCards]=useState<Record<string,boolean>>({});
-  const [sectionOpen,setSectionOpen]=useState(false);
+  const [sectionOpen,setSectionOpen]=useState(true);
   return (
     <section id="today-market-context" className="auto-copilot"><button type="button" aria-expanded={sectionOpen} aria-controls="market-suggestions-body" onClick={()=>setSectionOpen(v=>!v)} style={{padding:16,cursor:"pointer",fontWeight:700,order:-10}}>Market suggestions · {sectionOpen?"hide":"show"}</button><div id="market-suggestions-body" style={{display:sectionOpen?"contents":"none"}}>
       <header>
@@ -648,7 +648,7 @@ export default function AutomaticMarketCopilot({
                     item.ema20 || item.support,
                   );
                 return (
-                  <li key={item.symbol}>
+                  <li key={item.symbol}><HoldingCostBadge symbol={item.symbol} accountId={accountId} currentPrice={item.price}/>
                     <b>
                       {item.symbol} ·{" "}
                       {shares > 0
@@ -885,7 +885,7 @@ export default function AutomaticMarketCopilot({
                       </i>
                       <strong>
                         {action} · {item.symbol}
-                      </strong>
+                      </strong><HoldingCostBadge symbol={item.symbol} accountId={accountId} currentPrice={item.price}/>
                       <span>
                         {item.name || securityNames[item.symbol] || "Security"}
                       </span>
@@ -1173,7 +1173,7 @@ export default function AutomaticMarketCopilot({
                     <i>{index + 1}</i>
                     <span>
                       <b className="security-title">
-                        <strong>{item.symbol}</strong><HoldingCostBadge symbol={item.symbol} currentPrice={item.price}/>
+                        <strong>{item.symbol}</strong><HoldingCostBadge symbol={item.symbol} accountId={accountId} currentPrice={item.price}/>
                         <em>{displayName}</em>
                       </b>
                       <small>
@@ -1187,8 +1187,8 @@ export default function AutomaticMarketCopilot({
                       <small>/100</small>
                     </strong>
                   </div>
-                  <button type="button" className="holding-toggle-label" aria-expanded={!(collapsedCards[item.symbol]??true)} aria-controls={`candidate-details-${item.symbol}`} onClick={()=>setCollapsedCards(previous=>({...previous,[item.symbol]:!(previous[item.symbol]??true)}))}>{(collapsedCards[item.symbol]??true)?'▸ Show':'▾ Hide'} {item.symbol} details</button>
-                  <div id={`candidate-details-${item.symbol}`} style={{display:(collapsedCards[item.symbol]??true)?'none':'contents'}}>
+                  <button type="button" className="holding-toggle-label" aria-expanded={!(collapsedCards[item.symbol]??false)} aria-controls={`candidate-details-${item.symbol}`} onClick={()=>setCollapsedCards(previous=>({...previous,[item.symbol]:!(previous[item.symbol]??false)}))}>{(collapsedCards[item.symbol]??false)?'▸ Show':'▾ Hide'} {item.symbol} details</button>
+                  <div id={`candidate-details-${item.symbol}`} style={{display:(collapsedCards[item.symbol]??false)?'none':'contents'}}>
                   <em
                     className={
                       [

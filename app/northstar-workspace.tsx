@@ -4764,7 +4764,7 @@ export function NorthstarWorkspace({
         throw new Error(data.error || "No contract passed the filters.");
       setOptionResult(data);
       setOptionNotice(
-        "Exact contract candidate selected from the current chain.",
+        data.decisionLabel ? `${data.decisionLabel} — ${data.decision?.interpretation||"Review the analysis."}` : "Option analysis completed.",
       );
     } catch (error) {
       setOptionNotice(
@@ -7303,7 +7303,7 @@ export function NorthstarWorkspace({
             </section>
           )}
           {tab === "Daily Action Plan" && (
-            <details  id="today-recommendations" className="daily-account-action-plans selected-account-only"><summary style={{padding:16,cursor:"pointer",fontWeight:700}}>Account recommendations · show / hide</summary>
+            <details open key={advisorAccountId} id="today-recommendations" className="daily-account-action-plans selected-account-only"><summary style={{padding:16,cursor:"pointer",fontWeight:700}}>Account recommendations · show / hide</summary>
               <header>
                 <span>SELECTED INVESTMENT ACCOUNT · ACCOUNT-SPECIFIC GUIDANCE</span>
                 <h2>{advisorAccountName}</h2>
@@ -9896,7 +9896,7 @@ export function NorthstarWorkspace({
                 {optionNotice && (
                   <div className="option-notice">{optionNotice}</div>
                 )}
-                {optionResult && (
+                {optionResult?.contract && (
                   <article className="exact-contract">
                     <div className="contract-verdict">
                       <span>
