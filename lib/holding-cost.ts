@@ -1,5 +1,6 @@
 export type CostHolding={account_id?:unknown;ticker?:unknown;symbol?:unknown;quantity?:unknown;cost_basis_cents?:unknown;market_value_cents?:unknown};
 export function holdingCost(rows:CostHolding[],accountId:string,symbol:string){
+ if(!symbol.trim())return null;
  const matches=rows.filter(h=>String(h.account_id)===accountId&&String(h.ticker||h.symbol||'').toUpperCase()===symbol.toUpperCase()&&Number.isFinite(Number(h.quantity))&&Number(h.quantity)>0);
  if(!accountId||!matches.length)return null;
  const shares=matches.reduce((sum,h)=>sum+Number(h.quantity),0);
