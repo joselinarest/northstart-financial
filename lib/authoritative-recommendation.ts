@@ -1,4 +1,5 @@
 import {accountRiskSettings} from "@/lib/account-risk-settings";
+import {discoveryFinnhub} from "@/lib/discovery-queue";
 import {positionSizing} from "@/lib/position-sizing";
 import {holdingOpenRisk} from "@/lib/holding-open-risk";
 import {QuantDataProvider} from "@/lib/providers/quant-data";
@@ -32,7 +33,7 @@ const metric = (data: Json, ...keys: string[]) => {
   return null;
 };
 
-async function fundamentals(symbol: string) {
+async function fundamentals(db:PostgresDatabase,symbol: string) {
   const token = process.env.FINNHUB_API_KEY;
   if (!token)
     return {
@@ -47,15 +48,7 @@ async function fundamentals(symbol: string) {
     today = new Date(),
     from = new Date(Date.now() - 30 * 86400000),
     date = (d: Date) => d.toISOString().slice(0, 10),
-    get = async (path: string) => {
-      const response = await fetch(`${base}${path}`, {
-        headers: { "X-Finnhub-Token": token },
-        cache: "no-store",
-        signal: providerSignal(12000),
-      });
-      if (!response.ok) throw new Error(`FINNHUB_${response.status}`);
-      return response.json();
-    };
+    get = (path: string) => discoveryFinnhub(db,path,path.startsWith('/company-news')?300:21600);
   try {
     const [profile, metricData, news] = await Promise.all([
       get(`/stock/profile2?symbol=${symbol}`),
@@ -67,10 +60,10 @@ async function fundamentals(symbol: string) {
     return {
       available: true,
       provider: "FINNHUB",
-      asOf: new Date().toISOString(),
-      profile,
-      metrics: metricData.metric || {},
-      news: Array.isArray(news) ? news.slice(0, 20) : [],
+      asOf: metricData.asOf,
+      profile: profile.data,
+      metrics: metricData.data.metric || {},
+      news: Array.isArray(news.data) ? news.data.slice(0, 20) : [],
     };
   } catch (error) {
     return {
@@ -132,7 +125,7 @@ export async function researchRecommendation(
     [quoteSet, barsSet, fundamental, catalystContext] = await Promise.all([
       market.getQuotes([symbol]),
       market.getBars(symbol, { timeframe: "1Day", start, limit: 260 }),
-      fundamentals(symbol),
+      fundamentals(db,symbol),
       loadCatalystContext(symbol),
     ]),
     quote = quoteSet.quotes[symbol],

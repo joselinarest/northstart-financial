@@ -1143,4 +1143,8 @@ export const migrations: readonly Migration[] = [
 `CREATE TABLE options_account_history(id TEXT PRIMARY KEY,account_id TEXT NOT NULL REFERENCES accounts(id),symbol TEXT NOT NULL,decision_json JSONB NOT NULL,created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP)`,
 `ALTER TABLE background_jobs DROP CONSTRAINT IF EXISTS background_jobs_job_type_check`,
 `ALTER TABLE background_jobs ADD CONSTRAINT background_jobs_job_type_check CHECK(job_type IN ('PLAID_SYNC','PLAID_INVESTMENT_SYNC','NOTIFICATION_DELIVERY','MARKET_INTELLIGENCE','MARKET_DISCOVERY','DAILY_CLOSE_REVIEW','OVERNIGHT_OUTLOOK_REFRESH','TACTICAL_REENTRY_MONITOR','OPTIONS_FLOW','INVESTMENT_COVERAGE_AUDIT','ACCOUNT_INTELLIGENCE_LOOP','KIDS_PLAN_REVIEW','AI_EVENT_REVIEW','QUANT_FLOW','OPTIONS_DISCOVERY','OPTIONS_ACCOUNT_REVIEW'))`,
+]}, {id:"0050_discovery_missing_evidence",description:"Preserve unavailable discovery scores and revalidate older research",statements:[
+`ALTER TABLE market_discovery_candidates ALTER COLUMN business_quality DROP NOT NULL,ALTER COLUMN growth_acceleration DROP NOT NULL,ALTER COLUMN valuation DROP NOT NULL`,
+`UPDATE market_discovery_candidates SET business_quality=NULL,growth_acceleration=NULL,valuation=NULL,scores_json='{}'::jsonb,discovery_confidence=0,status='EARLY_WATCH',why_found='Prior research requires evidence-score revalidation',model_version='AWAITING_EVIDENCE_REVALIDATION' WHERE model_version<>'discovery-v5-evidence'`,
+`UPDATE discovery_queue SET stage='RESEARCH_PENDING',next_research_at=CURRENT_TIMESTAMP WHERE active AND seed_json IS NOT NULL AND last_researched_at IS NOT NULL`,
 ]},] as const;

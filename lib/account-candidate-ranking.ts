@@ -1,5 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import {entryOrderReady} from "@/lib/entry-plan";
+import {accountRiskSettings} from "@/lib/account-risk-settings";
 import type { PostgresDatabase } from "@/lib/db";
 type J = Record<string, any>;
 const clamp = (value: number) => Math.max(0, Math.min(100, Math.round(value)));
@@ -31,6 +32,7 @@ export async function rankCandidatesForAccount(
     .bind(accountId, householdId)
     .first<J>();
   if (!account) throw new Error("Selected investment account was not found");
+  const {effective:policy}=await accountRiskSettings(db,householdId,accountId);
   const holdings = (
       await db
         .prepare(
@@ -45,7 +47,7 @@ export async function rankCandidatesForAccount(
       holdings.reduce((sum, row) => sum + Number(row.value_cents || 0), 0),
     ),
     strategy = String(account.strategy || "Long-term"),
-    swing = /swing|trading/i.test(strategy),
+    swing = /swing|trading|mixed/i.test(strategy),
     retirement = /retire|401|ira/i.test(strategy),
     owned = new Map(
       holdings.map((row) => [
@@ -92,7 +94,7 @@ export async function rankCandidatesForAccount(
       let fit =
         72 -
         existingWeight * 3 -
-        Math.max(0, sectorWeight - 25) * 1.5 -
+        Math.max(0, sectorWeight - policy.maxSectorBps/100) * 1.5 -
         risk * 0.18;
       if (swing)
         fit +=
@@ -153,7 +155,7 @@ export async function rankCandidatesForAccount(
           risk <= 55 &&
           priceInEntryZone &&
           relativeVolume >= 1 &&
-          existingWeight <= 8 &&
+          existingWeight < policy.maxPositionBps/100 &&
           cash >= currentPrice,
         conditionalBuy =
           Boolean(entry)&&['BUY','ACCUMULATE','STRONG_BUY','BUY_PARTIAL','ADD','REENTER'].includes(decision?.action)&&parse(decision?.checks_json,{}).aiEvidence?.providerStatus==="AVAILABLE"&&Date.parse(decision?.expires_at)>Date.now()&&
@@ -163,20 +165,20 @@ export async function rankCandidatesForAccount(
           quality >= 60 &&
           fit >= 55 &&
           risk <= 65 &&
-          existingWeight <= 8 &&
+          existingWeight < policy.maxPositionBps/100 &&
           cash >= currentPrice,
         maxPositionDollars = Math.max(
           0,
-          total / 1000 - ((existingWeight / 100) * total) / 100,
+          total / 100 * policy.maxPositionBps/10000 - ((existingWeight / 100) * total) / 100,
         ),
         affordableShares = currentPrice
-          ? Math.floor(Math.min(cash, maxPositionDollars) / currentPrice)
+          ? Math.floor(Math.min(Math.max(0,cash-total/100*policy.cashReserveBps/10000), maxPositionDollars) / currentPrice)
           : 0,
-        triggerPrice = entryLow || currentPrice,
+        triggerPrice = Number(entry?.trigger||entry?.orderPrice||entryLow||currentPrice),
         decisionCondition = buyNow
-          ? `BUY NOW only while price remains between $${entryLow.toFixed(2)} and $${entryHigh.toFixed(2)}, relative volume remains at least 1.0×, and no material thesis-changing news appears.`
+          ? `${entry.orderType} at $${Number(entry.orderPrice).toFixed(2)}. ${entry.actionAfterConfirmation} Cancel: ${entry.cancelConditions.join('; ')}.`
           : conditionalBuy
-            ? `BUY IF price reclaims and holds $${triggerPrice.toFixed(2)} with relative volume at least 1.2×, technical score at least 68, and confidence at least 70%. Invalidate below $${invalidation.toFixed(2)}.`
+            ? `MONITOR ONLY at trigger $${triggerPrice.toFixed(2)}. ${entry.confirmationRequired.join('; ')}. ${entry.actionAfterConfirmation}`
             : researchComplete
               ? `NO BUY until price, fundamentals, valuation, account fit, and risk jointly pass the configured thresholds.`
               : "WAIT — required price, fundamental, valuation, technical, or risk evidence is incomplete.",
@@ -187,9 +189,7 @@ export async function rankCandidatesForAccount(
             ? "BUY_DECISION_READY"
             : conditionalBuy
               ? "CONDITIONAL_BUY"
-              : score >= 68
-                ? "GOOD_BUY_BUILD"
-                : score >= 58
+              : score >= 58
                   ? "WATCH_FOR_BETTER_ENTRY"
                   : "EARLY_WATCH",
         action = rejected
@@ -198,7 +198,7 @@ export async function rankCandidatesForAccount(
             ? "DO NOT ADD"
             : technical < 55
               ? "WAIT"
-              : existingWeight > 8
+              : existingWeight >= policy.maxPositionBps/100
                 ? "HOLD / DO NOT ADD"
                 : buyNow && affordableShares > 0
                   ? "BUY NOW"
@@ -240,7 +240,7 @@ export async function rankCandidatesForAccount(
         current_price: currentPrice,
         entry_plan:entry||null,
         trigger_price: action === "BUY IF" ? triggerPrice : currentPrice,
-        invalidation_price: invalidation,
+        invalidation_price: entry?.stopAfterEntry??invalidation,
         account_strategy: strategy,
         existing_weight: existingWeight,
         sector_weight: sectorWeight,

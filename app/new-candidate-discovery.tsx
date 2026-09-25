@@ -20,7 +20,7 @@ const labels: Record<string, string> = {
   REJECTED_NOT_SUITABLE: "🔻 Rejected / not suitable",
 };
 const fmt = (value: any, digits = 1) =>
-  Number.isFinite(Number(value))
+  value !== null && value !== undefined && value !== "" && Number.isFinite(Number(value))
     ? Number(value).toLocaleString(undefined, { maximumFractionDigits: digits })
     : "—";
 export default function NewCandidateDiscovery({
@@ -178,6 +178,11 @@ export default function NewCandidateDiscovery({
           <b>{scan?.errorCode ? "ERROR" : scan?.status || "UNKNOWN"}</b>
         </span>
       </section>
+      <details className="rounded-xl border border-line p-4">
+        <summary>Research coverage by sector and company size · {scan?.coverage?.discovery_concentration?.replaceAll('_',' ') || 'Awaiting evidence'}</summary>
+        <p>{fmt(scan?.coverage?.current_evidence_researched,0)} companies have current evidence scores. Unknown classifications remain unknown. Coverage does not imply a trade qualifies.</p>
+        <div className="flex flex-wrap gap-3">{(scan?.coverage?.research_groups||[]).map((group:Row)=><span key={group.sector+group.cap_bucket}>{group.sector} · {group.cap_bucket} · {group.count}</span>)}</div>
+      </details>
       <div className="candidate-tools">
         <form
           onSubmit={(event) => {
@@ -382,6 +387,7 @@ export default function NewCandidateDiscovery({
                         <dd>{fmt(row.entry_attractiveness, 0)}</dd>
                       </div>
                     </dl>
+                    {(row.evidence?.scoreLimitations||[]).length>0&&<details><summary>Score evidence and missing data</summary>{row.evidence.scoreLimitations.map((reason:string)=><p key={reason}>{reason}</p>)}<p>Fundamentals: {row.evidence.fundamentalsAsOf||'Timestamp unavailable'} · {row.evidence.provider||'Provider unavailable'}</p></details>}
                     <p>
                       <b>Why it ranks here:</b> {row.why_ranked}
                     </p>
