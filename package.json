@@ -36,7 +36,9 @@
     "test:entry-plan": "node scripts/entry-plan-check.mjs",
     "test:notification-events": "node scripts/notification-events-check.mjs",
     "build:worker": "node scripts/build-market-worker.mjs",
-    "test:worker": "node scripts/worker-reliability-check.mjs"
+    "test:worker": "node scripts/worker-reliability-check.mjs",
+    "test:quant-data": "node scripts/quant-data-check.mjs",
+    "test:security-workspace": "node scripts/security-workspace-check.mjs"
   },
   "dependencies": {
     "@aws-sdk/client-secrets-manager": "^3.1125.0",

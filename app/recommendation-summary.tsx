@@ -1,0 +1,1 @@
+export default function RecommendationSummary({action}:{action:string}){return <span className={`recommendation-badge ${/^(SELL|TRIM|REDUCE)/.test(action)?'sell':/^(BUY|ADD|ACCUMULATE)/.test(action)?'buy':'wait'}`}>{action.replaceAll('_',' ')}</span>}

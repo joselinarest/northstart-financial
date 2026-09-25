@@ -1130,4 +1130,10 @@ export const migrations: readonly Migration[] = [
  `CREATE INDEX IF NOT EXISTS background_jobs_active_scope ON background_jobs(job_type,household_id,(payload_json->>'accountId'),(payload_json->>'symbol')) WHERE status IN ('QUEUED','RUNNING','FAILED')`,
  `CREATE INDEX IF NOT EXISTS recommendations_account_security_latest ON recommendations(account_id,security_id,created_at DESC)`,
  `CREATE INDEX IF NOT EXISTS rotation_reviews_pending_outcomes ON rotation_reviews(account_id,created_at) WHERE outcome_json IS NULL AND snapshot_json->>'status'='REVIEW_READY'`,
- ]},] as const;
+ ]}, {id:"0048_quant_data_evidence",description:"Optional cached market structure evidence and monitoring jobs",statements:[
+`CREATE TABLE IF NOT EXISTS quant_data_prints (provider_id TEXT PRIMARY KEY,symbol TEXT NOT NULL,event_at TIMESTAMPTZ NOT NULL,payload JSONB NOT NULL,captured_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP)`,
+`CREATE INDEX IF NOT EXISTS quant_data_prints_symbol_time ON quant_data_prints(symbol,event_at)`,
+`CREATE TABLE IF NOT EXISTS quant_data_cache (cache_key TEXT PRIMARY KEY, payload JSONB, expires_at TIMESTAMPTZ, lease_until TIMESTAMPTZ, updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP)`,
+`ALTER TABLE background_jobs DROP CONSTRAINT IF EXISTS background_jobs_job_type_check`,
+`ALTER TABLE background_jobs ADD CONSTRAINT background_jobs_job_type_check CHECK(job_type IN ('PLAID_SYNC','PLAID_INVESTMENT_SYNC','NOTIFICATION_DELIVERY','MARKET_INTELLIGENCE','MARKET_DISCOVERY','DAILY_CLOSE_REVIEW','OVERNIGHT_OUTLOOK_REFRESH','TACTICAL_REENTRY_MONITOR','OPTIONS_FLOW','INVESTMENT_COVERAGE_AUDIT','ACCOUNT_INTELLIGENCE_LOOP','KIDS_PLAN_REVIEW','AI_EVENT_REVIEW','QUANT_FLOW'))`,
+]},] as const;

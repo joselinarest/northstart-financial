@@ -1,5 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
+import {LazyFlowEvidence} from './quant-data-evidence';
 import { useCallback, useEffect, useMemo, useState } from "react";
 type Row = Record<string, any>;
 const order = [
@@ -298,7 +299,7 @@ export default function NewCandidateDiscovery({
               </header>
               <div>
                 {grouped[section].map((row: Row) => (
-                  <article key={row.symbol}>
+                  <article key={row.symbol}><LazyFlowEvidence symbol={row.symbol}/>
                     <div className="candidate-rank">
                       <b>#{row.account_rank}</b>
                       <small>{row.account_rank_score}/100</small>

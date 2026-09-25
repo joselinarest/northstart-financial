@@ -1,0 +1,2 @@
+import React from 'react';import {createRoot} from 'react-dom/client';import Workspace from '../app/chart-decision-workspace';
+createRoot(document.getElementById('root')!).render(<Workspace accountId="test" accountName="Test investment account" accountValue={25000} cashAvailable={1000} ownedShares={10} ownedValue={1100} symbol="AMD" price={110} bid={109.9} ask={110.1} relativeVolume={1.5} fresh strategy="swing" entryLow={109} entryHigh={111} stop={105} target1={120} target2={125} support={108} resistance={115} confidence={70}/>);

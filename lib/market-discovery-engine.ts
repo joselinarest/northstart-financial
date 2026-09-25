@@ -1,3 +1,4 @@
+import {screeningPolicy,eligibleMarketAsset} from "@/lib/market-scan-policy";
 import {claimDiscovery,discoveryCoverage,discoveryFinnhub,prioritizeDiscovery,registerDiscoveryUniverse} from "@/lib/discovery-queue";
 import {remainingWorkMs,providerSignal} from "@/lib/work-budget";
 import {id,type PostgresDatabase} from "@/lib/db";
@@ -73,12 +74,12 @@ export async function runMarketDiscovery(db:PostgresDatabase,{force=false}:{forc
  let screened=0,enriched=0,rejected=0,aiFailures=0;const errors:string[]=[];
  try{
  const directory=await db.prepare("SELECT 1 fresh FROM discovery_control WHERE id='directory' AND refreshed_at>CURRENT_TIMESTAMP-INTERVAL '24 hours'").first();
- if(!directory){const assets=await alpacaDirectory(headers),eligible=assets.filter(x=>x.tradable&&["NASDAQ","NYSE","AMEX","ARCA","BATS"].includes(x.exchange)&&!/ warrant| unit| right|\bETF\b|\bETN\b|\b[23]X (?:Long|Short|Bull|Bear)\b/i.test(x.name||""));if(!eligible.length)throw Error("ALPACA_EMPTY_DIRECTORY");await registerDiscoveryUniverse(db,eligible);}
+ if(!directory){const assets=await alpacaDirectory(headers),eligible=assets.filter(eligibleMarketAsset);if(!eligible.length)throw Error("ALPACA_EMPTY_DIRECTORY");await registerDiscoveryUniverse(db,eligible);}
  await prioritizeDiscovery(db);
  const batch=await claimDiscovery(db,"SCREEN",120);
  if(batch.length){try{const bars=await barsFor(batch.map(x=>x.symbol),headers);
- for(const row of batch){const history=bars[row.symbol]||[],seed=technicalSeed(row.asset_json,history,null),stage=seed?"RESEARCH_PENDING":"RESEARCH_INCOMPLETE";
- await db.prepare(`UPDATE discovery_queue SET stage=?,seed_json=?::jsonb,priority=GREATEST(priority,?::int),last_screened_at=CURRENT_TIMESTAMP,next_screen_at=CURRENT_TIMESTAMP+(CASE WHEN priority>=100 THEN 2 ELSE 24 END)*INTERVAL '1 hour',lease_until=NULL,error_code=?,updated_at=CURRENT_TIMESTAMP WHERE symbol=?`).bind(stage,seed?JSON.stringify({seed,priceAsOf:history.at(-1)!.t}):null,seed?Math.min(99,Math.round(seed.seed)):0,seed?null:"INSUFFICIENT_PRICE_HISTORY",row.symbol).run();screened++;}
+ for(const row of batch){const history=bars[row.symbol]||[],seed=technicalSeed(row.asset_json,history,null),policy=screeningPolicy(row.priority,seed),stage=policy.stage;
+ await db.prepare(`UPDATE discovery_queue SET stage=?,seed_json=?::jsonb,priority=GREATEST(priority,?::int),last_screened_at=CURRENT_TIMESTAMP,next_screen_at=CURRENT_TIMESTAMP+(?::int*INTERVAL '1 minute'),lease_until=NULL,error_code=?,updated_at=CURRENT_TIMESTAMP WHERE symbol=?`).bind(stage,seed?JSON.stringify({seed,priceAsOf:history.at(-1)!.t}):null,seed?Math.min(99,Math.round(seed.seed)):0,policy.minutes,stage==="RESEARCH_PENDING"?null:policy.reason,row.symbol).run();screened++;}
  }catch(error){await db.prepare("UPDATE discovery_queue SET lease_until=NULL,next_screen_at=CURRENT_TIMESTAMP+INTERVAL '5 minutes',error_code='PRICE_SCREEN_FAILED' WHERE symbol=ANY(?::text[])").bind(batch.map(x=>x.symbol)).run();throw error;}}
  if(remainingWorkMs()>15000){const research=await claimDiscovery(db,"RESEARCH",2);
  for(const row of research){if(remainingWorkMs()<15000)break;try{

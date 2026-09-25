@@ -1,0 +1,14 @@
+import {build} from 'esbuild';
+import {PGlite} from '@electric-sql/pglite';
+import assert from 'node:assert/strict';
+await build({entryPoints:['db/migrations.ts','lib/market-scan-policy.ts'],outdir:'work/release-check',bundle:true,platform:'node',format:'esm'});
+const {migrations}=await import('../work/release-check/db/migrations.js');
+const db=new PGlite();await db.exec('CREATE TABLE background_jobs(job_type TEXT)');
+for(const statement of migrations.find(m=>m.id==='0048_quant_data_evidence').statements)await db.exec(statement);
+await db.exec("INSERT INTO background_jobs VALUES('QUANT_FLOW'),('AI_EVENT_REVIEW')");
+await assert.rejects(()=>db.exec("INSERT INTO background_jobs VALUES('UNSUPPORTED')"));
+const {screeningPolicy,eligibleMarketAsset}=await import('../work/release-check/lib/market-scan-policy.js');
+assert(eligibleMarketAsset({tradable:true,exchange:'ARCA',name:'Vanguard ETF'}));
+const seed={seed:40,metrics:{relativeVolume:1,dayChange:1,return20:2,averageDollarVolume:1000000}};
+assert.equal(screeningPolicy(0,seed).stage,'NEAR_MISS');assert.equal(screeningPolicy(150,seed).stage,'RESEARCH_PENDING');assert.equal(screeningPolicy(0,{...seed,metrics:{...seed.metrics,relativeVolume:2}}).stage,'RESEARCH_PENDING');
+await db.close();console.log('PASS migration queue constraint and selective screening');

@@ -10,11 +10,11 @@ const tabs: Record<string,string> = {
   "market-news":"Market News", growth:"Growth Finder", "dividend-growth":"Growth Finder", "new-candidates":"New Candidates",
   "real-estate":"Real Estate", "investment-account":"Accounts", "security-detail":"Professional Charts",
   options:"Options Advisor", "options-detail":"Options Advisor", transactions:"Bills & cards", spending:"Bills & cards",
-  budgets:"Bills & cards", notifications:"Settings", "kids-goals":"Kids / Goals", "system-health":"Settings",
+  budgets:"Bills & cards", notifications:"Alerts", "kids-goals":"Kids / Goals", "system-health":"Settings",
 };
 
 export default async function WorkspacePage({ params }: { params: Promise<{page:string}> }) {
   const { page } = await params;
-  if(page === "planner") redirect("/workspace/daily-action-plan");
+
   return <NorthstarWorkspace initialTab={tabs[page] || "Dashboard"} />;
 }

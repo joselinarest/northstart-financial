@@ -1,6 +1,7 @@
+import type {FlowEvidence} from "./flow-evidence";
 import type {PatternBar} from './pattern-evidence';
 
-export type ReviewInput={exitId:string;shares:number;exitPrice:number;exitAt:string;netProceeds:number;basis:number|null;entryAt:string|null;entryPrice:number|null;entryConfirmed:boolean|null;stop:number|null;predicted:unknown;patterns:{name:string;direction:string}[];modelVersion:string;strategyVersion:string;sellReason:string|null};
+export type ReviewInput={flow?:FlowEvidence|null;exitId:string;shares:number;exitPrice:number;exitAt:string;netProceeds:number;basis:number|null;entryAt:string|null;entryPrice:number|null;entryConfirmed:boolean|null;stop:number|null;predicted:unknown;patterns:{name:string;direction:string}[];modelVersion:string;strategyVersion:string;sellReason:string|null};
 export function buildPostTradeReview(input:ReviewInput,bars:PatternBar[]){
   const exitTime=Date.parse(input.exitAt),entryTime=input.entryAt?Date.parse(input.entryAt):NaN;
   const valid=bars.filter(b=>Number.isFinite(Date.parse(b.time))&&[b.high,b.low,b.close].every(v=>Number.isFinite(v)&&v>0)&&b.high>=b.low).sort((a,b)=>Date.parse(a.time)-Date.parse(b.time));
@@ -12,6 +13,13 @@ export function buildPostTradeReview(input:ReviewInput,bars:PatternBar[]){
   const holdValue=last?last.close*input.shares:null,excess=holdValue===null?null:input.netProceeds-holdValue;
   const stopped=completeHoldingPath&&input.stop!==null?held.some(b=>b.low<=input.stop!):null;
   const evidenceAttribution=input.patterns.map(p=>({name:p.name,assessment:!last?'PENDING':(p.direction==='UP'&&last.close>input.exitPrice)||(p.direction==='DOWN'&&last.close<input.exitPrice)?'DIRECTION_MATCHED':'DIRECTION_NOT_CONFIRMED',qualification:'Observed association after exit; not evidence of causation or a calibrated signal.'}));
+  for(const name of ['Options flow','GEX','Dark-pool levels']){
+    const observed=input.flow?.retrievedAt?Date.parse(input.flow.retrievedAt):NaN;
+    const contemporaneous=Number.isFinite(observed)&&observed<=exitTime;
+    const directional=name==='Options flow'&&contemporaneous&&input.flow?.conviction!==null&&['BULLISH','BEARISH'].includes(input.flow?.direction||'');
+    const change=last?last.close-input.exitPrice:null;
+    evidenceAttribution.push({name,assessment:!contemporaneous?'UNAVAILABLE':!directional||change===null||change===0?'NEUTRAL':((input.flow!.direction==='BULLISH')===(change>0))?'USEFUL':'MISLEADING',qualification:'Post-exit directional association only; not causal trade attribution. GEX/dark-pool usefulness requires a preregistered level-response hypothesis. No automatic retraining.'});
+  }
   return {version:'post-trade-1',exitId:input.exitId,status:!last?'AWAITING_POST_EXIT_DATA':completeHoldingPath?'PROVISIONAL':'INCOMPLETE_ENTRY_HISTORY',asOf:last?.time??input.exitAt,predicted:input.predicted,modelVersion:input.modelVersion,strategyVersion:input.strategyVersion,sellReason:input.sellReason,
     actual:{exitPrice:input.exitPrice,shares:input.shares,netProceeds:input.netProceeds,realizedResult:realized,realizedReturnBps:realized!==null&&input.basis!>0?Math.round(realized/input.basis!*10000):null},
     entryAssessment:input.entryConfirmed===null?'UNKNOWN — original entry confirmation not recorded':input.entryConfirmed?'Original entry confirmation recorded; profitability is evaluated separately':'Entry confirmation was missing; review execution discipline',

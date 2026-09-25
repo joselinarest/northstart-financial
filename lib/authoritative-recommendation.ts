@@ -1,3 +1,4 @@
+import {QuantDataProvider} from "@/lib/providers/quant-data";
 import {providerSignal} from "@/lib/work-budget";
 import { id, type PostgresDatabase } from "@/lib/db";
 import { marketDataProvider } from "@/lib/providers/alpaca-market-data";
@@ -510,7 +511,7 @@ export async function researchRecommendation(
           datetime: item.datetime,
         })),
       },
-      flow: { state: "UNAVAILABLE" },
+      flow: await new QuantDataProvider(db).getEvidence(symbol).catch(()=>({state:"UNAVAILABLE",canAuthorizeTrade:false})),
       portfolioFit: {
         state: shares > 0 ? "GOOD" : "INSUFFICIENT_CASH_OR_RISK_CAPACITY",
         cash,

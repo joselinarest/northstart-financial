@@ -1,0 +1,2 @@
+import FlowIntelligencePanel from './flow-intelligence-panel';
+export default function OptionsPanel({symbol,accountId,interpretation}:{symbol:string;accountId:string;interpretation:string}){return <section><h3>Central decision explanation</h3><p>{interpretation}</p><FlowIntelligencePanel symbol={symbol}/><a href={`/workspace/options?symbol=${encodeURIComponent(symbol)}&accountId=${encodeURIComponent(accountId)}`}>Review option contracts</a></section>}

@@ -10,6 +10,8 @@ export async function reviewClosedTrades(db:PostgresDatabase,accountId:string,se
     // Preserve the original prediction. A later model run must never rewrite what was predicted.
     const input:ReviewInput=prior?.input_json??{exitId:row.id,shares:row.exit_json.shares,exitPrice:row.exit_json.price,exitAt:row.exit_json.tradeAt,netProceeds:row.exit_json.netProceeds,basis:row.exit_json.basisKnown?row.exit_json.basis:null,entryAt:null,entryPrice:null,entryConfirmed:null,stop:null,predicted:row.checks_json?.aiEvidence??{reason:row.reason,attribution:row.recommendation_id?'Contemporaneous sale recommendation; execution linkage not proven':'No original recommendation available'},patterns:(row.checks_json?.patterns as {name:string;direction:string}[])??[],modelVersion:row.exit_json.modelVersion,strategyVersion:row.exit_json.strategyVersion,sellReason:row.sell_reason};
     if(!prior){
+      const ai=row.checks_json?.aiEvidence as {evidenceSources?:{label:string;value:unknown}[]}|undefined;
+      input.flow=(ai?.evidenceSources?.find(e=>e.label==='marketStructure')?.value??null) as ReviewInput['flow'];
       const lots=(await db.prepare(`SELECT l.acquired_at,t.price_cents FROM tax_lot_disposals d JOIN tax_lots l ON l.id=d.lot_id JOIN investment_transactions t ON t.id=l.opening_transaction_id JOIN trade_lifecycle_exits x ON x.exit_transaction_id=d.sell_transaction_id WHERE x.id=?`).bind(row.id).all<{acquired_at:string;price_cents:number}>()).results;
       // Multi-lot trades need lot-weighted paths; never assign one lot's excursions to all shares.
       if(lots.length===1&&Number(lots[0].price_cents)>0){input.entryAt=new Date(lots[0].acquired_at).toISOString();input.entryPrice=Number(lots[0].price_cents)/100;}

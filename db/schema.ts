@@ -57,4 +57,7 @@ export const schemaStatements = [
 `ALTER TABLE household_invitations ADD CONSTRAINT household_invitations_role_check CHECK(role IN ('owner','co_owner','manager','investment_manager','member','observer','account_connector','student','viewer','accountant'))`,
 `ALTER TABLE household_invitations DROP CONSTRAINT IF EXISTS household_invitations_type_check`,
 `ALTER TABLE household_invitations ADD CONSTRAINT household_invitations_type_check CHECK(invitation_type IN ('join_household','create_household'))`,
+`CREATE TABLE IF NOT EXISTS quant_data_prints (provider_id TEXT PRIMARY KEY,symbol TEXT NOT NULL,event_at TIMESTAMPTZ NOT NULL,payload JSONB NOT NULL,captured_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP)`,
+`CREATE INDEX IF NOT EXISTS quant_data_prints_symbol_time ON quant_data_prints(symbol,event_at)`,
+`CREATE TABLE IF NOT EXISTS quant_data_cache (cache_key TEXT PRIMARY KEY, payload JSONB, expires_at TIMESTAMPTZ, lease_until TIMESTAMPTZ, updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP)`,
 ];
