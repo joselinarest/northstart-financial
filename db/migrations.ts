@@ -1136,4 +1136,11 @@ export const migrations: readonly Migration[] = [
 `CREATE TABLE IF NOT EXISTS quant_data_cache (cache_key TEXT PRIMARY KEY, payload JSONB, expires_at TIMESTAMPTZ, lease_until TIMESTAMPTZ, updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP)`,
 `ALTER TABLE background_jobs DROP CONSTRAINT IF EXISTS background_jobs_job_type_check`,
 `ALTER TABLE background_jobs ADD CONSTRAINT background_jobs_job_type_check CHECK(job_type IN ('PLAID_SYNC','PLAID_INVESTMENT_SYNC','NOTIFICATION_DELIVERY','MARKET_INTELLIGENCE','MARKET_DISCOVERY','DAILY_CLOSE_REVIEW','OVERNIGHT_OUTLOOK_REFRESH','TACTICAL_REENTRY_MONITOR','OPTIONS_FLOW','INVESTMENT_COVERAGE_AUDIT','ACCOUNT_INTELLIGENCE_LOOP','KIDS_PLAN_REVIEW','AI_EVENT_REVIEW','QUANT_FLOW'))`,
+]}, {id:"0049_options_discovery",description:"Broad-universe option screening and account decision snapshots",statements:[
+`CREATE TABLE options_discovery(symbol TEXT PRIMARY KEY REFERENCES discovery_queue(symbol),stage TEXT NOT NULL DEFAULT 'NOT_SCANNED',reason TEXT NOT NULL DEFAULT 'Awaiting broad price/liquidity screen',payload_json JSONB NOT NULL DEFAULT '{}',checked_at TIMESTAMPTZ,next_check_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,lease_until TIMESTAMPTZ)`,
+`CREATE INDEX options_discovery_due ON options_discovery(next_check_at,checked_at)`,
+`CREATE TABLE options_account_decisions(account_id TEXT NOT NULL REFERENCES accounts(id),symbol TEXT NOT NULL,decision_json JSONB NOT NULL,updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,PRIMARY KEY(account_id,symbol))`,
+`CREATE TABLE options_account_history(id TEXT PRIMARY KEY,account_id TEXT NOT NULL REFERENCES accounts(id),symbol TEXT NOT NULL,decision_json JSONB NOT NULL,created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP)`,
+`ALTER TABLE background_jobs DROP CONSTRAINT IF EXISTS background_jobs_job_type_check`,
+`ALTER TABLE background_jobs ADD CONSTRAINT background_jobs_job_type_check CHECK(job_type IN ('PLAID_SYNC','PLAID_INVESTMENT_SYNC','NOTIFICATION_DELIVERY','MARKET_INTELLIGENCE','MARKET_DISCOVERY','DAILY_CLOSE_REVIEW','OVERNIGHT_OUTLOOK_REFRESH','TACTICAL_REENTRY_MONITOR','OPTIONS_FLOW','INVESTMENT_COVERAGE_AUDIT','ACCOUNT_INTELLIGENCE_LOOP','KIDS_PLAN_REVIEW','AI_EVENT_REVIEW','QUANT_FLOW','OPTIONS_DISCOVERY','OPTIONS_ACCOUNT_REVIEW'))`,
 ]},] as const;

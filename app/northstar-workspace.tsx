@@ -1475,8 +1475,10 @@ export function NorthstarWorkspace({
     volume: "—",
     catalyst: "Check current news and event risk",
   });
-  const [capital, setCapital] = useState(25000);
-  const [risk, setRisk] = useState(0.5);
+  const [plannerPolicy,setPlannerPolicy]=useState<any>(null);
+  const [plannerDefaultsRevision,setPlannerDefaultsRevision]=useState(0);
+  const [capital, setCapital] = useState(0);
+  const [risk, setRisk] = useState(0);
   const [entry, setEntry] = useState(0);
   const [stop, setStop] = useState(0);
   const [target, setTarget] = useState(0);
@@ -1499,16 +1501,16 @@ export function NorthstarWorkspace({
       target <= entry
     )
       return { max: 0, shares: 0, exposure: 0, rr: 0 };
-    const max = (capital * risk) / 100,
+    const max = plannerPolicy?(Math.min(capital,plannerPolicy.value)*Math.min(risk,plannerPolicy.effective.swingRiskBps/100))/100:0,
       per = Math.max(0.01, Math.abs(entry - stop)),
-      shares = Math.floor(max / per);
+      shares = plannerPolicy?Math.max(0,Math.floor(Math.min(max/per,Math.max(0,plannerPolicy.cash-capital*plannerPolicy.effective.cashReserveBps/10000)/entry,Math.max(0,capital*plannerPolicy.effective.maxPositionBps/10000-Number(plannerPolicy.positionValue||0))/entry))):0;
     return {
-      max,
+      max:shares*per,
       shares,
       exposure: shares * entry,
       rr: Math.abs(target - entry) / per,
     };
-  }, [capital, risk, entry, stop, target]);
+  }, [capital, risk, entry, stop, target,plannerPolicy]);
   const [extraMortgage, setExtraMortgage] = useState(300);
   const [extraCard, setExtraCard] = useState(300);
   const [alertFilter, setAlertFilter] = useState("All");
@@ -2763,32 +2765,6 @@ export function NorthstarWorkspace({
     "Professional Charts",
     "Prepare Trade",
   ].includes(tab);
-  useEffect(() => {
-    const required = isSwingDecisionPage
-      ? swingAccounts
-      : isPortfolioPage
-        ? investmentAccounts
-        : isLongTermInvestmentPage
-          ? longTermAccounts
-          : null;
-    if (
-      !required ||
-      !required.length ||
-      required.some((account) => String(account.id) === advisorAccountId)
-    )
-      return;
-    const next = String(required[0].id);
-    setAdvisorAccountId(next);
-    localStorage.setItem("northstar-advisor-account", next);
-  }, [
-    isSwingDecisionPage,
-    isPortfolioPage,
-    isLongTermInvestmentPage,
-    swingAccounts,
-    longTermAccounts,
-    investmentAccounts,
-    advisorAccountId,
-  ]);
   const swingAccountIds = useMemo(
     () => new Set(swingAccounts.map((account) => String(account.id))),
     [swingAccounts],
@@ -2805,7 +2781,6 @@ export function NorthstarWorkspace({
       swingAccounts.find(
         (account) => String(account.id) === advisorAccountId,
       ) ||
-      swingAccounts[0] ||
       null,
     [swingAccounts, advisorAccountId],
   );
@@ -2825,19 +2800,12 @@ export function NorthstarWorkspace({
       swingAdvisorAccount?.name ||
       "No Swing account configured",
   );
-  useEffect(() => {
-    if (tab !== "Prepare Trade" || !swingAdvisorAccount) return;
-    const value =
-      swingAdvisorHoldings.reduce(
-        (sum, holding) => sum + Number(holding.market_value_cents || 0),
-        0,
-      ) / 100 || Number(swingAdvisorAccount.current_balance_cents || 0) / 100;
-    if (value > 0) setCapital(value);
-  }, [tab, swingAdvisorAccount, swingAdvisorHoldings]);
+  useEffect(()=>{if(tab!=='Prepare Trade'||!swingAdvisorAccount)return;let active=true;setPlannerPolicy(null);fetch('/api/action-guidance?accountId='+encodeURIComponent(String(swingAdvisorAccount.id)),{headers:accessToken?{Authorization:'Bearer '+accessToken}:{}}).then(async r=>{const d=await r.json();if(!r.ok)throw Error(d.error||'Risk settings unavailable');if(!active)return;const policy=d.riskSettings;if(policy){setPlannerPolicy({...policy,positionValue:swingAdvisorHoldings.filter(h=>String(h.ticker||h.symbol).toUpperCase()===pick.ticker).reduce((s,h)=>s+Number(h.market_value_cents||0)/100,0)});setCapital(Number(policy.value.toFixed(2)));setRisk(policy.effective.swingRiskBps/100);}}).catch(()=>{if(active)setPlannerPolicy(null)});return()=>{active=false}},[tab,swingAdvisorAccount?.id,pick.ticker,plannerDefaultsRevision,accessToken]);
   useEffect(() => {
     if (tab !== "Prepare Trade") return;
     let active = true;
-    const raw = sessionStorage.getItem("northstar-prepared-action");
+    const fallbackSymbol=String(sessionStorage.getItem('northstar-chart-symbol')||swingAdvisorHoldings[0]?.ticker||swingAdvisorHoldings[0]?.symbol||'');
+    const raw = sessionStorage.getItem("northstar-prepared-action")||(fallbackSymbol?JSON.stringify({symbol:fallbackSymbol,action:'Review setup',reason:'Planning defaults from provider history; confirmation is still required.'}):null);
     if (!raw) {
       setPreparedAction(null);
       return;
@@ -2859,6 +2827,7 @@ export function NorthstarWorkspace({
       .trim()
       .toUpperCase();
     if (!symbol) return;
+    setEntry(0);setStop(0);setTarget(0);
     const action = String(
         saved.action || saved.suggestedAction || "Review setup",
       ),
@@ -2894,6 +2863,9 @@ export function NorthstarWorkspace({
           quote = quotes.quotes?.[symbol] || {},
           price = Number(quote.ask || quote.last || quote.bid || closes.at(-1));
         if (!price) throw new Error("Current provider price is unavailable");
+        if(!quotesResponse.ok||!barsResponse.ok||bars.length<21)throw new Error("At least 21 verified candles and a quote are required for planning defaults.");
+        const atr=bars.slice(-14).reduce((sum:number,bar:any,i:number)=>{const previous=bars[bars.length-15+i].close;return sum+Math.max(bar.high-bar.low,Math.abs(bar.high-previous),Math.abs(bar.low-previous));},0)/14;
+        if(!Number.isFinite(atr)||atr<=0)throw new Error("Valid volatility history is required for a stop default.");
         const recent = closes.slice(-20),
           support = recent.length ? Math.min(...recent) : price * 0.975,
           resistance = recent.length ? Math.max(...recent) : price * 1.06,
@@ -2916,14 +2888,14 @@ export function NorthstarWorkspace({
                 50
               ? "Bullish"
               : "Neutral",
-          invalidation = Math.min(price * 0.975, support * 0.995),
+          invalidation = Math.max(.01,Math.min(price-atr,support-atr*.25)),
           riskPerShare = Math.max(0.01, price - invalidation),
           firstTarget = Math.max(resistance, price + riskPerShare * 2);
         if (!active) return;
         setPick({
           ticker: symbol,
           name: symbol,
-          score: trend === "Bullish" ? 82 : 68,
+          score: 0,
           setup: reason,
           price,
           trend,
@@ -2962,7 +2934,7 @@ export function NorthstarWorkspace({
     return () => {
       active = false;
     };
-  }, [tab, swingAdvisorName, realtimeTick]);
+  }, [tab, swingAdvisorAccount?.id, swingAdvisorHoldings.map(h=>String(h.ticker||h.symbol)).join(","), plannerDefaultsRevision]);
   const ownedInvestmentSymbols = useMemo(
     () =>
       Array.from(
@@ -8331,7 +8303,7 @@ export function NorthstarWorkspace({
                               "northstar-chart-account",
                               String(account.id),
                             );
-                            setAdvisorAccountId(String(account.id));
+                            selectAnalysisScope(String(account.id));
                             setChartSymbol(symbol);
                             navigate("Professional Charts");
                           }}
@@ -9617,20 +9589,20 @@ export function NorthstarWorkspace({
                     </p>
                   </div>
                   <div>
-                    {longTermAccounts.length > 1 && (
+                    {investmentAccounts.length > 1 && (
                       <label className="shortlist-account-select">
-                        Long-term account
+                        Investment account
                         <select
                           value={advisorAccountId}
                           onChange={(event) => {
-                            setAdvisorAccountId(event.target.value);
+                            selectAnalysisScope(event.target.value);
                             localStorage.setItem(
                               "northstar-advisor-account",
                               event.target.value,
                             );
                           }}
                         >
-                          {longTermAccounts.map((account) => (
+                          {investmentAccounts.map((account) => (
                             <option
                               value={String(account.id)}
                               key={`shortlist_${account.id}`}
@@ -10970,7 +10942,7 @@ export function NorthstarWorkspace({
             <div className="title">
               <div>
                 <p>MANDATORY RISK CHECK</p>
-                <h2>Trade size and risk plan</h2>
+                <h2>Trade size and risk plan · {pick.ticker||"Select a stock"}</h2><p>{plannerPolicy?`${plannerPolicy.effective.label} · ${swingAdvisorName}`:"Loading account risk settings; position sizing is unavailable until they load."}</p><button type="button" onClick={()=>setPlannerDefaultsRevision(v=>v+1)}>Restore account defaults</button><HoldingCostBadge symbol={pick.ticker} accountId={String(swingAdvisorAccount?.id||"")} currentPrice={entry||null}/>{!entry&&<p role="status">{preparedAction?.status||"Choose a stock using Add to Prepare Trade; no price or stop can be invented without market evidence."}</p>}
                 <small>
                   Uses the selected action, current market price, your Swing
                   account value, and maximum risk to calculate entry, stop,
@@ -10978,7 +10950,7 @@ export function NorthstarWorkspace({
                 </small>
               </div>
               <span className={calc.rr >= 2 ? "pass" : "warn"}>
-                {calc.rr >= 2 ? "✓ Passes rules" : "! Improve reward/risk"}
+                {calc.rr >= 2 ? "✓ Reward/risk passes · validation required" : "! Improve reward/risk"}
               </span>
             </div>
             <div className="plan-grid">
@@ -10988,7 +10960,8 @@ export function NorthstarWorkspace({
                     Account size ($)
                     <input
                       type="number"
-                      value={capital}
+                      value={capital||""}
+                      step="0.01"
                       onChange={(e) => setCapital(+e.target.value)}
                     />
                   </label>
@@ -11006,7 +10979,9 @@ export function NorthstarWorkspace({
                     Entry ($)
                     <input
                       type="number"
-                      value={entry}
+                      value={entry||""}
+                      placeholder="Awaiting market evidence"
+                      step="0.01"
                       onChange={(e) => setEntry(+e.target.value)}
                     />
                   </label>
@@ -11014,7 +10989,9 @@ export function NorthstarWorkspace({
                     Invalidation / stop ($)
                     <input
                       type="number"
-                      value={stop}
+                      value={stop||""}
+                      placeholder="Awaiting invalidation level"
+                      step="0.01"
                       onChange={(e) => setStop(+e.target.value)}
                     />
                   </label>
@@ -11022,7 +10999,9 @@ export function NorthstarWorkspace({
                     First target ($)
                     <input
                       type="number"
-                      value={target}
+                      value={target||""}
+                      placeholder="Awaiting target"
+                      step="0.01"
                       onChange={(e) => setTarget(+e.target.value)}
                     />
                   </label>
@@ -11052,12 +11031,12 @@ export function NorthstarWorkspace({
                         : "The stop must be below the intended long entry."}
                     </span>
                   </li>
-                  <li className={risk > 0 && risk <= 1 ? "pass" : "warn"}>
+                  <li className={entry>0 && stop>0 && calc.shares>0 && plannerPolicy && risk > 0 && risk <= plannerPolicy.effective.swingRiskBps/100 ? "pass" : "warn"}>
                     <b>Keep risk within the plan</b>
                     <span>
-                      {risk > 0 && risk <= 1
+                      {entry>0 && stop>0 && calc.shares>0 && plannerPolicy && risk > 0 && risk <= plannerPolicy.effective.swingRiskBps/100
                         ? `${risk.toFixed(2)}% of account capital; maximum planned loss $${calc.max.toFixed(2)}.`
-                        : "Use a positive maximum risk no greater than 1% per idea."}
+                        : "Load valid prices and account capacity; keep risk within this account’s recommended limit."}
                     </span>
                   </li>
                   <li className={calc.rr >= 2 ? "pass" : "warn"}>

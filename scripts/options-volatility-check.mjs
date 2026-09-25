@@ -1,0 +1,17 @@
+import assert from 'node:assert/strict';
+import {assessOptionVolatility,volatilityContext,realizedVolatility} from '../lib/options-volatility.ts';
+import {buildOptionCandidates} from '../lib/ai-options-candidates.ts';
+import {PGlite} from '@electric-sql/pglite';
+import {migrations} from '../db/migrations.ts';
+const context={...volatilityContext([],[]),realized:.3,marketRealized:.2};
+assert.equal(realizedVolatility([]),null);
+assert.equal(assessOptionVolatility(context,.8,45,.1,true).allowed,false,'expensive IV rejected');
+assert.equal(assessOptionVolatility(context,.3,45,.1,false).allowed,false,'event gate blocks');
+assert.equal(assessOptionVolatility({...context,marketRealized:null},.3,45,.1,true).allowed,false,'missing market vol blocks');
+const normal=assessOptionVolatility(context,.3,45,.1,true),stress=assessOptionVolatility({...context,marketRealized:.5},.3,45,.1,true);assert(normal.allowed);assert.equal(stress.riskMultiplier,.5);
+const contract={contractSymbol:'TEST261218C00100000',type:'CALL',ask:2,bid:1.95,dte:45,spreadPct:2.5,impliedVolatility:.3,delta:.5,gamma:.01,theta:-.02,vega:.1,volume:100,openInterest:1000,volatility:normal};
+const underlying={action:'BUY_IF',providerStatus:'AVAILABLE',thesisStatus:'VALID',deterministicCandidates:[{id:'shares',instrument:'SHARES',action:'BUY_IF',eligible:true,cost:100,entry:100,stop:95,shares:1}]};
+assert(buildOptionCandidates([contract],underlying,1000,400,true).some(c=>c.instrument==='CALL'&&c.shares===2));
+const expensive=buildOptionCandidates([{...contract,volatility:assessOptionVolatility(context,.8,45,.1,true)}],underlying,1000,400,true);assert(expensive.some(c=>c.instrument==='SHARES'));assert(!expensive.some(c=>c.instrument==='CALL'));assert(expensive.some(c=>c.instrument==='NO_TRADE'));
+assert.equal(buildOptionCandidates([contract],null,1000,400,true).length,1);
+const pg=new PGlite();await pg.exec('CREATE TABLE discovery_queue(symbol text PRIMARY KEY);CREATE TABLE accounts(id text PRIMARY KEY);CREATE TABLE background_jobs(job_type text);');for(const sql of migrations.find(m=>m.id==='0049_options_discovery').statements)await pg.exec(sql);await pg.exec("INSERT INTO discovery_queue VALUES('SMALL');INSERT INTO options_discovery(symbol) SELECT symbol FROM discovery_queue ON CONFLICT DO NOTHING;INSERT INTO accounts VALUES('a'),('b');INSERT INTO options_account_decisions VALUES('a','SMALL','{}'),('b','SMALL','{}');");assert.equal((await pg.query('SELECT count(*)::int n FROM options_account_decisions')).rows[0].n,2);await pg.close();console.log('PASS volatility/missing-data/event gates, market-risk sizing, shares/no-trade alternatives and account-isolated migration');

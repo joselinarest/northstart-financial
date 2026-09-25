@@ -1,3 +1,5 @@
+import {runOptionsDiscovery} from '@/lib/options-discovery';
+import {analyzeAndStoreOptions} from '@/lib/options-analysis';
 import {coalesceRefreshJobs} from '@/lib/worker-refresh-queue';
 import {exchangeDay} from '@/lib/exchange-calendar';
 import {scheduleQuantFlow,monitorQuantFlow} from "@/lib/quant-data-monitor";
@@ -69,19 +71,20 @@ async function processNotifications(request: Request,limits:{totalMs:number;jobM
   if(session==="AFTER_HOURS"&&etMinute>=exchangeDay(Date.now()).closeMinute+5)for(const household of households.results)await db.prepare("INSERT INTO background_jobs(id,household_id,job_type,idempotency_key,payload_json) VALUES(?,?,'DAILY_CLOSE_REVIEW',?,?) ON CONFLICT(idempotency_key) DO NOTHING").bind(id("job"),household.household_id,`close-review:${household.household_id}:${sessionDate}`,JSON.stringify({householdId:household.household_id,sessionDate})).run();
   if(session==="PREMARKET"&&etMinute>=8*60+30)for(const household of households.results)await db.prepare("INSERT INTO background_jobs(id,household_id,job_type,idempotency_key,payload_json) VALUES(?,?,'OVERNIGHT_OUTLOOK_REFRESH',?,?) ON CONFLICT(idempotency_key) DO NOTHING").bind(id("job"),household.household_id,`premarket-review:${household.household_id}:${sessionDate}`,JSON.stringify({householdId:household.household_id,sessionDate})).run();
   if(session!=="CLOSED"){const tacticalBucket=`${sessionDate}:${Math.floor(etMinute/5)}`;await db.prepare("INSERT INTO background_jobs(id,job_type,idempotency_key,payload_json) VALUES(?,'TACTICAL_REENTRY_MONITOR',?,?) ON CONFLICT(idempotency_key) DO NOTHING").bind(id("job"),`tactical-monitor:${tacticalBucket}`,JSON.stringify({session,tacticalBucket})).run()}
+  await db.prepare("INSERT INTO background_jobs(id,job_type,idempotency_key,payload_json) SELECT ?,'OPTIONS_DISCOVERY',?,'{}'::jsonb WHERE NOT EXISTS(SELECT 1 FROM background_jobs WHERE job_type='OPTIONS_DISCOVERY' AND status IN ('QUEUED','RUNNING','FAILED')) ON CONFLICT(idempotency_key) DO NOTHING").bind(id('job'),'options-discovery:'+Math.floor(Date.now()/300000)).run();
   // Claim work atomically. EventBridge can invoke more than once and an SSR
   // request can die mid-job; SKIP LOCKED plus stale-lock recovery prevents both
   // duplicate execution and permanently RUNNING work.
   await coalesceRefreshJobs(db);
   const jobs={results:[] as Record<string, any>[]};
-  const claimJob = async()=>await db.prepare(`WITH claimable AS (
+  const claimJob = async(preferBroad=false)=>await db.prepare(`WITH claimable AS (
       SELECT id FROM background_jobs
       WHERE attempts<6 AND available_at<=CURRENT_TIMESTAMP
         AND (status IN ('QUEUED','FAILED') OR (status='RUNNING' AND locked_at<CURRENT_TIMESTAMP-INTERVAL '10 minutes'))
-      ORDER BY CASE job_type WHEN 'AI_EVENT_REVIEW' THEN 0 WHEN 'PLAID_INVESTMENT_SYNC' THEN 1 WHEN 'PLAID_SYNC' THEN 1 WHEN 'NOTIFICATION_DELIVERY' THEN 2 WHEN 'ACCOUNT_INTELLIGENCE_LOOP' THEN 3 WHEN 'MARKET_DISCOVERY' THEN 4 WHEN 'MARKET_INTELLIGENCE' THEN 5 ELSE 5 END,created_at FOR UPDATE SKIP LOCKED LIMIT 1
+      ORDER BY CASE WHEN ?::boolean AND job_type IN ('MARKET_DISCOVERY','OPTIONS_DISCOVERY') THEN 0 ELSE 1 END,CASE job_type WHEN 'AI_EVENT_REVIEW' THEN 0 WHEN 'PLAID_INVESTMENT_SYNC' THEN 1 WHEN 'PLAID_SYNC' THEN 1 WHEN 'NOTIFICATION_DELIVERY' THEN 2 WHEN 'ACCOUNT_INTELLIGENCE_LOOP' THEN 3 WHEN 'MARKET_DISCOVERY' THEN 4 WHEN 'OPTIONS_DISCOVERY' THEN 4 WHEN 'OPTIONS_ACCOUNT_REVIEW' THEN 4 WHEN 'MARKET_INTELLIGENCE' THEN 5 ELSE 5 END,created_at FOR UPDATE SKIP LOCKED LIMIT 1
     ) UPDATE background_jobs j SET status='RUNNING',attempts=j.attempts+1,
       locked_at=CURRENT_TIMESTAMP,updated_at=CURRENT_TIMESTAMP
-      FROM claimable c WHERE j.id=c.id RETURNING j.*`).all<Record<string, any>>();
+      FROM claimable c WHERE j.id=c.id RETURNING j.*`).bind(preferBroad).all<Record<string, any>>();
   if (process.env.VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY)
     webpush.setVapidDetails(
       process.env.EMAIL_FROM?.match(/<([^>]+)>/)?.[1]
@@ -93,7 +96,7 @@ async function processNotifications(request: Request,limits:{totalMs:number;jobM
   let jobsCompleted = 0,
     jobsFailed = 0;
   for (let claimCount=0;claimCount<20&&Date.now()<jobDeadline;claimCount++) {
-    const job=(await claimJob()).results[0];if(!job)break;jobs.results.push(job);
+    const job=(await claimJob(claimCount===0)).results[0];if(!job)break;jobs.results.push(job);
     try {
       await withWorkBudget(Math.max(1,Math.min(limits.jobMs,jobDeadline-Date.now())),async()=>{
       if (job.job_type === "PLAID_SYNC" || job.job_type === "PLAID_INVESTMENT_SYNC") {
@@ -114,6 +117,8 @@ async function processNotifications(request: Request,limits:{totalMs:number;jobM
         if(!householdId)throw new Error("MARKET_HOUSEHOLD_REQUIRED");
         await evaluateMarketIntelligence(db,householdId);
       }
+      if(job.job_type==='OPTIONS_DISCOVERY')await runOptionsDiscovery(db);
+      if(job.job_type==='OPTIONS_ACCOUNT_REVIEW'){const response=await analyzeAndStoreOptions(db,String(job.household_id),json(job.payload_json));if(!response.ok)throw Error('OPTIONS_REVIEW_'+response.status);}
       if(job.job_type==="MARKET_DISCOVERY")await runMarketDiscovery(db);
       if(job.job_type==="AI_EVENT_REVIEW"){const payload=json(job.payload_json);await authoritativeRecommendation(db,{householdId:String(job.household_id),accountId:String(payload.accountId),symbol:String(payload.symbol),force:true});}
       if(job.job_type==="QUANT_FLOW")await monitorQuantFlow(db,String(json(job.payload_json).symbol));

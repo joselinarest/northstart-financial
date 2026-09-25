@@ -183,7 +183,7 @@ assert.throws(()=>validateAIReasoning({...output,scenarios:{bull:90,base:90,bear
 assert.throws(()=>validateAIReasoning({...output,evidenceIds:['inventedSource']},request),/EVIDENCE/);
 const openAI=new OpenAIProvider('TEST_ONLY',async(url,options)=>{assert.equal(url,'https://api.openai.com/v1/responses');const body=JSON.parse(options.body);assert.equal(body.store,false);assert.equal(body.text.format.strict,true);assert.equal(body.tools,undefined);return new Response(JSON.stringify({status:'completed',output:[{type:'message',content:[{type:'output_text',text:JSON.stringify(output)}]}]}),{status:200,headers:{'x-request-id':'test'}});});
 assert.deepEqual(validateAIReasoning((await openAI.analyze(request)).output,request),output);
-const option={contractSymbol:'NVDA261218C00100000',type:'CALL',ask:3,bid:2.9,dte:45,spreadPct:3,impliedVolatility:.3,delta:.5,gamma:.01,theta:-.03,vega:.1,volume:100,openInterest:1000};
+const option={volatility:{allowed:true,riskMultiplier:1},contractSymbol:'NVDA261218C00100000',type:'CALL',ask:3,bid:2.9,dte:45,spreadPct:3,impliedVolatility:.3,delta:.5,gamma:.01,theta:-.03,vega:.1,volume:100,openInterest:1000};
 assert.equal(buildOptionCandidates([option],null,1000,600,true).length,1,'underlying first');
 const underlyingDecision={...good,action:'BUY_IF',providerStatus:'AVAILABLE',thesisStatus:'VALID'};
 const instruments=buildOptionCandidates([option,{...option,type:'PUT',contractSymbol:'NVDA261218P00100000'}],underlyingDecision,1000,600,true);
