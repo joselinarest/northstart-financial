@@ -6081,7 +6081,7 @@ export function NorthstarWorkspace({
       </main>
     );
   return (
-    <HoldingCostProvider holdings={connectedFinance.holdings} accountId={advisorAccountId}><main
+    <HoldingCostProvider holdings={connectedFinance.holdings} accountId={advisorAccountId} accounts={investmentAccounts}><main
       className={`workspace-view page-${(pathByTab[tab] || "dashboard").replace(/[^a-z-]/g, "")} ${["Account Transactions", "Bill Transactions"].includes(tab) ? "page-route-detail" : ""} ${researchDetailOpen ? "page-research-detail" : ""}`}
     >
       <RealtimeSync

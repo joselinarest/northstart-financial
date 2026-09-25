@@ -27,6 +27,9 @@ type OptionResult = {
     openInterest: number | null;
     iv: number | null;
     theta: number | null;
+    gamma?: number | null;
+    vega?: number | null;
+    rho?: number | null;
     premium: number;
     maxLoss: number;
     breakeven: number;
@@ -147,7 +150,7 @@ export default function SwingOptionsAdvisor({
           <span><small>Maximum loss</small><b>{money(result.contract.maxLoss)}</b><em>Premium at risk</em></span>
           <span><small>Break-even</small><b>{money(result.contract.breakeven)}</b><em>At expiration</em></span>
         </div>
-        <OptionsVolatilityPanel assessment={result.volatility}/>
+        <section className="rounded-lg border border-line bg-soft p-3"><h4>Greeks · contract price sensitivity</h4><div className="contract-metrics">{([["Delta",result.contract.delta,"Sensitivity to underlying price"],["Gamma",result.contract.gamma,"Change in Delta as underlying moves"],["Theta",result.contract.theta,"Time decay"],["Vega",result.contract.vega,"Sensitivity to implied volatility"],["Rho",result.contract.rho,"Sensitivity to interest rates"]] as const).map(([label,value,description])=><span key={label}><small>{label}</small><b>{value==null?"Unavailable":value.toFixed(4)}</b><em>{description}</em></span>)}</div><p>Vega measures how the option premium responds to implied volatility. Falling IV can reduce a long option’s value even when the stock moves in the expected direction. Greeks are local estimates and change with price, volatility and time.</p></section><OptionsVolatilityPanel assessment={result.volatility}/>
         <section className={`option-catalyst-gate ${result.catalystGate?.status?.toLowerCase() || "unavailable"}`}>
           <div><small>CATALYST / EVENT GATE</small><b>{result.catalystGate?.status || "UNAVAILABLE"}</b></div>
           <p>{result.catalystGate?.summary || "Current news and earnings coverage must load before an option entry can qualify."}</p>

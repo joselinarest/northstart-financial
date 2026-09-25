@@ -532,6 +532,7 @@ export default function AutomaticMarketCopilot({
   }, [data.asOf, strategy, accountName, accountScope, holdings]);
   const [collapsedCards,setCollapsedCards]=useState<Record<string,boolean>>({});
   const [sectionOpen,setSectionOpen]=useState(true);
+  const [columns,setColumns]=useState("multiple");
   return (
     <section id="today-market-context" className="auto-copilot"><button type="button" aria-expanded={sectionOpen} aria-controls="market-suggestions-body" onClick={()=>setSectionOpen(v=>!v)} style={{padding:16,cursor:"pointer",fontWeight:700,order:-10}}>Market suggestions · {sectionOpen?"hide":"show"}</button><div id="market-suggestions-body" style={{display:sectionOpen?"contents":"none"}}>
       <header>
@@ -561,7 +562,7 @@ export default function AutomaticMarketCopilot({
         </button>
       </header>
       <div className="copilot-account-context">
-        <b>Suggestions for: {accountName}</b>
+        <b>Suggestions for: {accountName}</b><label>Layout <select aria-label="Suggestion columns" value={columns} onChange={e=>setColumns(e.target.value)}><option value="single">One column</option><option value="multiple">Multiple columns</option></select></label>
         <span>
           {accountPurpose} · {selectedAccountType} · {holdings.length} holding
           {holdings.length === 1 ? "" : "s"} · $
@@ -807,139 +808,6 @@ export default function AutomaticMarketCopilot({
               </span>
             </div>
           )}
-          {!!actionAlerts.length && (
-            <section className="market-action-alert" role="alert">
-              <header>
-                <b>
-                  🔥{" "}
-                  {strategy === "long-term"
-                    ? "OWNED RETIREMENT HOLDING REVIEWS"
-                    : "HOT SWING DECISIONS"}{" "}
-                  · ACTION REVIEW NOW
-                </b>
-                <span>
-                  All actions below are calculated for {accountName} (
-                  {accountPurpose}). Northstar never places an order.
-                </span>
-              </header>
-              {actionAlerts.map((item) => {
-                const context = holdingContext(item.symbol),
-                  isFund = [
-                    "VTI",
-                    "VOO",
-                    "SCHD",
-                    "VXUS",
-                    "BND",
-                    "QQQ",
-                    "IWM",
-                    "URA",
-                    "NLR",
-                  ].includes(item.symbol),
-                  limit = isFund ? 25 : 10,
-                  owned =
-                    Boolean(context.holding) ||
-                    ownedSymbols.some(
-                      (symbol) =>
-                        symbol.toUpperCase() === item.symbol.toUpperCase(),
-                    ),
-                  atLimit = owned && context.weight >= limit,
-                  overLimit = owned && context.weight > limit,
-                  decisionReference =
-                    item.fairValue || item.sma200 || item.sma100 || item.sma50,
-                  referenceKind = item.fairValue
-                    ? "Fundamental fair-value model"
-                    : item.sma200
-                      ? "200-day market reference"
-                      : item.sma100
-                        ? "100-day market reference"
-                        : "50-day market reference",
-                  valuationPass = item.price <= decisionReference * 1.1,
-                  readyToBuy = !atLimit && item.stableBuy === true,
-                  action = overLimit
-                    ? "DO NOT BUY MORE · TRIM REVIEW"
-                    : owned && item.trend === "Bearish"
-                      ? "DO NOT BUY MORE · RISK REVIEW"
-                      : readyToBuy
-                        ? strategy === "long-term"
-                          ? owned
-                            ? "BUY MORE SHARES REVIEW — ALREADY OWNED"
-                            : "RESEARCH ONLY — NEW, NOT OWNED"
-                          : owned
-                            ? "YES — PREPARE SWING ADD"
-                            : "YES — PREPARE A SWING BUY"
-                        : "NO ACTION · CRITERIA NOT MET";
-                return (
-                  <article
-                    className={readyToBuy ? "hot-buy" : "hot-risk"}
-                    key={item.symbol}
-                  >
-                    <div>
-                      <i
-                        aria-label={
-                          readyToBuy
-                            ? "Buy criteria passed"
-                            : "Risk review required"
-                        }
-                      >
-                        {readyToBuy ? "👍" : "⚠"}
-                      </i>
-                      <strong>
-                        {action} · {item.symbol}
-                      </strong><HoldingCostBadge symbol={item.symbol} accountId={accountId} currentPrice={item.price}/>
-                      <span>
-                        {item.name || securityNames[item.symbol] || "Security"}
-                      </span>
-                    </div>
-                    <dl>
-                      <div>
-                        <dt>Selected account weight</dt>
-                        <dd>
-                          {owned
-                            ? `${context.weight.toFixed(1)}% / ${limit}% guide`
-                            : "Not owned"}
-                        </dd>
-                      </div>
-                      <div>
-                        <dt>Current price</dt>
-                        <dd>${item.price.toFixed(2)}</dd>
-                      </div>
-                      <div>
-                        <dt>
-                          {strategy === "long-term"
-                            ? "Accumulation reference"
-                            : "Required buy trigger"}
-                        </dt>
-                        <dd>
-                          {strategy === "long-term"
-                            ? `At/below $${decisionReference.toFixed(2)}`
-                            : `$${item.resistance.toFixed(2)} + model confirmation`}
-                        </dd>
-                      </div>
-                      <div>
-                        <dt>{referenceKind}</dt>
-                        <dd>${decisionReference.toFixed(2)}</dd>
-                      </div>
-                    </dl>
-                    <p>
-                      <b>Action now:</b>{" "}
-                      {overLimit
-                        ? `Do not buy more. This position exceeds the ${limit}% size guide for ${accountName}; open Portfolio for the consistent partial-trim calculation.`
-                        : readyToBuy
-                          ? strategy === "long-term"
-                            ? `The account-size check passed. Review a staged contribution for ${accountName}; this is a multi-year proposal, not a swing entry.`
-                            : `The account-size and market checks passed. Prepare the swing plan with invalidation near $${item.invalidation.toFixed(2)}.`
-                          : `Do not add now. Northstar’s account-size or market-evidence criteria did not pass.`}
-                    </p>
-                    <button type="button" onClick={() => onSelect(item.symbol)}>
-                      Open complete{" "}
-                      {strategy === "long-term" ? "retirement" : "swing"}{" "}
-                      analysis for {item.symbol} →
-                    </button>
-                  </article>
-                );
-              })}
-            </section>
-          )}
           <div className="proposal-settings">
             <div>
               <span>
@@ -1020,8 +888,8 @@ export default function AutomaticMarketCopilot({
             )}
           </div>
           {!(data.candidates || []).length && <div className="market-list-status" role="status"><b>{loading ? "Loading market suggestions…" : "No market candidates returned"}</b><p>{loading ? "Retrieving the latest provider scan. Stock cards appear here when it completes." : "The scan returned an empty shortlist. This is separate from the account HOLD/WAIT recommendations. Retry the live scan or check provider health."}</p></div>}
-          <div className="auto-grid" aria-label="Market stock suggestions">
-            {(data.candidates || []).slice(0, 6).map((item, index) => {
+          <div className="auto-grid" data-columns={columns} aria-label="Market stock suggestions">
+            {[...new Map([...actionAlerts,...(data.candidates || []).slice(0,6)].map(item=>[item.symbol,item])).values()].map((item, index) => {
               const riskPerShare = Math.max(
                   0.01,
                   item.price - item.invalidation,
