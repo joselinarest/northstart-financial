@@ -118,7 +118,7 @@ export default function SwingOptionsAdvisor({
       </div>
       <em>ANALYSIS ONLY · NO ORDER IS SENT</em>
     </div>
-    {accountPolicy&&<aside className="m-4 rounded-lg border border-line p-4"><b>{accountPolicy.optionsEnabled?'Options enabled · account risk checks required':'Options trading suggestions disabled for this account'}</b><p>Broad-market research remains available. {accountPolicy.optionsEnabled?('Account premium cap: '+money(accountPolicy.premiumCap)):"No contract entry will be suggested until you explicitly enable options in account settings."}</p><a href="/workspace/configuration">Review this account’s risk settings</a></aside>}
+    {accountPolicy&&<div role="note" className="option-account-policy"><b>{accountPolicy.optionsEnabled?'Options enabled · account risk checks required':'Options trading suggestions disabled for this account'}</b><p>Broad-market research remains available. {accountPolicy.optionsEnabled?('Account premium cap: '+money(accountPolicy.premiumCap)):"No contract entry will be suggested until you explicitly enable options in account settings."}</p><a href="/workspace/configuration">Review this account’s risk settings</a></div>}
     {!accountId && <div className="option-account-required" role="alert"><div><b>Investment account data is unavailable</b><span>{accountStatus}</span></div><div><button type="button" onClick={onRefreshAccounts}>Refresh accounts</button><button type="button" onClick={onConfigureAccount}>Open account settings</button></div></div>}
     <div className="option-fields">
       <label>Stock to analyze<input value={symbol} onChange={event => setSymbol(event.target.value.toUpperCase().replace(/[^A-Z.]/g, "").slice(0, 10))} /></label>

@@ -18822,3 +18822,8 @@ footer {
 .chart-level-key .support i{background:#62aee8}.chart-level-key .resistance i{background:#e5ad45}.chart-level-key .stop i{background:#f06d65}.chart-level-key .target i{background:#69d2a5}.chart-level-key .fib i{background:#9ce7c6}
 @media(max-width:700px){.chart-level-key{grid-template-columns:1fr 1fr;padding:8px}.chart-level-key span{grid-template-columns:9px 1fr;font-size:11px}.chart-level-key span b{grid-column:2;white-space:normal}.integrated-chart-canvas canvas{min-height:330px}}
 @media(max-width:390px){.chart-level-key{grid-template-columns:1fr}.chart-level-key span{grid-template-columns:9px 1fr auto}.chart-level-key span b{grid-column:auto;white-space:nowrap}}
+
+/* Policy notice stays in document flow rather than inheriting sidebar geometry. */
+.swing-options-advisor > .option-account-policy { position:static; display:grid; gap:8px; height:auto; min-height:0; min-width:0; margin:16px; padding:16px; border:1px solid var(--line); border-radius:10px; overflow-wrap:anywhere; }
+.swing-options-advisor > .option-account-policy p { margin:0; font-size:14px; line-height:1.5; letter-spacing:normal; color:inherit; }
+.swing-options-advisor > .option-account-policy a { text-decoration:underline; }
