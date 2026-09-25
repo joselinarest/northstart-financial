@@ -1,3 +1,5 @@
+import {accountRiskSettings} from '@/lib/account-risk-settings';
+import {saveManualHolding,ManualHoldingError,type ManualHoldingInput} from '@/lib/manual-holdings';
 import { workspace } from "@/lib/db";
 import { decryptSecret } from "@/lib/crypto";
 import { reviewKidsPlans } from "@/lib/kids-planning";
@@ -155,6 +157,7 @@ export async function PATCH(request: Request) {
         return Response.json({ error: "Cash balance must be zero or greater" }, { status: 400 });
       const cashCents = Math.round(cashBalance * 100);
       await db.prepare(`UPDATE accounts a SET available_balance_cents=?,current_balance_cents=?+COALESCE((SELECT SUM(ROUND(h.quantity*COALESCE(h.price_cents,0))) FROM holdings h WHERE h.account_id=a.id),0),updated_at=CURRENT_TIMESTAMP WHERE a.id=? AND a.connection_id IS NULL`).bind(cashCents,cashCents,body.accountId).run();
+      await db.prepare("UPDATE investment_account_settings SET available_cash_cents=?,updated_at=CURRENT_TIMESTAMP WHERE account_id=?").bind(cashCents,body.accountId).run();
       await reviewKidsPlans(db, householdId, "ACCOUNT_CHANGED");
     }
     const saved = await db
@@ -215,94 +218,14 @@ export async function POST(request: Request) {
         "Mixed",
       ];
     if (body.action === "add_manual_holding") {
-      const ticker = String(body.ticker || "")
-          .trim()
-          .toUpperCase()
-          .replace(/[^A-Z0-9.-]/g, "")
-          .slice(0, 12),
-        name = String(body.name || ticker)
-          .trim()
-          .slice(0, 120),
-        quantity = Number(body.quantity),
-        averageCost =
-          body.averageCost === undefined ||
-          body.averageCost === null ||
-          body.averageCost === ""
-            ? null
-            : Number(body.averageCost),
-        currentValue = Number(body.currentValue),
-        currentPrice = Number.isFinite(Number(body.currentPrice))
-          ? Number(body.currentPrice)
-          : Number.isFinite(currentValue) && quantity > 0
-            ? currentValue / quantity
-            : NaN,
-        acquisitionDate = String(body.acquisitionDate || "").trim() || null;
-      if (
-        !ticker ||
-        !Number.isFinite(quantity) ||
-        quantity <= 0 ||
-        (averageCost !== null &&
-          (!Number.isFinite(averageCost) || averageCost < 0)) ||
-        !Number.isFinite(currentPrice) ||
-        currentPrice < 0
-      )
-        return Response.json(
-          {
-            error:
-              "Ticker, positive quantity, and current price are required; average cost is optional",
-          },
-          { status: 400 },
-        );
-      const account = await db
-        .prepare(
-          "SELECT a.id FROM accounts a JOIN entities e ON e.id=a.entity_id WHERE a.id=? AND e.household_id=? AND a.connection_id IS NULL AND a.type='investment'",
-        )
-        .bind(body.accountId, householdId)
-        .first<Record<string, any>>();
-      if (!account)
-        return Response.json(
-          { error: "Manual investment account not found" },
-          { status: 404 },
-        );
-      const security = await db
-          .prepare(
-            "INSERT INTO securities(id,ticker,name,type,currency) VALUES(?,?,?,'stock','USD') ON CONFLICT(ticker,type) DO UPDATE SET name=excluded.name RETURNING id",
-          )
-          .bind(`manual_sec_${crypto.randomUUID()}`, ticker, name || ticker)
-          .first<{ id: string }>(),
-        holdingId = `manual_hold_${crypto.randomUUID()}`;
-      await db.batch([
-        db
-          .prepare(
-            "INSERT INTO holdings(id,account_id,security_id,quantity,cost_basis_cents,price_cents,price_at,acquisition_date) VALUES(?,?,?,?,?,?,CURRENT_TIMESTAMP,?) ON CONFLICT(account_id,security_id) DO UPDATE SET quantity=excluded.quantity,cost_basis_cents=excluded.cost_basis_cents,price_cents=excluded.price_cents,price_at=CURRENT_TIMESTAMP",
-          )
-          .bind(
-            holdingId,
-            body.accountId,
-            security!.id,
-            quantity,
-            averageCost === null
-              ? null
-              : Math.round(quantity * averageCost * 100),
-            Math.round(currentPrice * 100),
-            acquisitionDate,
-          ),
-        db
-          .prepare(
-            "INSERT INTO audit_log(id,household_id,user_id,action,target_type,target_id,metadata_json) VALUES(?,?,?,?,?,?,?)",
-          )
-          .bind(
-            `audit_${crypto.randomUUID()}`,
-            householdId,
-            userId,
-            "manual_holding_saved",
-            "holding",
-            holdingId,
-            JSON.stringify({ accountId: body.accountId, ticker, quantity }),
-          ),
-      ]);
-      await reviewKidsPlans(db, householdId, "ACCOUNT_CHANGED");
-      return Response.json({ ok: true, ticker }, { status: 201 });
+      try {
+        const result=await saveManualHolding(db,{householdId,userId},body as ManualHoldingInput);
+        let reviewPending=false;try{await reviewKidsPlans(db,householdId,"ACCOUNT_CHANGED")}catch{reviewPending=true}
+        return Response.json({...result,reviewPending},{status:201});
+      } catch(error) {
+        if(error instanceof ManualHoldingError)return Response.json({error:error.message},{status:error.status});
+        throw error;
+      }
     }
     const alias = String(body.alias || "")
       .trim()
@@ -339,7 +262,7 @@ export async function POST(request: Request) {
         { error: "Cash balance must be zero or greater" },
         { status: 400 },
       );
-    await db.batch([
+    await db.transaction(async tx=>{await tx.batch([
       db
         .prepare(
           "INSERT INTO accounts(id,entity_id,provider_account_id,name,official_name,nickname,investment_purpose,type,subtype,currency,current_balance_cents,available_balance_cents,investment_sync_status,manual_owner_name,updated_at) VALUES(?,?,?,?,?,?,?,'investment',?,'USD',?,?,'MANUAL',?,CURRENT_TIMESTAMP)",
@@ -375,6 +298,8 @@ export async function POST(request: Request) {
           }),
         ),
     ]);
+    await accountRiskSettings(tx,householdId,accountId);
+    });
     return Response.json(
       {
         ok: true,

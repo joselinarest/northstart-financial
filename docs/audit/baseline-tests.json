@@ -1,0 +1,67 @@
+[
+  {
+    "test": "trade-lifecycle-check",
+    "status": "PASS",
+    "output": "Trade lifecycle behavior: strong trend HOLD, broken thesis, target TRIM, concentration, tactical economics, confirmed pullback/breakout, cancellation, exact risk sizing, rotation and HOLD attribution passed.\n\n"
+  },
+  {
+    "test": "trade-lifecycle-integration-check",
+    "status": "FAIL",
+    "output": "\nCannot find package '@/lib' imported from D:\\Projects\\northstart-financial\\lib\\ai-decision-core.ts Error [ERR_MODULE_NOT_FOUND]: Cannot find package '@/lib' imported from D:\\Projects\\northstart-financial\\lib\\ai-decision-core.ts\n    at Object.getPackageJSONURL (node:internal/modules/package_json_reader:301:9)\n    at packageResolve (node:internal/modules/esm/resolve:768:81)\n    at moduleResolve (node:internal/modules/esm/resolve:859:18)\n    at defaultResolve (node:internal/modules/esm/resolve:992:11)\n    at #cachedDefaultResolve (node:internal/modules/esm/loader:701:20)\n    at #resolveAndMaybeBlockOnLoaderThread (node:internal/modules/esm/loader:721:38)\n    at nextStep (node:internal/modules/customization_hooks:189:26)\n    at resolve (file:///D:/Projects/northstart-financial/scripts/trade-lifecycle-integration-check.mjs:18:10)\n    at nextStep (node:internal/modules/customization_hooks:189:26)\n    at resolveWithHooks (node:internal/modules/customization_hooks:417:10)\n"
+  },
+  {
+    "test": "plaid-investments-check",
+    "status": "PASS",
+    "output": "Plaid Investments consent, provider refresh, holdings reconciliation, paginated trades, webhook queue, history, diagnostics, recovery flow, additive manual accounts, deduplicated account identity, and purpose-scoped Tactical Swing, and confirmed manual-account deletion verified.\n\n"
+  },
+  {
+    "test": "notification-events-check",
+    "status": "PASS",
+    "output": "Notifications passed: server-only generation, duplicate suppression, event timeline, per-device retry, quiet hours, persisted cross-device read state, household isolation, and real service-worker deep-link handler. Network push and deployed scheduler not exercised.\n\n"
+  },
+  {
+    "test": "worker-reliability-check",
+    "status": "PASS",
+    "output": "Worker reliability passed: exclusive lease, owner-only release, crash expiry recovery, safe retryable database errors.\n\n"
+  },
+  {
+    "test": "discovery-queue-check",
+    "status": "PASS",
+    "output": "PASS: persisted coverage, fair claims, lease recovery, no duplicate claims, directory idempotency, cached timestamps, 429 cooldown\n\n"
+  },
+  {
+    "test": "market-discovery-check",
+    "status": "PASS",
+    "output": "Market-wide discovery, selected-account ranking, and exact-ticker explanation checks passed\n\n"
+  },
+  {
+    "test": "daily-close-review-check",
+    "status": "PASS",
+    "output": "Always-on daily close review, next-session outlook, revision gating, and calibration checks passed\n\n"
+  },
+  {
+    "test": "ai-decision-engine-check",
+    "status": "FAIL",
+    "output": "\",\"ticker\",\"refresh\"].includes(k)))return Response.json({error:\"Only accountId, ticker and refresh are accepted. Market/account facts are loaded server-side.\"},{status:400});\\n' +\r\n    '    if(typeof body.accountId!==\"string\"||typeof body.ticker!==\"string\"||!/^[A-Za-z0-9.-]{1,24}$/.test(body.ticker))return Response.json({error:\"accountId and valid ticker are required\"},{status:400});\\n' +\r\n    '    const result=await authoritativeRecommendation(db,{householdId,accountId:body.accountId,symbol:body.ticker.toUpperCase(),force:body.refresh===true});\\n' +\r\n    '    return Response.json({decision:result.checks.aiEvidence,deterministicFacts:result.checks,readOnly:true},{headers:{\"Cache-Control\":\"private, no-store\"}});\\n' +\r\n    '  }catch(error){if(error instanceof Response)return error;return Response.json({error:error instanceof Error?error.message:\"Decision engine unavailable\"},{status:500});}\\n' +\r\n    '}\\n' +\r\n    'export async function GET(request:Request){\\n' +\r\n    '  try{const {db,householdId}=await workspace(request),url=new URL(request.url),accountId=url.searchParams.get(\"accountId\"),ticker=url.searchParams.get(\"ticker\");\\n' +\r\n    '    const result=await db.prepare(\"SELECT d.output_json,d.input_snapshot_json,d.status,c.expires_at FROM ai_current_decisions c JOIN ai_decision_runs d ON d.id=c.decision_id WHERE d.household_id=? AND c.account_id=? AND c.ticker=? AND c.expires_at>CURRENT_TIMESTAMP ORDER BY c.captured_at DESC LIMIT 1\").bind(householdId,accountId,ticker?.toUpperCase()).first();\\n' +\r\n    '    return result?Response.json(result,{headers:{\"Cache-Control\":\"private, no-store\"}}):Response.json({status:\"UNAVAILABLE\",error:\"No current account decision; request server-side analysis.\"},{status:404});\\n' +\r\n    '  }catch(error){if(error instanceof Response)return error;return Response.json({error:\"Decision unavailable\"},{status:500});}\\n' +\r\n    '}\\r\\n',\r\n  expected: /Investment account not found/,\r\n  operator: 'match',\r\n  diff: 'simple'\r\n}\r\n\r\nNode.js v24.19.0\r\n"
+  },
+  {
+    "test": "account-candidate-ranking-check",
+    "status": "PASS",
+    "output": "Account-specific candidate ranking and explicit ticker explanation contract verified.\n\n"
+  },
+  {
+    "test": "capital-rotation-check",
+    "status": "PASS",
+    "output": "PASS: HOLD baseline, explicit tax/cost/data gates, comparable horizons, confirmation separation, exact risk/cash sizing, rebuy comparison, no execution\n\n"
+  },
+  {
+    "test": "pattern-review-check",
+    "status": "PASS",
+    "output": "PASS: 26 pattern labels detected on synthetic candles; missing confirmations, malformed data, explicit timeframes, post-trade HOLD/MFE/MAE, unknown history and pending horizons.\n\n"
+  },
+  {
+    "test": "system-capability-check",
+    "status": "PASS",
+    "output": "System capability registry, runtime evidence, honest statuses, and System Health rendering verified.\n\n"
+  }
+]

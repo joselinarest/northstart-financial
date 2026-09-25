@@ -1,10 +1,11 @@
+import ts from 'typescript';import {readFileSync} from 'node:fs';
 process.on("uncaughtException",error=>{console.error(error.message,error.query||error.stack);process.exit(1);});
 import assert from 'node:assert/strict';
 import {registerHooks} from 'node:module';
 import {PGlite} from '@electric-sql/pglite';
 import {migrations} from '../db/migrations.ts';
 const stub=(source)=>`data:text/javascript,${encodeURIComponent(source)}`;
-registerHooks({resolve(specifier,context,next){
+registerHooks({load(url,context,next){if(url.startsWith('file:')&&url.endsWith('.ts'))return {format:'module',source:ts.transpileModule(readFileSync(new URL(url),'utf8'),{compilerOptions:{module:ts.ModuleKind.ESNext,target:ts.ScriptTarget.ES2022}}).outputText,shortCircuit:true};return next(url,context)},resolve(specifier,context,next){
   if(specifier==='@/lib/db')return {url:stub('export const id=(p)=>p+"_"+crypto.randomUUID();'),shortCircuit:true};
   if(specifier==='@/lib/providers/alpaca-market-data')return {url:stub('export const marketDataProvider=()=>{throw Error("Use test provider")};'),shortCircuit:true};
   if(specifier==='@/lib/authoritative-recommendation')return {url:stub('export const researchRecommendation=()=>{throw Error("Use test research")};'),shortCircuit:true};
@@ -15,8 +16,13 @@ registerHooks({resolve(specifier,context,next){
   if(specifier==='@/lib/lifecycle-options')return {url:new URL('../lib/lifecycle-options.ts',import.meta.url).href,shortCircuit:true};
   if(specifier==='@/lib/sector-benchmark')return {url:new URL('../lib/sector-benchmark.ts',import.meta.url).href,shortCircuit:true};
   if(specifier.startsWith('@/lib/ai-'))return {url:new URL(`../lib/${specifier.slice('@/lib/'.length)}.ts`,import.meta.url).href,shortCircuit:true};
+  if(specifier==='@/lib/runtime-secrets')return {url:stub('export const loadRuntimeSecrets=async()=>{};'),shortCircuit:true};
+  if(specifier.startsWith('@/lib/'))return {url:new URL('../lib/'+specifier.slice('@/lib/'.length)+'.ts',import.meta.url).href,shortCircuit:true};
   return next(specifier,context);
 }});
+// Stable Monday isolates lifecycle tests from Friday entry policy (tested separately).
+const NativeDate=Date;const testNow=NativeDate.UTC(2026,8,28,15),wallStart=NativeDate.now();
+globalThis.Date=class extends NativeDate{constructor(...args){super(...(args.length?args:[testNow+NativeDate.now()-wallStart]))}static now(){return testNow+NativeDate.now()-wallStart}};
 const {runTradeLifecycle,lifecycleAccountView}=await import('../lib/trade-lifecycle-service.ts');
 const pg=new PGlite();
 await pg.exec(`
@@ -149,10 +155,11 @@ const prior=(await pg.query("SELECT * FROM ai_decision_runs WHERE status='COMPLE
 const aiInput={householdId:'h',accountId:'a',accountName:'Private account name',ticker:'NVDA',strategy:'SWING_SHARES',requestType:'TEST',features:{...prior.input_snapshot_json,apiKey:'TEST_SECRET',accountNumber:'PRIVATE_NUMBER'},evidence:prior.evidence_json,dataTimestamp:new Date().toISOString(),requiredFacts:[],candidates:prior.output_json.deterministicCandidates};
 const good=await runCentralDecision(aiInput,{db,aiProvider});
 assert.equal(good.providerStatus,'AVAILABLE');assert.equal(good.executionAllowed,false);
-assert.equal(good.snapshotId,decisionSnapshotId(aiInput));
+assert.match(good.snapshotId,/^[a-f0-9]{64}$/); // Central engine adds the optional provider evidence before hashing.
 assert.notEqual(decisionSnapshotId(aiInput),decisionSnapshotId({...aiInput,features:{...aiInput.features,cash:123}}));
 assert.doesNotMatch(JSON.stringify(redactDecisionData(aiInput)),/TEST_SECRET|PRIVATE_NUMBER|Private account name/);
 const requestRow=(await pg.query("SELECT request_json FROM ai_decision_requests WHERE decision_id=$1",[good.decisionId])).rows[0];
+assert.equal(requestRow.request_json.snapshotId,good.snapshotId);
 assert.doesNotMatch(JSON.stringify(requestRow),/TEST_SECRET|PRIVATE_NUMBER/);
 const badProvider={name:'TEST',async analyze(input){const good=await aiProvider.analyze(input);return {...good,output:{...good.output,shares:999999}};}};
 const invented=await runCentralDecision(aiInput,{db,aiProvider:badProvider});

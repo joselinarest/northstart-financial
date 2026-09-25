@@ -8,6 +8,7 @@ const [workspace,styles,confirmation,predictionStyles,responsiveStyles,layoutSty
   readFile(new URL("../app/responsive-mobile.css",import.meta.url),"utf8"),
   readFile(new URL("../app/layout-system.css",import.meta.url),"utf8"),
 ]);
+const chart=await readFile(new URL("../app/chart-engine.tsx",import.meta.url),"utf8");
 const checks=[
   ["five mobile destinations",/["']Today["']/.test(workspace)&&/["']Portfolio["']/.test(workspace)&&/["']Markets["']/.test(workspace)&&/["']Finance["']/.test(workspace)&&workspace.includes("<span>Alerts</span>")],
   ["permission-aware secondary drawer",workspace.includes("visibleNavigationGroups.map")&&workspace.includes('id="workspace-navigation"')],
@@ -18,7 +19,7 @@ const checks=[
   ["mobile bottom sheets",styles.includes(".confirmation-overlay{align-items:end")&&styles.includes(".header-notification-modal{height:100%")],
   ["focus-trapped confirmation",confirmation.includes('event.key!=="Tab"')&&confirmation.includes("trigger?.focus()")],
   ["no native confirmation",!workspace.includes("window.alert(")&&!workspace.includes("window.confirm(")&&!workspace.includes("window.prompt(")],
-  ["projected future candles",workspace.includes("prediction-candles")&&workspace.includes("PROJECTED CANDLES")],
+  ["unavailable forecast is explicit",chart.includes("Forecast unavailable / insufficient confidence")&&!workspace.includes("PROJECTED CANDLES")],
   ["mobile chart reserves forecast region",predictionStyles.includes("inset:18px 44% 0 32px!important")&&!responsiveStyles.includes(".candle-field{min-width:0!important;width:100%!important")],
   ["native mobile document scrolling",styles.includes("body:has(>.workspace-view){height:auto!important")&&styles.includes("overflow-y:visible!important")&&responsiveStyles.includes("overflow-y:visible")],
   ["live mobile market countdown",workspace.includes('className="mobile-market-countdown"')&&/marketClock\.isOpen\s*\?\s*"CLOSES"\s*:\s*"OPENS"/.test(workspace)&&/mobile-market-countdown\{display:block!important/.test(styles)],

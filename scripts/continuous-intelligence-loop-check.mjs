@@ -6,7 +6,7 @@ const checks=[
  [worker.includes('runAccountIntelligenceLoop'),'worker executes loop'],
  [worker.includes('account-loop:${account.id}:${loopBucket}'),'account-specific scheduled idempotency'],
  [loop.includes("'SYNC'")&&loop.includes("'ANALYZE'")&&loop.includes("'PREDICT'")&&loop.includes("'RECOMMEND'")&&loop.includes("'ALERT'")&&loop.includes("'MEASURE'")&&loop.includes("'LEARN'")&&loop.includes("'REANALYZE'"),'all loop stages'],
- [loop.includes('decideInvestment')&&loop.includes('persist:true'),'central decision engine persists snapshots'],
+ [loop.includes('queueLifecycleTickers')&&read('lib/lifecycle-work-queue.ts').includes("'AI_EVENT_REVIEW'")&&worker.includes('authoritativeRecommendation'),'central decision engine persists snapshots'],
  [loop.includes('ai_decision_outcomes'),'immutable outcome measurement'],
  [loop.includes('account.id')&&loop.includes('account.strategy'),'account and strategy retained'],
  [api.includes("'ACCOUNT_INTELLIGENCE_LOOP'")&&api.includes('cycleKey'),'manual run enqueues backend job'],

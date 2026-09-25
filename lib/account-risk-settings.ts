@@ -7,6 +7,8 @@ export async function accountRiskSettings(db:PostgresDatabase,householdId:string
   // Unknown liquidity uses the conservative branch until market evidence confirms it.
   const recommended=recommendedTradingPolicy({accountType:account.strategy,value,cash,largestPositionBps:value?Number(account.largest)/100/value*10000:0,liquid:false});
   await db.prepare("INSERT INTO account_risk_config(account_id,recommended_json) VALUES(?,?) ON CONFLICT(account_id) DO UPDATE SET recommended_json=EXCLUDED.recommended_json").bind(accountId,JSON.stringify(recommended)).run();
+  const strategy=/SWING/i.test(account.strategy)?'SWING':/RETIRE/i.test(account.strategy)?'RETIREMENT':/CHILD|CUSTODIAL/i.test(account.strategy)?'CHILD_GROWTH':/DIVIDEND/i.test(account.strategy)?'DIVIDEND_INCOME':'GROWTH_5_7';
+  await db.prepare("INSERT INTO investment_account_settings(account_id,strategy_type,goal_name,risk_profile,maximum_position_bps,maximum_risk_bps,available_cash_cents,policy_json) VALUES(?,?,'Build wealth','CONSERVATIVE',?,?,?,?::jsonb) ON CONFLICT(account_id) DO NOTHING").bind(accountId,strategy,recommended.maxPositionBps,recommended.swingRiskBps,account.cash,JSON.stringify({tradingPolicy:recommended})).run();
   const saved=await db.prepare("SELECT custom_json FROM account_risk_config WHERE account_id=?").bind(accountId).first<{custom_json:TradingPolicy|null}>();
   return {accountId,value,cash,recommended,effective:saved?.custom_json||recommended};
 }

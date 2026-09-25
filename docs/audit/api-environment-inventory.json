@@ -1,0 +1,2189 @@
+{
+  "generatedAt": "2026-09-25T16:01:21.268Z",
+  "note": "Presence is not proof of correct request contract, authorization or runtime behavior.",
+  "routes": [
+    {
+      "file": "app/api/action-guidance/route.ts",
+      "route": "/api/action-guidance",
+      "methods": [
+        "GET"
+      ],
+      "verification": "UNVERIFIED"
+    },
+    {
+      "file": "app/api/ai/decision/route.ts",
+      "route": "/api/ai/decision",
+      "methods": [
+        "POST",
+        "GET"
+      ],
+      "verification": "UNVERIFIED"
+    },
+    {
+      "file": "app/api/ai/health/route.ts",
+      "route": "/api/ai/health",
+      "methods": [
+        "GET"
+      ],
+      "verification": "UNVERIFIED"
+    },
+    {
+      "file": "app/api/ai/investment-coach/route.ts",
+      "route": "/api/ai/investment-coach",
+      "methods": [
+        "POST"
+      ],
+      "verification": "UNVERIFIED"
+    },
+    {
+      "file": "app/api/alerts/route.ts",
+      "route": "/api/alerts",
+      "methods": [
+        "GET",
+        "PATCH"
+      ],
+      "verification": "UNVERIFIED"
+    },
+    {
+      "file": "app/api/alerts/stream/route.ts",
+      "route": "/api/alerts/stream",
+      "methods": [
+        "GET"
+      ],
+      "verification": "UNVERIFIED"
+    },
+    {
+      "file": "app/api/app-version/route.ts",
+      "route": "/api/app-version",
+      "methods": [
+        "GET"
+      ],
+      "verification": "UNVERIFIED"
+    },
+    {
+      "file": "app/api/auth/session/route.ts",
+      "route": "/api/auth/session",
+      "methods": [
+        "GET",
+        "POST",
+        "DELETE"
+      ],
+      "verification": "UNVERIFIED"
+    },
+    {
+      "file": "app/api/configuration/route.ts",
+      "route": "/api/configuration",
+      "methods": [
+        "GET",
+        "PUT"
+      ],
+      "verification": "UNVERIFIED"
+    },
+    {
+      "file": "app/api/connections/plaid/attempt/route.ts",
+      "route": "/api/connections/plaid/attempt",
+      "methods": [
+        "POST",
+        "GET"
+      ],
+      "verification": "UNVERIFIED"
+    },
+    {
+      "file": "app/api/connections/plaid/exchange/route.ts",
+      "route": "/api/connections/plaid/exchange",
+      "methods": [
+        "POST"
+      ],
+      "verification": "UNVERIFIED"
+    },
+    {
+      "file": "app/api/connections/plaid/investments-refresh/route.ts",
+      "route": "/api/connections/plaid/investments-refresh",
+      "methods": [
+        "POST"
+      ],
+      "verification": "UNVERIFIED"
+    },
+    {
+      "file": "app/api/connections/plaid/link-token/route.ts",
+      "route": "/api/connections/plaid/link-token",
+      "methods": [
+        "POST"
+      ],
+      "verification": "UNVERIFIED"
+    },
+    {
+      "file": "app/api/connections/plaid/route.ts",
+      "route": "/api/connections/plaid",
+      "methods": [
+        "GET",
+        "PATCH",
+        "POST",
+        "DELETE"
+      ],
+      "verification": "UNVERIFIED"
+    },
+    {
+      "file": "app/api/connections/plaid/sync/route.ts",
+      "route": "/api/connections/plaid/sync",
+      "methods": [
+        "POST"
+      ],
+      "verification": "UNVERIFIED"
+    },
+    {
+      "file": "app/api/connections/plaid/webhook/route.ts",
+      "route": "/api/connections/plaid/webhook",
+      "methods": [
+        "POST"
+      ],
+      "verification": "UNVERIFIED"
+    },
+    {
+      "file": "app/api/daily-market-review/route.ts",
+      "route": "/api/daily-market-review",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "verification": "UNVERIFIED"
+    },
+    {
+      "file": "app/api/dashboard/intelligence/route.ts",
+      "route": "/api/dashboard/intelligence",
+      "methods": [
+        "GET"
+      ],
+      "verification": "UNVERIFIED"
+    },
+    {
+      "file": "app/api/dev/market-discovery/route.ts",
+      "route": "/api/dev/market-discovery",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "verification": "UNVERIFIED"
+    },
+    {
+      "file": "app/api/dev/options-flow/route.ts",
+      "route": "/api/dev/options-flow",
+      "methods": [
+        "POST",
+        "GET"
+      ],
+      "verification": "UNVERIFIED"
+    },
+    {
+      "file": "app/api/documents/route.ts",
+      "route": "/api/documents",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "verification": "UNVERIFIED"
+    },
+    {
+      "file": "app/api/documents/[id]/route.ts",
+      "route": "/api/documents/[id]",
+      "methods": [
+        "GET"
+      ],
+      "verification": "UNVERIFIED"
+    },
+    {
+      "file": "app/api/entities/route.ts",
+      "route": "/api/entities",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "verification": "UNVERIFIED"
+    },
+    {
+      "file": "app/api/goals/route.ts",
+      "route": "/api/goals",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "verification": "UNVERIFIED"
+    },
+    {
+      "file": "app/api/health/route.ts",
+      "route": "/api/health",
+      "methods": [
+        "GET"
+      ],
+      "verification": "UNVERIFIED"
+    },
+    {
+      "file": "app/api/household/invitations/accept/route.ts",
+      "route": "/api/household/invitations/accept",
+      "methods": [
+        "POST"
+      ],
+      "verification": "UNVERIFIED"
+    },
+    {
+      "file": "app/api/household/invitations/route.ts",
+      "route": "/api/household/invitations",
+      "methods": [
+        "POST",
+        "DELETE"
+      ],
+      "verification": "UNVERIFIED"
+    },
+    {
+      "file": "app/api/household/members/route.ts",
+      "route": "/api/household/members",
+      "methods": [
+        "DELETE"
+      ],
+      "verification": "UNVERIFIED"
+    },
+    {
+      "file": "app/api/household/route.ts",
+      "route": "/api/household",
+      "methods": [
+        "GET"
+      ],
+      "verification": "UNVERIFIED"
+    },
+    {
+      "file": "app/api/intelligence-loop/route.ts",
+      "route": "/api/intelligence-loop",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "verification": "UNVERIFIED"
+    },
+    {
+      "file": "app/api/investment-accounts/route.ts",
+      "route": "/api/investment-accounts",
+      "methods": [
+        "GET",
+        "PUT"
+      ],
+      "verification": "UNVERIFIED"
+    },
+    {
+      "file": "app/api/investment-theses/route.ts",
+      "route": "/api/investment-theses",
+      "methods": [
+        "GET",
+        "PUT"
+      ],
+      "verification": "UNVERIFIED"
+    },
+    {
+      "file": "app/api/investment-transactions/route.ts",
+      "route": "/api/investment-transactions",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "verification": "UNVERIFIED"
+    },
+    {
+      "file": "app/api/investments/performance/route.ts",
+      "route": "/api/investments/performance",
+      "methods": [
+        "GET"
+      ],
+      "verification": "UNVERIFIED"
+    },
+    {
+      "file": "app/api/investments/rotation/route.ts",
+      "route": "/api/investments/rotation",
+      "methods": [
+        "GET"
+      ],
+      "verification": "UNVERIFIED"
+    },
+    {
+      "file": "app/api/kids-planning/route.ts",
+      "route": "/api/kids-planning",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "verification": "UNVERIFIED"
+    },
+    {
+      "file": "app/api/learning/route.ts",
+      "route": "/api/learning",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "verification": "UNVERIFIED"
+    },
+    {
+      "file": "app/api/liabilities/route.ts",
+      "route": "/api/liabilities",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "verification": "UNVERIFIED"
+    },
+    {
+      "file": "app/api/market/bars/route.ts",
+      "route": "/api/market/bars",
+      "methods": [
+        "GET"
+      ],
+      "verification": "UNVERIFIED"
+    },
+    {
+      "file": "app/api/market/candidates/discovery/route.ts",
+      "route": "/api/market/candidates/discovery",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "verification": "UNVERIFIED"
+    },
+    {
+      "file": "app/api/market/candidates/route.ts",
+      "route": "/api/market/candidates",
+      "methods": [
+        "GET"
+      ],
+      "verification": "UNVERIFIED"
+    },
+    {
+      "file": "app/api/market/clock/route.ts",
+      "route": "/api/market/clock",
+      "methods": [
+        "GET"
+      ],
+      "verification": "UNVERIFIED"
+    },
+    {
+      "file": "app/api/market/dividend-growth/route.ts",
+      "route": "/api/market/dividend-growth",
+      "methods": [
+        "GET"
+      ],
+      "verification": "UNVERIFIED"
+    },
+    {
+      "file": "app/api/market/flow/route.ts",
+      "route": "/api/market/flow",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "verification": "UNVERIFIED"
+    },
+    {
+      "file": "app/api/market/macro/route.ts",
+      "route": "/api/market/macro",
+      "methods": [
+        "GET"
+      ],
+      "verification": "UNVERIFIED"
+    },
+    {
+      "file": "app/api/market/news/route.ts",
+      "route": "/api/market/news",
+      "methods": [
+        "GET"
+      ],
+      "verification": "UNVERIFIED"
+    },
+    {
+      "file": "app/api/market/options/route.ts",
+      "route": "/api/market/options",
+      "methods": [
+        "POST"
+      ],
+      "verification": "UNVERIFIED"
+    },
+    {
+      "file": "app/api/market/options/scan/route.ts",
+      "route": "/api/market/options/scan",
+      "methods": [
+        "POST"
+      ],
+      "verification": "UNVERIFIED"
+    },
+    {
+      "file": "app/api/market/quant-data/route.ts",
+      "route": "/api/market/quant-data",
+      "methods": [
+        "GET"
+      ],
+      "verification": "UNVERIFIED"
+    },
+    {
+      "file": "app/api/market/quote/route.ts",
+      "route": "/api/market/quote",
+      "methods": [
+        "GET"
+      ],
+      "verification": "UNVERIFIED"
+    },
+    {
+      "file": "app/api/market/quotes/route.ts",
+      "route": "/api/market/quotes",
+      "methods": [
+        "GET"
+      ],
+      "verification": "UNVERIFIED"
+    },
+    {
+      "file": "app/api/market/research/route.ts",
+      "route": "/api/market/research",
+      "methods": [
+        "GET"
+      ],
+      "verification": "UNVERIFIED"
+    },
+    {
+      "file": "app/api/market/search/route.ts",
+      "route": "/api/market/search",
+      "methods": [
+        "GET"
+      ],
+      "verification": "UNVERIFIED"
+    },
+    {
+      "file": "app/api/market-alerts/evaluate/route.ts",
+      "route": "/api/market-alerts/evaluate",
+      "methods": [
+        "POST"
+      ],
+      "verification": "UNVERIFIED"
+    },
+    {
+      "file": "app/api/market-alerts/preferences/route.ts",
+      "route": "/api/market-alerts/preferences",
+      "methods": [
+        "GET",
+        "PUT"
+      ],
+      "verification": "UNVERIFIED"
+    },
+    {
+      "file": "app/api/market-discovery/evaluate/route.ts",
+      "route": "/api/market-discovery/evaluate",
+      "methods": [
+        "POST"
+      ],
+      "verification": "UNVERIFIED"
+    },
+    {
+      "file": "app/api/market-discovery/route.ts",
+      "route": "/api/market-discovery",
+      "methods": [
+        "GET"
+      ],
+      "verification": "UNVERIFIED"
+    },
+    {
+      "file": "app/api/notifications/events/route.ts",
+      "route": "/api/notifications/events",
+      "methods": [
+        "GET",
+        "PATCH"
+      ],
+      "verification": "UNVERIFIED"
+    },
+    {
+      "file": "app/api/notifications/history/route.ts",
+      "route": "/api/notifications/history",
+      "methods": [
+        "GET",
+        "PATCH"
+      ],
+      "verification": "UNVERIFIED"
+    },
+    {
+      "file": "app/api/notifications/investment-health/route.ts",
+      "route": "/api/notifications/investment-health",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "verification": "UNVERIFIED"
+    },
+    {
+      "file": "app/api/notifications/preferences/route.ts",
+      "route": "/api/notifications/preferences",
+      "methods": [
+        "GET",
+        "PATCH"
+      ],
+      "verification": "UNVERIFIED"
+    },
+    {
+      "file": "app/api/notifications/process/route.ts",
+      "route": "/api/notifications/process",
+      "methods": [
+        "POST"
+      ],
+      "verification": "UNVERIFIED"
+    },
+    {
+      "file": "app/api/notifications/push-subscription/route.ts",
+      "route": "/api/notifications/push-subscription",
+      "methods": [
+        "GET",
+        "POST",
+        "DELETE"
+      ],
+      "verification": "UNVERIFIED"
+    },
+    {
+      "file": "app/api/overview/route.ts",
+      "route": "/api/overview",
+      "methods": [
+        "GET"
+      ],
+      "verification": "UNVERIFIED"
+    },
+    {
+      "file": "app/api/paper-trades/route.ts",
+      "route": "/api/paper-trades",
+      "methods": [
+        "GET",
+        "POST",
+        "DELETE"
+      ],
+      "verification": "UNVERIFIED"
+    },
+    {
+      "file": "app/api/planned-actions/evaluate/route.ts",
+      "route": "/api/planned-actions/evaluate",
+      "methods": [
+        "POST"
+      ],
+      "verification": "UNVERIFIED"
+    },
+    {
+      "file": "app/api/planned-actions/route.ts",
+      "route": "/api/planned-actions",
+      "methods": [
+        "GET",
+        "POST",
+        "PATCH"
+      ],
+      "verification": "UNVERIFIED"
+    },
+    {
+      "file": "app/api/portfolio/advice/route.ts",
+      "route": "/api/portfolio/advice",
+      "methods": [
+        "GET"
+      ],
+      "verification": "UNVERIFIED"
+    },
+    {
+      "file": "app/api/portfolio/balance/route.ts",
+      "route": "/api/portfolio/balance",
+      "methods": [
+        "GET"
+      ],
+      "verification": "UNVERIFIED"
+    },
+    {
+      "file": "app/api/portfolio/history/route.ts",
+      "route": "/api/portfolio/history",
+      "methods": [
+        "GET"
+      ],
+      "verification": "UNVERIFIED"
+    },
+    {
+      "file": "app/api/portfolio/performance/route.ts",
+      "route": "/api/portfolio/performance",
+      "methods": [
+        "GET"
+      ],
+      "verification": "UNVERIFIED"
+    },
+    {
+      "file": "app/api/portfolio-builder/route.ts",
+      "route": "/api/portfolio-builder",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "verification": "UNVERIFIED"
+    },
+    {
+      "file": "app/api/predictions/route.ts",
+      "route": "/api/predictions",
+      "methods": [
+        "GET",
+        "POST",
+        "PATCH"
+      ],
+      "verification": "UNVERIFIED"
+    },
+    {
+      "file": "app/api/properties/account-links/route.ts",
+      "route": "/api/properties/account-links",
+      "methods": [
+        "GET",
+        "POST",
+        "DELETE"
+      ],
+      "verification": "UNVERIFIED"
+    },
+    {
+      "file": "app/api/properties/insights/route.ts",
+      "route": "/api/properties/insights",
+      "methods": [
+        "GET"
+      ],
+      "verification": "UNVERIFIED"
+    },
+    {
+      "file": "app/api/properties/route.ts",
+      "route": "/api/properties",
+      "methods": [
+        "GET",
+        "POST",
+        "PATCH"
+      ],
+      "verification": "UNVERIFIED"
+    },
+    {
+      "file": "app/api/recommendations/authoritative/route.ts",
+      "route": "/api/recommendations/authoritative",
+      "methods": [
+        "GET"
+      ],
+      "verification": "UNVERIFIED"
+    },
+    {
+      "file": "app/api/recommendations/evaluate/route.ts",
+      "route": "/api/recommendations/evaluate",
+      "methods": [
+        "POST"
+      ],
+      "verification": "UNVERIFIED"
+    },
+    {
+      "file": "app/api/recommendations/performance/route.ts",
+      "route": "/api/recommendations/performance",
+      "methods": [
+        "GET"
+      ],
+      "verification": "UNVERIFIED"
+    },
+    {
+      "file": "app/api/recommendations/route.ts",
+      "route": "/api/recommendations",
+      "methods": [
+        "GET",
+        "POST",
+        "PATCH"
+      ],
+      "verification": "UNVERIFIED"
+    },
+    {
+      "file": "app/api/recurring/route.ts",
+      "route": "/api/recurring",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "verification": "UNVERIFIED"
+    },
+    {
+      "file": "app/api/security/access-requests/route.ts",
+      "route": "/api/security/access-requests",
+      "methods": [
+        "GET",
+        "PATCH"
+      ],
+      "verification": "UNVERIFIED"
+    },
+    {
+      "file": "app/api/system/capabilities/route.ts",
+      "route": "/api/system/capabilities",
+      "methods": [
+        "GET"
+      ],
+      "verification": "UNVERIFIED"
+    },
+    {
+      "file": "app/api/system/foundation-audit/route.ts",
+      "route": "/api/system/foundation-audit",
+      "methods": [
+        "GET"
+      ],
+      "verification": "UNVERIFIED"
+    },
+    {
+      "file": "app/api/tactical-rebuy/route.ts",
+      "route": "/api/tactical-rebuy",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "verification": "UNVERIFIED"
+    },
+    {
+      "file": "app/api/trade-lifecycle/route.ts",
+      "route": "/api/trade-lifecycle",
+      "methods": [
+        "GET"
+      ],
+      "verification": "UNVERIFIED"
+    },
+    {
+      "file": "app/api/transactions/route.ts",
+      "route": "/api/transactions",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "verification": "UNVERIFIED"
+    },
+    {
+      "file": "app/api/watchlist/route.ts",
+      "route": "/api/watchlist",
+      "methods": [
+        "GET",
+        "POST",
+        "DELETE"
+      ],
+      "verification": "UNVERIFIED"
+    }
+  ],
+  "requests": [
+    {
+      "file": "app/account-growth-chart.tsx",
+      "url": "/api/investments/performance?accountId=${encodeURIComponent(accountId)}",
+      "verification": "STATIC_INVENTORY_ONLY"
+    },
+    {
+      "file": "app/action-guidance-panel.tsx",
+      "url": "/api/intelligence-loop",
+      "verification": "STATIC_INVENTORY_ONLY"
+    },
+    {
+      "file": "app/action-guidance-panel.tsx",
+      "url": "/api/action-guidance?accountId=${encodeURIComponent(accountId)}",
+      "verification": "STATIC_INVENTORY_ONLY"
+    },
+    {
+      "file": "app/action-guidance-panel.tsx",
+      "url": "/api/planned-actions",
+      "verification": "STATIC_INVENTORY_ONLY"
+    },
+    {
+      "file": "app/ai-health-panel.tsx",
+      "url": "/api/ai/health",
+      "verification": "STATIC_INVENTORY_ONLY"
+    },
+    {
+      "file": "app/api/ai/investment-coach/route.ts",
+      "url": "https://api.openai.com/v1/responses",
+      "verification": "STATIC_INVENTORY_ONLY"
+    },
+    {
+      "file": "app/api/connections/plaid/exchange/route.ts",
+      "url": "${host}/item/public_token/exchange",
+      "verification": "STATIC_INVENTORY_ONLY"
+    },
+    {
+      "file": "app/api/connections/plaid/investments-refresh/route.ts",
+      "url": "${host()}/investments/refresh",
+      "verification": "STATIC_INVENTORY_ONLY"
+    },
+    {
+      "file": "app/api/connections/plaid/link-token/route.ts",
+      "url": "${host}/link/token/create",
+      "verification": "STATIC_INVENTORY_ONLY"
+    },
+    {
+      "file": "app/api/connections/plaid/route.ts",
+      "url": "${host}/item/remove",
+      "verification": "STATIC_INVENTORY_ONLY"
+    },
+    {
+      "file": "app/api/connections/plaid/sync/route.ts",
+      "url": "${plaidHost()}${path}",
+      "verification": "STATIC_INVENTORY_ONLY"
+    },
+    {
+      "file": "app/api/connections/plaid/sync/route.ts",
+      "url": "${base}/api/notifications/process",
+      "verification": "STATIC_INVENTORY_ONLY"
+    },
+    {
+      "file": "app/api/connections/plaid/webhook/route.ts",
+      "url": "${base}/api/notifications/process",
+      "verification": "STATIC_INVENTORY_ONLY"
+    },
+    {
+      "file": "app/api/household/invitations/route.ts",
+      "url": "https://api.resend.com/emails",
+      "verification": "STATIC_INVENTORY_ONLY"
+    },
+    {
+      "file": "app/api/market/candidates/route.ts",
+      "url": "https://finnhub.io/api/v1/stock/metric?symbol=${candidate.symbol}&metric=all",
+      "verification": "STATIC_INVENTORY_ONLY"
+    },
+    {
+      "file": "app/api/market/candidates/route.ts",
+      "url": "https://finnhub.io/api/v1/stock/profile2?symbol=${candidate.symbol}",
+      "verification": "STATIC_INVENTORY_ONLY"
+    },
+    {
+      "file": "app/api/market/macro/route.ts",
+      "url": "https://api.stlouisfed.org/fred/series/observations?${params}",
+      "verification": "STATIC_INVENTORY_ONLY"
+    },
+    {
+      "file": "app/api/market/news/route.ts",
+      "url": "https://eventregistry.org/api/v1/article/getArticles",
+      "verification": "STATIC_INVENTORY_ONLY"
+    },
+    {
+      "file": "app/api/market/options/route.ts",
+      "url": "https://data.alpaca.markets/v1beta1/options/snapshots/",
+      "verification": "STATIC_INVENTORY_ONLY"
+    },
+    {
+      "file": "app/api/market/quote/route.ts",
+      "url": "https://data.alpaca.markets/v2/stocks/${symbol}/snapshot",
+      "verification": "STATIC_INVENTORY_ONLY"
+    },
+    {
+      "file": "app/api/market/research/route.ts",
+      "url": "${base}${path}",
+      "verification": "STATIC_INVENTORY_ONLY"
+    },
+    {
+      "file": "app/api/market/search/route.ts",
+      "url": "${base}/v2/assets?status=active&asset_class=us_equity",
+      "verification": "STATIC_INVENTORY_ONLY"
+    },
+    {
+      "file": "app/automatic-market-copilot.tsx",
+      "url": "/api/watchlist",
+      "verification": "STATIC_INVENTORY_ONLY"
+    },
+    {
+      "file": "app/automatic-market-copilot.tsx",
+      "url": "/api/market/candidates?strategy=${strategy}&analysisVersion=4&refresh=${Date.now()}",
+      "verification": "STATIC_INVENTORY_ONLY"
+    },
+    {
+      "file": "app/capital-rotation-panel.tsx",
+      "url": "/api/intelligence-loop",
+      "verification": "STATIC_INVENTORY_ONLY"
+    },
+    {
+      "file": "app/capital-rotation-panel.tsx",
+      "url": "/api/investments/rotation?accountId=${encodeURIComponent(accountId)}",
+      "verification": "STATIC_INVENTORY_ONLY"
+    },
+    {
+      "file": "app/chart-decision-workspace.tsx",
+      "url": "/api/market/research?symbol=${encodeURIComponent(props.symbol)}",
+      "verification": "STATIC_INVENTORY_ONLY"
+    },
+    {
+      "file": "app/chart-decision-workspace.tsx",
+      "url": "/api/recommendations/authoritative?accountId=${encodeURIComponent(props.accountId)}&symbol=${encodeURIComponent(props.symbol)}",
+      "verification": "STATIC_INVENTORY_ONLY"
+    },
+    {
+      "file": "app/chart-decision-workspace.tsx",
+      "url": "/api/recommendations/authoritative?accountId=${encodeURIComponent(props.accountId)}&symbol=${encodeURIComponent(props.symbol)}&refresh=true",
+      "verification": "STATIC_INVENTORY_ONLY"
+    },
+    {
+      "file": "app/chart-decision-workspace.tsx",
+      "url": "/api/recommendations/authoritative?accountId=${encodeURIComponent(props.accountId)}&symbol=${encodeURIComponent(props.symbol)}&refresh=true",
+      "verification": "STATIC_INVENTORY_ONLY"
+    },
+    {
+      "file": "app/chart-engine.tsx",
+      "url": "/api/planned-actions",
+      "verification": "STATIC_INVENTORY_ONLY"
+    },
+    {
+      "file": "app/chart-engine.tsx",
+      "url": "/api/market/bars?symbol=${encodeURIComponent(props.symbol)}&range=${timeframe}",
+      "verification": "STATIC_INVENTORY_ONLY"
+    },
+    {
+      "file": "app/chart-engine.tsx",
+      "url": "/api/market/bars?symbol=${encodeURIComponent(props.symbol)}&range=${range}",
+      "verification": "STATIC_INVENTORY_ONLY"
+    },
+    {
+      "file": "app/chart-pattern-gallery.tsx",
+      "url": "/api/market/bars?symbol=${encodeURIComponent(symbol)}&range=${range}",
+      "verification": "STATIC_INVENTORY_ONLY"
+    },
+    {
+      "file": "app/chart-prediction-lab.tsx",
+      "url": "/api/market/bars?symbol=${symbol}&range=1Y",
+      "verification": "STATIC_INVENTORY_ONLY"
+    },
+    {
+      "file": "app/child-account-attachment.tsx",
+      "url": "/api/kids-planning",
+      "verification": "STATIC_INVENTORY_ONLY"
+    },
+    {
+      "file": "app/child-account-attachment.tsx",
+      "url": "/api/connections/plaid",
+      "verification": "STATIC_INVENTORY_ONLY"
+    },
+    {
+      "file": "app/child-account-attachment.tsx",
+      "url": "/api/kids-planning",
+      "verification": "STATIC_INVENTORY_ONLY"
+    },
+    {
+      "file": "app/configuration-center.tsx",
+      "url": "/api/configuration",
+      "verification": "STATIC_INVENTORY_ONLY"
+    },
+    {
+      "file": "app/configuration-center.tsx",
+      "url": "/api/configuration",
+      "verification": "STATIC_INVENTORY_ONLY"
+    },
+    {
+      "file": "app/connected-holdings-analysis.tsx",
+      "url": "/api/portfolio/history?accountId=${encodeURIComponent(accountId)}",
+      "verification": "STATIC_INVENTORY_ONLY"
+    },
+    {
+      "file": "app/connected-holdings-analysis.tsx",
+      "url": "/api/market/bars?symbol=${encodeURIComponent(symbol)}&range=1Y",
+      "verification": "STATIC_INVENTORY_ONLY"
+    },
+    {
+      "file": "app/connected-holdings-analysis.tsx",
+      "url": "/api/market/research?symbol=${encodeURIComponent(symbol)}",
+      "verification": "STATIC_INVENTORY_ONLY"
+    },
+    {
+      "file": "app/daily-close-review.tsx",
+      "url": "/api/daily-market-review",
+      "verification": "STATIC_INVENTORY_ONLY"
+    },
+    {
+      "file": "app/dividend-growth-finder.tsx",
+      "url": "/api/market/dividend-growth?refresh=${Date.now()}",
+      "verification": "STATIC_INVENTORY_ONLY"
+    },
+    {
+      "file": "app/dividend-growth-finder.tsx",
+      "url": "/api/watchlist",
+      "verification": "STATIC_INVENTORY_ONLY"
+    },
+    {
+      "file": "app/flow-intelligence-panel.tsx",
+      "url": "/api/market/flow?symbol=${encodeURIComponent(symbol)}",
+      "verification": "STATIC_INVENTORY_ONLY"
+    },
+    {
+      "file": "app/flow-intelligence-panel.tsx",
+      "url": "/api/market/flow",
+      "verification": "STATIC_INVENTORY_ONLY"
+    },
+    {
+      "file": "app/foundation-audit-panel.tsx",
+      "url": "/api/system/foundation-audit",
+      "verification": "STATIC_INVENTORY_ONLY"
+    },
+    {
+      "file": "app/header-market-search.tsx",
+      "url": "/api/market/search?q=${encodeURIComponent(query.trim())}",
+      "verification": "STATIC_INVENTORY_ONLY"
+    },
+    {
+      "file": "app/holding-price-limits.tsx",
+      "url": "/api/watchlist?includeQuotes=0",
+      "verification": "STATIC_INVENTORY_ONLY"
+    },
+    {
+      "file": "app/holding-price-limits.tsx",
+      "url": "/api/market/bars?symbol=${encodeURIComponent(symbol)}&range=1Y",
+      "verification": "STATIC_INVENTORY_ONLY"
+    },
+    {
+      "file": "app/holding-price-limits.tsx",
+      "url": "/api/watchlist",
+      "verification": "STATIC_INVENTORY_ONLY"
+    },
+    {
+      "file": "app/intelligence-loop-health.tsx",
+      "url": "/api/intelligence-loop",
+      "verification": "STATIC_INVENTORY_ONLY"
+    },
+    {
+      "file": "app/intelligence-loop-health.tsx",
+      "url": "/api/intelligence-loop",
+      "verification": "STATIC_INVENTORY_ONLY"
+    },
+    {
+      "file": "app/investment-account-manager.tsx",
+      "url": "/api/investment-accounts",
+      "verification": "STATIC_INVENTORY_ONLY"
+    },
+    {
+      "file": "app/investment-account-manager.tsx",
+      "url": "/api/investment-transactions?accountId=${encodeURIComponent(String(selected.id))}",
+      "verification": "STATIC_INVENTORY_ONLY"
+    },
+    {
+      "file": "app/investment-account-manager.tsx",
+      "url": "/api/investment-accounts",
+      "verification": "STATIC_INVENTORY_ONLY"
+    },
+    {
+      "file": "app/investment-account-manager.tsx",
+      "url": "/api/investment-transactions",
+      "verification": "STATIC_INVENTORY_ONLY"
+    },
+    {
+      "file": "app/investment-account-profile.tsx",
+      "url": "/api/investment-accounts",
+      "verification": "STATIC_INVENTORY_ONLY"
+    },
+    {
+      "file": "app/investment-command-center.tsx",
+      "url": "/api/action-guidance?accountId=${encodeURIComponent(accountId)}",
+      "verification": "STATIC_INVENTORY_ONLY"
+    },
+    {
+      "file": "app/investment-command-center.tsx",
+      "url": "/api/market/clock",
+      "verification": "STATIC_INVENTORY_ONLY"
+    },
+    {
+      "file": "app/investment-command-center.tsx",
+      "url": "/api/market/macro",
+      "verification": "STATIC_INVENTORY_ONLY"
+    },
+    {
+      "file": "app/investment-command-center.tsx",
+      "url": "/api/dashboard/intelligence?accountId=${encodeURIComponent(accountId)}",
+      "verification": "STATIC_INVENTORY_ONLY"
+    },
+    {
+      "file": "app/investment-command-center.tsx",
+      "url": "/api/portfolio/performance?accountId=${encodeURIComponent(accountId)}",
+      "verification": "STATIC_INVENTORY_ONLY"
+    },
+    {
+      "file": "app/investment-notification-health.tsx",
+      "url": "/api/notifications/investment-health",
+      "verification": "STATIC_INVENTORY_ONLY"
+    },
+    {
+      "file": "app/investment-notification-health.tsx",
+      "url": "/api/notifications/investment-health",
+      "verification": "STATIC_INVENTORY_ONLY"
+    },
+    {
+      "file": "app/kids-goals-center.tsx",
+      "url": "/api/kids-planning",
+      "verification": "STATIC_INVENTORY_ONLY"
+    },
+    {
+      "file": "app/kids-goals-center.tsx",
+      "url": "/api/kids-planning",
+      "verification": "STATIC_INVENTORY_ONLY"
+    },
+    {
+      "file": "app/kids-holding-actions.tsx",
+      "url": "/api/ai/decision",
+      "verification": "STATIC_INVENTORY_ONLY"
+    },
+    {
+      "file": "app/linked-chart-setup.tsx",
+      "url": "/api/market/bars?symbol=${encodeURIComponent(symbol)}&range=5m",
+      "verification": "STATIC_INVENTORY_ONLY"
+    },
+    {
+      "file": "app/long-term-balance-card.tsx",
+      "url": "/api/portfolio/balance?accountId=${encodeURIComponent(accountId)}",
+      "verification": "STATIC_INVENTORY_ONLY"
+    },
+    {
+      "file": "app/market-alert-center.tsx",
+      "url": "/api/alerts?unread=false",
+      "verification": "STATIC_INVENTORY_ONLY"
+    },
+    {
+      "file": "app/market-alert-center.tsx",
+      "url": "/api/market-alerts/preferences",
+      "verification": "STATIC_INVENTORY_ONLY"
+    },
+    {
+      "file": "app/market-alert-center.tsx",
+      "url": "/api/alerts",
+      "verification": "STATIC_INVENTORY_ONLY"
+    },
+    {
+      "file": "app/market-alert-center.tsx",
+      "url": "/api/market-alerts/preferences",
+      "verification": "STATIC_INVENTORY_ONLY"
+    },
+    {
+      "file": "app/market-alert-center.tsx",
+      "url": "/api/market-alerts/preferences",
+      "verification": "STATIC_INVENTORY_ONLY"
+    },
+    {
+      "file": "app/market-alert-center.tsx",
+      "url": "/api/market-alerts/evaluate",
+      "verification": "STATIC_INVENTORY_ONLY"
+    },
+    {
+      "file": "app/market-session-report.tsx",
+      "url": "/api/market/bars?symbol=${symbol}&range=1Y",
+      "verification": "STATIC_INVENTORY_ONLY"
+    },
+    {
+      "file": "app/market-watchlist.tsx",
+      "url": "/api/watchlist",
+      "verification": "STATIC_INVENTORY_ONLY"
+    },
+    {
+      "file": "app/market-watchlist.tsx",
+      "url": "/api/watchlist",
+      "verification": "STATIC_INVENTORY_ONLY"
+    },
+    {
+      "file": "app/new-candidate-discovery.tsx",
+      "url": "/api/market/candidates/discovery?accountId=${encodeURIComponent(accountId)}&strategy=ALL&search=${encodeURIComponent(symbol)}",
+      "verification": "STATIC_INVENTORY_ONLY"
+    },
+    {
+      "file": "app/new-candidate-discovery.tsx",
+      "url": "/api/market/candidates/discovery",
+      "verification": "STATIC_INVENTORY_ONLY"
+    },
+    {
+      "file": "app/northstar-workspace.tsx",
+      "url": "/api/ai/investment-coach",
+      "verification": "STATIC_INVENTORY_ONLY"
+    },
+    {
+      "file": "app/northstar-workspace.tsx",
+      "url": "/api/market/quotes?symbols=${encodeURIComponent(symbol)}",
+      "verification": "STATIC_INVENTORY_ONLY"
+    },
+    {
+      "file": "app/northstar-workspace.tsx",
+      "url": "/api/market/bars?symbol=${encodeURIComponent(symbol)}&range=1Y",
+      "verification": "STATIC_INVENTORY_ONLY"
+    },
+    {
+      "file": "app/northstar-workspace.tsx",
+      "url": "/api/alerts?unread=true",
+      "verification": "STATIC_INVENTORY_ONLY"
+    },
+    {
+      "file": "app/northstar-workspace.tsx",
+      "url": "/api/alerts",
+      "verification": "STATIC_INVENTORY_ONLY"
+    },
+    {
+      "file": "app/northstar-workspace.tsx",
+      "url": "/api/alerts",
+      "verification": "STATIC_INVENTORY_ONLY"
+    },
+    {
+      "file": "app/northstar-workspace.tsx",
+      "url": "/api/predictions",
+      "verification": "STATIC_INVENTORY_ONLY"
+    },
+    {
+      "file": "app/northstar-workspace.tsx",
+      "url": "/api/household",
+      "verification": "STATIC_INVENTORY_ONLY"
+    },
+    {
+      "file": "app/northstar-workspace.tsx",
+      "url": "/api/household/invitations",
+      "verification": "STATIC_INVENTORY_ONLY"
+    },
+    {
+      "file": "app/northstar-workspace.tsx",
+      "url": "/api/household/invitations",
+      "verification": "STATIC_INVENTORY_ONLY"
+    },
+    {
+      "file": "app/northstar-workspace.tsx",
+      "url": "/api/household/members",
+      "verification": "STATIC_INVENTORY_ONLY"
+    },
+    {
+      "file": "app/northstar-workspace.tsx",
+      "url": "/api/household/invitations/accept",
+      "verification": "STATIC_INVENTORY_ONLY"
+    },
+    {
+      "file": "app/northstar-workspace.tsx",
+      "url": "/api/connections/plaid",
+      "verification": "STATIC_INVENTORY_ONLY"
+    },
+    {
+      "file": "app/northstar-workspace.tsx",
+      "url": "/api/transactions",
+      "verification": "STATIC_INVENTORY_ONLY"
+    },
+    {
+      "file": "app/northstar-workspace.tsx",
+      "url": "/api/connections/plaid",
+      "verification": "STATIC_INVENTORY_ONLY"
+    },
+    {
+      "file": "app/northstar-workspace.tsx",
+      "url": "/api/investment-accounts",
+      "verification": "STATIC_INVENTORY_ONLY"
+    },
+    {
+      "file": "app/northstar-workspace.tsx",
+      "url": "/api/connections/plaid",
+      "verification": "STATIC_INVENTORY_ONLY"
+    },
+    {
+      "file": "app/northstar-workspace.tsx",
+      "url": "/api/connections/plaid",
+      "verification": "STATIC_INVENTORY_ONLY"
+    },
+    {
+      "file": "app/northstar-workspace.tsx",
+      "url": "/api/connections/plaid/sync",
+      "verification": "STATIC_INVENTORY_ONLY"
+    },
+    {
+      "file": "app/northstar-workspace.tsx",
+      "url": "/api/connections/plaid/investments-refresh",
+      "verification": "STATIC_INVENTORY_ONLY"
+    },
+    {
+      "file": "app/northstar-workspace.tsx",
+      "url": "/api/connections/plaid",
+      "verification": "STATIC_INVENTORY_ONLY"
+    },
+    {
+      "file": "app/northstar-workspace.tsx",
+      "url": "/api/connections/plaid",
+      "verification": "STATIC_INVENTORY_ONLY"
+    },
+    {
+      "file": "app/northstar-workspace.tsx",
+      "url": "/api/connections/plaid/attempt",
+      "verification": "STATIC_INVENTORY_ONLY"
+    },
+    {
+      "file": "app/northstar-workspace.tsx",
+      "url": "/api/connections/plaid/exchange",
+      "verification": "STATIC_INVENTORY_ONLY"
+    },
+    {
+      "file": "app/northstar-workspace.tsx",
+      "url": "/api/connections/plaid/link-token",
+      "verification": "STATIC_INVENTORY_ONLY"
+    },
+    {
+      "file": "app/northstar-workspace.tsx",
+      "url": "/api/market/quote?symbol=${encodeURIComponent(query)}",
+      "verification": "STATIC_INVENTORY_ONLY"
+    },
+    {
+      "file": "app/northstar-workspace.tsx",
+      "url": "/api/market/options",
+      "verification": "STATIC_INVENTORY_ONLY"
+    },
+    {
+      "file": "app/northstar-workspace.tsx",
+      "url": "/api/market/clock",
+      "verification": "STATIC_INVENTORY_ONLY"
+    },
+    {
+      "file": "app/northstar-workspace.tsx",
+      "url": "/api/documents",
+      "verification": "STATIC_INVENTORY_ONLY"
+    },
+    {
+      "file": "app/northstar-workspace.tsx",
+      "url": "/api/documents/${data.id}",
+      "verification": "STATIC_INVENTORY_ONLY"
+    },
+    {
+      "file": "app/northstar-workspace.tsx",
+      "url": "/api/auth/session",
+      "verification": "STATIC_INVENTORY_ONLY"
+    },
+    {
+      "file": "app/northstar-workspace.tsx",
+      "url": "/api/overview",
+      "verification": "STATIC_INVENTORY_ONLY"
+    },
+    {
+      "file": "app/northstar-workspace.tsx",
+      "url": "/api/market/clock",
+      "verification": "STATIC_INVENTORY_ONLY"
+    },
+    {
+      "file": "app/northstar-workspace.tsx",
+      "url": "/api/market/bars?symbol=${encodeURIComponent(chartSymbol)}&range=${timeframe}",
+      "verification": "STATIC_INVENTORY_ONLY"
+    },
+    {
+      "file": "app/northstar-workspace.tsx",
+      "url": "/api/market/quotes?symbols=${encodeURIComponent(chartSymbol)}",
+      "verification": "STATIC_INVENTORY_ONLY"
+    },
+    {
+      "file": "app/northstar-workspace.tsx",
+      "url": "/api/market-discovery?symbol=${encodeURIComponent(selectedInvestmentId)}",
+      "verification": "STATIC_INVENTORY_ONLY"
+    },
+    {
+      "file": "app/northstar-workspace.tsx",
+      "url": "/api/market/research?symbol=${encodeURIComponent(selectedInvestment.symbol)}",
+      "verification": "STATIC_INVENTORY_ONLY"
+    },
+    {
+      "file": "app/northstar-workspace.tsx",
+      "url": "/api/market/news",
+      "verification": "STATIC_INVENTORY_ONLY"
+    },
+    {
+      "file": "app/northstar-workspace.tsx",
+      "url": "/api/market/macro",
+      "verification": "STATIC_INVENTORY_ONLY"
+    },
+    {
+      "file": "app/northstar-workspace.tsx",
+      "url": "/api/notifications/push-subscription",
+      "verification": "STATIC_INVENTORY_ONLY"
+    },
+    {
+      "file": "app/northstar-workspace.tsx",
+      "url": "/api/notifications/push-subscription",
+      "verification": "STATIC_INVENTORY_ONLY"
+    },
+    {
+      "file": "app/northstar-workspace.tsx",
+      "url": "/api/alerts",
+      "verification": "STATIC_INVENTORY_ONLY"
+    },
+    {
+      "file": "app/northstar-workspace.tsx",
+      "url": "/api/notifications/push-subscription",
+      "verification": "STATIC_INVENTORY_ONLY"
+    },
+    {
+      "file": "app/notification-event-center.tsx",
+      "url": "/api/notifications/events${eventId?",
+      "verification": "STATIC_INVENTORY_ONLY"
+    },
+    {
+      "file": "app/notification-event-center.tsx",
+      "url": "/api/notifications/events",
+      "verification": "STATIC_INVENTORY_ONLY"
+    },
+    {
+      "file": "app/notification-event-center.tsx",
+      "url": "/api/notifications/events",
+      "verification": "STATIC_INVENTORY_ONLY"
+    },
+    {
+      "file": "app/notification-event-center.tsx",
+      "url": "/api/notifications/push-subscription",
+      "verification": "STATIC_INVENTORY_ONLY"
+    },
+    {
+      "file": "app/paper-trading-simulator.tsx",
+      "url": "/api/paper-trades",
+      "verification": "STATIC_INVENTORY_ONLY"
+    },
+    {
+      "file": "app/paper-trading-simulator.tsx",
+      "url": "/api/market/quotes?symbols=${symbol}",
+      "verification": "STATIC_INVENTORY_ONLY"
+    },
+    {
+      "file": "app/paper-trading-simulator.tsx",
+      "url": "/api/market/options",
+      "verification": "STATIC_INVENTORY_ONLY"
+    },
+    {
+      "file": "app/paper-trading-simulator.tsx",
+      "url": "/api/paper-trades",
+      "verification": "STATIC_INVENTORY_ONLY"
+    },
+    {
+      "file": "app/paper-trading-simulator.tsx",
+      "url": "/api/paper-trades",
+      "verification": "STATIC_INVENTORY_ONLY"
+    },
+    {
+      "file": "app/portfolio-balance-explorer.tsx",
+      "url": "/api/recommendations?accountId=",
+      "verification": "STATIC_INVENTORY_ONLY"
+    },
+    {
+      "file": "app/portfolio-builder-wizard.tsx",
+      "url": "/api/portfolio-builder",
+      "verification": "STATIC_INVENTORY_ONLY"
+    },
+    {
+      "file": "app/portfolio-builder-wizard.tsx",
+      "url": "/api/portfolio-builder",
+      "verification": "STATIC_INVENTORY_ONLY"
+    },
+    {
+      "file": "app/portfolio-intelligence.tsx",
+      "url": "/api/portfolio/advice?accountId=${encodeURIComponent(accountId)}",
+      "verification": "STATIC_INVENTORY_ONLY"
+    },
+    {
+      "file": "app/property-account-manager.tsx",
+      "url": "/api/connections/plaid",
+      "verification": "STATIC_INVENTORY_ONLY"
+    },
+    {
+      "file": "app/property-account-manager.tsx",
+      "url": "/api/properties/account-links",
+      "verification": "STATIC_INVENTORY_ONLY"
+    },
+    {
+      "file": "app/property-account-manager.tsx",
+      "url": "/api/properties/account-links",
+      "verification": "STATIC_INVENTORY_ONLY"
+    },
+    {
+      "file": "app/property-account-manager.tsx",
+      "url": "/api/properties/account-links",
+      "verification": "STATIC_INVENTORY_ONLY"
+    },
+    {
+      "file": "app/pwa-manager.tsx",
+      "url": "/api/app-version",
+      "verification": "STATIC_INVENTORY_ONLY"
+    },
+    {
+      "file": "app/pwa-manager.tsx",
+      "url": "/api/app-version",
+      "verification": "STATIC_INVENTORY_ONLY"
+    },
+    {
+      "file": "app/pwa-manager.tsx",
+      "url": "/api/notifications/push-subscription",
+      "verification": "STATIC_INVENTORY_ONLY"
+    },
+    {
+      "file": "app/pwa-manager.tsx",
+      "url": "/api/notifications/push-subscription?id=${encodeURIComponent(id)}",
+      "verification": "STATIC_INVENTORY_ONLY"
+    },
+    {
+      "file": "app/quant-data-evidence.tsx",
+      "url": "/api/market/quant-data?symbol=${encodeURIComponent(symbol)}",
+      "verification": "STATIC_INVENTORY_ONLY"
+    },
+    {
+      "file": "app/quant-data-evidence.tsx",
+      "url": "/api/market/quant-data?health=true",
+      "verification": "STATIC_INVENTORY_ONLY"
+    },
+    {
+      "file": "app/real-estate-workspace.tsx",
+      "url": "/api/properties",
+      "verification": "STATIC_INVENTORY_ONLY"
+    },
+    {
+      "file": "app/real-estate-workspace.tsx",
+      "url": "/api/properties/insights",
+      "verification": "STATIC_INVENTORY_ONLY"
+    },
+    {
+      "file": "app/real-estate-workspace.tsx",
+      "url": "/api/properties",
+      "verification": "STATIC_INVENTORY_ONLY"
+    },
+    {
+      "file": "app/real-estate-workspace.tsx",
+      "url": "/api/properties",
+      "verification": "STATIC_INVENTORY_ONLY"
+    },
+    {
+      "file": "app/realtime-sync.tsx",
+      "url": "/api/alerts?unread=true",
+      "verification": "STATIC_INVENTORY_ONLY"
+    },
+    {
+      "file": "app/swing-options-advisor.tsx",
+      "url": "/api/market/options/scan",
+      "verification": "STATIC_INVENTORY_ONLY"
+    },
+    {
+      "file": "app/swing-options-advisor.tsx",
+      "url": "/api/market/candidates/discovery?accountId=",
+      "verification": "STATIC_INVENTORY_ONLY"
+    },
+    {
+      "file": "app/system-capability-audit.tsx",
+      "url": "/api/system/capabilities",
+      "verification": "STATIC_INVENTORY_ONLY"
+    },
+    {
+      "file": "app/tactical-rebuy-panel.tsx",
+      "url": "/api/tactical-rebuy?accountId=${encodeURIComponent(accountId)}",
+      "verification": "STATIC_INVENTORY_ONLY"
+    },
+    {
+      "file": "app/tactical-rebuy-panel.tsx",
+      "url": "/api/tactical-rebuy",
+      "verification": "STATIC_INVENTORY_ONLY"
+    },
+    {
+      "file": "app/trade-lifecycle-panel.tsx",
+      "url": "/api/trade-lifecycle?accountId=${encodeURIComponent(accountId)}",
+      "verification": "STATIC_INVENTORY_ONLY"
+    },
+    {
+      "file": "app/transaction-notification-center.tsx",
+      "url": "/api/notifications/preferences",
+      "verification": "STATIC_INVENTORY_ONLY"
+    },
+    {
+      "file": "app/transaction-notification-center.tsx",
+      "url": "/api/notifications/history?limit=50",
+      "verification": "STATIC_INVENTORY_ONLY"
+    },
+    {
+      "file": "app/transaction-notification-center.tsx",
+      "url": "/api/notifications/preferences",
+      "verification": "STATIC_INVENTORY_ONLY"
+    },
+    {
+      "file": "app/transaction-notification-center.tsx",
+      "url": "/api/notifications/history",
+      "verification": "STATIC_INVENTORY_ONLY"
+    },
+    {
+      "file": "lib/auth.ts",
+      "url": "${issuer}/.well-known/jwks.json",
+      "verification": "STATIC_INVENTORY_ONLY"
+    },
+    {
+      "file": "lib/authoritative-recommendation.ts",
+      "url": "${base}${path}",
+      "verification": "STATIC_INVENTORY_ONLY"
+    },
+    {
+      "file": "lib/catalyst-entry-gate.ts",
+      "url": "${base}${path}",
+      "verification": "STATIC_INVENTORY_ONLY"
+    },
+    {
+      "file": "lib/cognito-client.ts",
+      "url": "${domain}/oauth2/token",
+      "verification": "STATIC_INVENTORY_ONLY"
+    },
+    {
+      "file": "lib/cognito-client.ts",
+      "url": "/api/auth/session",
+      "verification": "STATIC_INVENTORY_ONLY"
+    },
+    {
+      "file": "lib/cognito-client.ts",
+      "url": "/api/auth/session",
+      "verification": "STATIC_INVENTORY_ONLY"
+    },
+    {
+      "file": "lib/discovery-queue.ts",
+      "url": "https://finnhub.io/api/v1",
+      "verification": "STATIC_INVENTORY_ONLY"
+    },
+    {
+      "file": "lib/market-alert-engine.ts",
+      "url": "${base}${path}",
+      "verification": "STATIC_INVENTORY_ONLY"
+    },
+    {
+      "file": "lib/market-discovery-engine.ts",
+      "url": "${base}/v2/assets?status=active&asset_class=us_equity",
+      "verification": "STATIC_INVENTORY_ONLY"
+    },
+    {
+      "file": "lib/market-discovery-engine.ts",
+      "url": "https://data.alpaca.markets/v2/stocks/bars?${query}",
+      "verification": "STATIC_INVENTORY_ONLY"
+    },
+    {
+      "file": "lib/notification-worker.ts",
+      "url": "${base}/api/connections/plaid/sync",
+      "verification": "STATIC_INVENTORY_ONLY"
+    },
+    {
+      "file": "lib/notification-worker.ts",
+      "url": "https://api.resend.com/emails",
+      "verification": "STATIC_INVENTORY_ONLY"
+    },
+    {
+      "file": "lib/plaid-webhook-verification.ts",
+      "url": "${host()}/webhook_verification_key/get",
+      "verification": "STATIC_INVENTORY_ONLY"
+    },
+    {
+      "file": "lib/provider-health.ts",
+      "url": "https://data.alpaca.markets/v1beta1/options/snapshots/SPY?limit=1&feed=",
+      "verification": "STATIC_INVENTORY_ONLY"
+    },
+    {
+      "file": "lib/provider-health.ts",
+      "url": "https://finnhub.io/api/v1/",
+      "verification": "STATIC_INVENTORY_ONLY"
+    },
+    {
+      "file": "lib/provider-health.ts",
+      "url": "https://api.openai.com/v1/models",
+      "verification": "STATIC_INVENTORY_ONLY"
+    },
+    {
+      "file": "lib/provider-health.ts",
+      "url": "https://${env}.plaid.com/institutions/get",
+      "verification": "STATIC_INVENTORY_ONLY"
+    },
+    {
+      "file": "lib/providers/alpaca-market-data.ts",
+      "url": "${base}/v2/clock",
+      "verification": "STATIC_INVENTORY_ONLY"
+    },
+    {
+      "file": "lib/providers/alpaca-market-data.ts",
+      "url": "https://data.alpaca.markets/v2/stocks/${symbol}/bars?timeframe=${encodeURIComponent(input.timeframe)}&start=${encodeURIComponent(input.start)}&limit=${input.limit}&adjustment=all&feed=${encodeURIComponent(feed)}",
+      "verification": "STATIC_INVENTORY_ONLY"
+    }
+  ],
+  "environment": [
+    {
+      "name": "OPENAI_API_KEY",
+      "classification": "SERVER_ONLY_SECRET",
+      "files": [
+        "app/api/ai/health/route.ts",
+        "app/api/ai/investment-coach/route.ts",
+        "app/api/system/capabilities/route.ts",
+        "lib/ai-provider.ts",
+        "lib/ai-provider.ts",
+        "lib/provider-health.ts"
+      ]
+    },
+    {
+      "name": "OPENAI_MODEL",
+      "classification": "PROVIDER_CONFIG",
+      "files": [
+        "app/api/ai/investment-coach/route.ts",
+        "app/api/ai/investment-coach/route.ts",
+        "lib/ai-decision-core.ts"
+      ]
+    },
+    {
+      "name": "AWS_COMMIT_ID",
+      "classification": "RUNTIME_DEPLOYMENT",
+      "files": [
+        "app/api/app-version/route.ts"
+      ]
+    },
+    {
+      "name": "NEXT_PUBLIC_APP_VERSION",
+      "classification": "PUBLIC_BROWSER_SAFE",
+      "files": [
+        "app/api/app-version/route.ts"
+      ]
+    },
+    {
+      "name": "PLAID_ENV",
+      "classification": "PROVIDER_CONFIG",
+      "files": [
+        "app/api/configuration/route.ts",
+        "app/api/connections/plaid/attempt/route.ts",
+        "app/api/connections/plaid/exchange/route.ts",
+        "app/api/connections/plaid/exchange/route.ts",
+        "app/api/connections/plaid/investments-refresh/route.ts",
+        "app/api/connections/plaid/investments-refresh/route.ts",
+        "app/api/connections/plaid/link-token/route.ts",
+        "app/api/connections/plaid/link-token/route.ts",
+        "app/api/connections/plaid/link-token/route.ts",
+        "app/api/connections/plaid/link-token/route.ts",
+        "app/api/connections/plaid/link-token/route.ts",
+        "app/api/connections/plaid/link-token/route.ts",
+        "app/api/connections/plaid/route.ts",
+        "app/api/connections/plaid/route.ts",
+        "app/api/connections/plaid/sync/route.ts",
+        "app/api/connections/plaid/sync/route.ts",
+        "lib/plaid-webhook-verification.ts",
+        "lib/plaid-webhook-verification.ts",
+        "lib/provider-health.ts"
+      ]
+    },
+    {
+      "name": "PLAID_REDIRECT_URI",
+      "classification": "PROVIDER_CONFIG",
+      "files": [
+        "app/api/connections/plaid/attempt/route.ts",
+        "app/api/connections/plaid/link-token/route.ts"
+      ]
+    },
+    {
+      "name": "PLAID_WEBHOOK_URL",
+      "classification": "PROVIDER_CONFIG",
+      "files": [
+        "app/api/connections/plaid/attempt/route.ts",
+        "app/api/connections/plaid/link-token/route.ts",
+        "app/api/connections/plaid/link-token/route.ts",
+        "app/api/connections/plaid/link-token/route.ts",
+        "app/api/notifications/preferences/route.ts"
+      ]
+    },
+    {
+      "name": "PLAID_CLIENT_ID",
+      "classification": "PROVIDER_CONFIG",
+      "files": [
+        "app/api/connections/plaid/exchange/route.ts",
+        "app/api/connections/plaid/exchange/route.ts",
+        "app/api/connections/plaid/investments-refresh/route.ts",
+        "app/api/connections/plaid/link-token/route.ts",
+        "app/api/connections/plaid/link-token/route.ts",
+        "app/api/connections/plaid/route.ts",
+        "app/api/connections/plaid/sync/route.ts",
+        "lib/plaid-webhook-verification.ts",
+        "lib/plaid-webhook-verification.ts",
+        "lib/provider-health.ts"
+      ]
+    },
+    {
+      "name": "PLAID_SECRET",
+      "classification": "SERVER_ONLY_SECRET",
+      "files": [
+        "app/api/connections/plaid/exchange/route.ts",
+        "app/api/connections/plaid/exchange/route.ts",
+        "app/api/connections/plaid/investments-refresh/route.ts",
+        "app/api/connections/plaid/link-token/route.ts",
+        "app/api/connections/plaid/link-token/route.ts",
+        "app/api/connections/plaid/route.ts",
+        "app/api/connections/plaid/sync/route.ts",
+        "lib/plaid-webhook-verification.ts",
+        "lib/plaid-webhook-verification.ts",
+        "lib/provider-health.ts"
+      ]
+    },
+    {
+      "name": "PLAID_PRODUCTS",
+      "classification": "PROVIDER_CONFIG",
+      "files": [
+        "app/api/connections/plaid/link-token/route.ts"
+      ]
+    },
+    {
+      "name": "PLAID_COUNTRY_CODES",
+      "classification": "PROVIDER_CONFIG",
+      "files": [
+        "app/api/connections/plaid/link-token/route.ts",
+        "app/api/connections/plaid/link-token/route.ts"
+      ]
+    },
+    {
+      "name": "PLAID_LINK_CUSTOMIZATION_NAME",
+      "classification": "PROVIDER_CONFIG",
+      "files": [
+        "app/api/connections/plaid/link-token/route.ts"
+      ]
+    },
+    {
+      "name": "CRON_SECRET",
+      "classification": "SERVER_ONLY_SECRET",
+      "files": [
+        "app/api/connections/plaid/sync/route.ts",
+        "app/api/connections/plaid/sync/route.ts",
+        "app/api/connections/plaid/sync/route.ts",
+        "app/api/connections/plaid/sync/route.ts",
+        "app/api/connections/plaid/webhook/route.ts",
+        "app/api/connections/plaid/webhook/route.ts",
+        "app/api/market-alerts/evaluate/route.ts",
+        "app/api/market-alerts/evaluate/route.ts",
+        "app/api/market-discovery/evaluate/route.ts",
+        "app/api/market-discovery/evaluate/route.ts",
+        "app/api/notifications/preferences/route.ts",
+        "lib/notification-worker.ts",
+        "lib/notification-worker.ts",
+        "lib/notification-worker.ts",
+        "lib/notification-worker.ts",
+        "lib/notification-worker.ts",
+        "workers/market-worker.ts",
+        "workers/market-worker.ts"
+      ]
+    },
+    {
+      "name": "APP_URL",
+      "classification": "RUNTIME_DEPLOYMENT",
+      "files": [
+        "app/api/connections/plaid/sync/route.ts",
+        "app/api/connections/plaid/webhook/route.ts",
+        "app/api/household/invitations/route.ts",
+        "app/api/notifications/preferences/route.ts",
+        "lib/notification-worker.ts",
+        "lib/notification-worker.ts",
+        "workers/market-worker.ts",
+        "workers/market-worker.ts"
+      ]
+    },
+    {
+      "name": "NODE_ENV",
+      "classification": "RUNTIME_DEPLOYMENT",
+      "files": [
+        "app/api/dev/market-discovery/route.ts",
+        "app/api/dev/options-flow/route.ts",
+        "app/api/system/capabilities/route.ts",
+        "app/api/system/foundation-audit/route.ts",
+        "app/mobile-overflow-debug.tsx",
+        "lib/db.ts"
+      ]
+    },
+    {
+      "name": "FAMILY_APPROVER_EMAILS",
+      "classification": "RUNTIME_DEPLOYMENT",
+      "files": [
+        "app/api/household/invitations/route.ts",
+        "app/api/security/access-requests/route.ts"
+      ]
+    },
+    {
+      "name": "RESEND_API_KEY",
+      "classification": "SERVER_ONLY_SECRET",
+      "files": [
+        "app/api/household/invitations/route.ts",
+        "app/api/household/invitations/route.ts",
+        "app/api/notifications/investment-health/route.ts",
+        "app/api/notifications/preferences/route.ts",
+        "app/api/system/capabilities/route.ts",
+        "lib/notification-worker.ts",
+        "lib/notification-worker.ts"
+      ]
+    },
+    {
+      "name": "EMAIL_FROM",
+      "classification": "RUNTIME_DEPLOYMENT",
+      "files": [
+        "app/api/household/invitations/route.ts",
+        "app/api/household/invitations/route.ts",
+        "app/api/notifications/investment-health/route.ts",
+        "app/api/notifications/preferences/route.ts",
+        "lib/notification-worker.ts",
+        "lib/notification-worker.ts",
+        "lib/notification-worker.ts",
+        "lib/notification-worker.ts"
+      ]
+    },
+    {
+      "name": "ALPACA_API_KEY",
+      "classification": "SERVER_ONLY_SECRET",
+      "files": [
+        "app/api/market/candidates/route.ts",
+        "app/api/market/clock/route.ts",
+        "app/api/market/dividend-growth/route.ts",
+        "app/api/market/options/route.ts",
+        "app/api/market/options/route.ts",
+        "app/api/market/quote/route.ts",
+        "app/api/market/quote/route.ts",
+        "app/api/market/search/route.ts",
+        "app/api/paper-trades/route.ts",
+        "app/api/paper-trades/route.ts",
+        "app/api/portfolio/history/route.ts",
+        "app/api/portfolio/history/route.ts",
+        "app/api/watchlist/route.ts",
+        "app/api/watchlist/route.ts",
+        "lib/lifecycle-options.ts",
+        "lib/market-discovery-engine.ts",
+        "lib/provider-health.ts",
+        "lib/providers/alpaca-market-data.ts"
+      ]
+    },
+    {
+      "name": "ALPACA_API_SECRET",
+      "classification": "SERVER_ONLY_SECRET",
+      "files": [
+        "app/api/market/candidates/route.ts",
+        "app/api/market/clock/route.ts",
+        "app/api/market/dividend-growth/route.ts",
+        "app/api/market/options/route.ts",
+        "app/api/market/options/route.ts",
+        "app/api/market/quote/route.ts",
+        "app/api/market/quote/route.ts",
+        "app/api/market/search/route.ts",
+        "app/api/paper-trades/route.ts",
+        "app/api/paper-trades/route.ts",
+        "app/api/portfolio/history/route.ts",
+        "app/api/portfolio/history/route.ts",
+        "app/api/watchlist/route.ts",
+        "app/api/watchlist/route.ts",
+        "lib/lifecycle-options.ts",
+        "lib/market-discovery-engine.ts",
+        "lib/provider-health.ts",
+        "lib/providers/alpaca-market-data.ts"
+      ]
+    },
+    {
+      "name": "ALPACA_DATA_FEED",
+      "classification": "PROVIDER_CONFIG",
+      "files": [
+        "app/api/market/candidates/route.ts",
+        "app/api/market/dividend-growth/route.ts",
+        "app/api/paper-trades/route.ts",
+        "app/api/portfolio/history/route.ts",
+        "app/api/watchlist/route.ts",
+        "lib/market-discovery-engine.ts",
+        "lib/providers/alpaca-market-data.ts"
+      ]
+    },
+    {
+      "name": "FINNHUB_API_KEY",
+      "classification": "SERVER_ONLY_SECRET",
+      "files": [
+        "app/api/market/candidates/route.ts",
+        "app/api/market/candidates/route.ts",
+        "app/api/market/candidates/route.ts",
+        "app/api/market/dividend-growth/route.ts",
+        "app/api/market/research/route.ts",
+        "app/api/system/capabilities/route.ts",
+        "lib/authoritative-recommendation.ts",
+        "lib/catalyst-entry-gate.ts",
+        "lib/discovery-queue.ts",
+        "lib/market-alert-engine.ts",
+        "lib/market-discovery-engine.ts",
+        "lib/provider-health.ts"
+      ]
+    },
+    {
+      "name": "ALPACA_CLOCK_BASE_URL",
+      "classification": "PROVIDER_CONFIG",
+      "files": [
+        "app/api/market/clock/route.ts",
+        "app/api/market/clock/route.ts",
+        "app/api/market/search/route.ts",
+        "lib/market-discovery-engine.ts",
+        "lib/provider-health.ts",
+        "lib/providers/alpaca-market-data.ts"
+      ]
+    },
+    {
+      "name": "FRED_API_KEY",
+      "classification": "SERVER_ONLY_SECRET",
+      "files": [
+        "app/api/market/macro/route.ts"
+      ]
+    },
+    {
+      "name": "NEWSAPI_AI_KEY",
+      "classification": "SERVER_ONLY_SECRET",
+      "files": [
+        "app/api/market/news/route.ts"
+      ]
+    },
+    {
+      "name": "NEWS_API_KEY",
+      "classification": "SERVER_ONLY_SECRET",
+      "files": [
+        "app/api/market/news/route.ts"
+      ]
+    },
+    {
+      "name": "ALPACA_OPTIONS_FEED",
+      "classification": "PROVIDER_CONFIG",
+      "files": [
+        "app/api/market/options/route.ts",
+        "app/api/market/options/route.ts",
+        "lib/lifecycle-options.ts",
+        "lib/provider-health.ts"
+      ]
+    },
+    {
+      "name": "VAPID_PUBLIC_KEY",
+      "classification": "SERVER_ONLY_SECRET",
+      "files": [
+        "app/api/notifications/investment-health/route.ts",
+        "app/api/notifications/preferences/route.ts",
+        "app/api/notifications/push-subscription/route.ts",
+        "app/api/notifications/push-subscription/route.ts",
+        "lib/notification-worker.ts",
+        "lib/notification-worker.ts",
+        "lib/notification-worker.ts"
+      ]
+    },
+    {
+      "name": "VAPID_PRIVATE_KEY",
+      "classification": "SERVER_ONLY_SECRET",
+      "files": [
+        "app/api/notifications/investment-health/route.ts",
+        "app/api/notifications/preferences/route.ts",
+        "app/api/notifications/push-subscription/route.ts",
+        "lib/notification-worker.ts",
+        "lib/notification-worker.ts",
+        "lib/notification-worker.ts"
+      ]
+    },
+    {
+      "name": "NEXT_PUBLIC_GOOGLE_MAPS_API_KEY",
+      "classification": "PUBLIC_BROWSER_SAFE",
+      "files": [
+        "app/google-address-autocomplete.tsx"
+      ]
+    },
+    {
+      "name": "NEXT_PUBLIC_REALTIME_WS_URL",
+      "classification": "PUBLIC_BROWSER_SAFE",
+      "files": [
+        "app/realtime-sync.tsx"
+      ]
+    },
+    {
+      "name": "AWS_REGION",
+      "classification": "RUNTIME_DEPLOYMENT",
+      "files": [
+        "lib/auth.ts"
+      ]
+    },
+    {
+      "name": "COGNITO_USER_POOL_ID",
+      "classification": "RUNTIME_DEPLOYMENT",
+      "files": [
+        "lib/auth.ts"
+      ]
+    },
+    {
+      "name": "COGNITO_ISSUER",
+      "classification": "RUNTIME_DEPLOYMENT",
+      "files": [
+        "lib/auth.ts"
+      ]
+    },
+    {
+      "name": "NEXT_PUBLIC_COGNITO_CLIENT_ID",
+      "classification": "PUBLIC_BROWSER_SAFE",
+      "files": [
+        "lib/auth.ts",
+        "lib/cognito-client.ts"
+      ]
+    },
+    {
+      "name": "COGNITO_CLIENT_ID",
+      "classification": "RUNTIME_DEPLOYMENT",
+      "files": [
+        "lib/auth.ts"
+      ]
+    },
+    {
+      "name": "NORTHSTAR_CHAMPION_MODEL_VERSION",
+      "classification": "RUNTIME_DEPLOYMENT",
+      "files": [
+        "lib/authoritative-recommendation.ts",
+        "lib/continuous-intelligence-loop.ts"
+      ]
+    },
+    {
+      "name": "NORTHSTAR_STRATEGY_VERSION",
+      "classification": "RUNTIME_DEPLOYMENT",
+      "files": [
+        "lib/authoritative-recommendation.ts",
+        "lib/continuous-intelligence-loop.ts"
+      ]
+    },
+    {
+      "name": "NEXT_PUBLIC_COGNITO_DOMAIN",
+      "classification": "PUBLIC_BROWSER_SAFE",
+      "files": [
+        "lib/cognito-client.ts"
+      ]
+    },
+    {
+      "name": "TOKEN_ENCRYPTION_KEY",
+      "classification": "SERVER_ONLY_SECRET",
+      "files": [
+        "lib/crypto.ts",
+        "lib/crypto.ts"
+      ]
+    },
+    {
+      "name": "DATABASE_URL",
+      "classification": "SERVER_ONLY_SECRET",
+      "files": [
+        "lib/db.ts",
+        "lib/db.ts",
+        "lib/db.ts"
+      ]
+    },
+    {
+      "name": "DATABASE_SSL",
+      "classification": "RUNTIME_DEPLOYMENT",
+      "files": [
+        "lib/db.ts",
+        "lib/db.ts"
+      ]
+    },
+    {
+      "name": "DATABASE_POOL_MAX",
+      "classification": "RUNTIME_DEPLOYMENT",
+      "files": [
+        "lib/db.ts"
+      ]
+    },
+    {
+      "name": "AUTO_MIGRATE_DATABASE",
+      "classification": "RUNTIME_DEPLOYMENT",
+      "files": [
+        "lib/db.ts",
+        "lib/db.ts"
+      ]
+    },
+    {
+      "name": "OPTIONS_FLOW_PROVIDER_URL",
+      "classification": "RUNTIME_DEPLOYMENT",
+      "files": [
+        "lib/options-flow-engine.ts"
+      ]
+    },
+    {
+      "name": "OPTIONS_FLOW_PROVIDER_TOKEN",
+      "classification": "SERVER_ONLY_SECRET",
+      "files": [
+        "lib/options-flow-engine.ts"
+      ]
+    },
+    {
+      "name": "QUANT_DATA_API_KEY",
+      "classification": "SERVER_ONLY_SECRET",
+      "files": [
+        "lib/providers/quant-data.ts",
+        "lib/providers/quant-data.ts",
+        "lib/providers/quant-data.ts",
+        "lib/quant-data-monitor.ts"
+      ]
+    },
+    {
+      "name": "NORTHSTAR_SECRET_ID",
+      "classification": "SERVER_ONLY_SECRET",
+      "files": [
+        "lib/runtime-secrets.ts"
+      ]
+    }
+  ]
+}

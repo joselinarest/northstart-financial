@@ -412,7 +412,7 @@ export async function researchRecommendation(
   const price = Number(quote?.last || 0),
     risk = Math.max(0.01, price - Number(support || price * 0.94)),
     cash = Math.max(0,Number(account.cash_cents || 0) / 100-Number(reservation?.total||0)),
-    maxRisk = Number(account.maximum_risk_bps || 50) / 10000,
+    maxRisk = Number(account.maximum_risk_bps ?? 50) / 10000,
     accountValueRow = await db
       .prepare(
         "SELECT COALESCE(SUM(h.quantity*h.price_cents),0)::text value_cents FROM holdings h WHERE h.account_id=?",

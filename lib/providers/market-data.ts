@@ -1,7 +1,7 @@
 export type MarketFeed="sip"|"iex"|"delayed_sip"|"indicative"|string;
 export type DataFreshness="FRESH"|"DELAYED"|"STALE"|"UNAVAILABLE";
 export type MarketSession="PREMARKET"|"REGULAR"|"AFTER_HOURS"|"CLOSED";
-export type NormalizedQuote={symbol:string;bid:number|null;ask:number|null;last:number|null;previousClose:number|null;change:number|null;changePct:number|null;bidSize:number|null;askSize:number|null;open:number|null;high:number|null;low:number|null;volume:number|null;timestamp:string|null;source:string;feed:MarketFeed;freshness:DataFreshness;ageSeconds:number|null};
+export type NormalizedQuote={symbol:string;priceBasis?:"LATEST_TRADE"|"LAST_REGULAR_CLOSE";marketLabel?:string;bid:number|null;ask:number|null;last:number|null;previousClose:number|null;change:number|null;changePct:number|null;bidSize:number|null;askSize:number|null;open:number|null;high:number|null;low:number|null;volume:number|null;timestamp:string|null;source:string;feed:MarketFeed;freshness:DataFreshness;ageSeconds:number|null};
 export type NormalizedBar={time:string;open:number;high:number;low:number;close:number;volume:number;vwap:number|null;tradeCount:number|null};
 export type MarketClock={timestamp:string;isOpen:boolean;nextOpen:string;nextClose:string;session:MarketSession;source:string};
 export interface MarketDataProvider{readonly name:string;getClock():Promise<MarketClock>;getQuotes(symbols:string[]):Promise<{feed:MarketFeed;asOf:string;quotes:Record<string,NormalizedQuote>}>;getBars(symbol:string,input:{timeframe:string;start:string;limit:number}):Promise<{feed:MarketFeed;asOf:string;bars:NormalizedBar[]}>}

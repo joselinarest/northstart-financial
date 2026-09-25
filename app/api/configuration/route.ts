@@ -1,3 +1,4 @@
+import {inspectServerConfiguration} from '@/lib/server-configuration';
 import {workspace,id} from "@/lib/db";
 import {GLOBAL_DEFAULTS,validateGlobalSettings} from "@/lib/app-configuration";
 import {accountRiskSettings} from "@/lib/account-risk-settings";
@@ -10,7 +11,7 @@ export async function GET(request:Request){try{
   const risk=[];for(const a of accounts.results)risk.push({...await accountRiskSettings(db,householdId,a.id),name:a.name});
   const health=await db.prepare("SELECT provider,status,last_success_at,last_error,checked_at FROM provider_health_checks").all<{provider:string;status:string;last_success_at:string;last_error:string;checked_at:string}>();
   const providers=PROVIDERS.map(name=>{const state=health.results.find(h=>h.provider===name);return {name,configured:configured[name],status:!configured[name]?"NOT CONFIGURED":state?.status||"DEGRADED",lastSuccess:state?.last_success_at||null,lastError:state?.last_error||null,lastTest:state?.checked_at||null,environment:name.startsWith("Plaid")?process.env.PLAID_ENV:null};});
-  return Response.json({settings:saved?.settings_json||GLOBAL_DEFAULTS,defaults:GLOBAL_DEFAULTS,accounts:risk,providers,configurationHealth:providers.some(p=>!p.configured)?"Missing Provider":providers.some(p=>p.status!=="HEALTHY")?"Needs Attention":"Ready"},{headers:{"Cache-Control":"private, no-store"}});
+  return Response.json({serverConfiguration:inspectServerConfiguration(process.env),settings:saved?.settings_json||GLOBAL_DEFAULTS,defaults:GLOBAL_DEFAULTS,accounts:risk,providers,configurationHealth:providers.some(p=>!p.configured)?"Missing Provider":providers.some(p=>p.status!=="HEALTHY")?"Needs Attention":"Ready"},{headers:{"Cache-Control":"private, no-store"}});
 }catch(e){if(e instanceof Response)return e;return Response.json({error:"Configuration unavailable"},{status:503});}}
 export async function PUT(request:Request){try{
   const {db,householdId,userId,role}=await workspace(request),body=await request.json() as Record<string,unknown>;

@@ -70,7 +70,7 @@ export async function GET(request: Request) {
                 "Run or refresh the market-wide scan, then evaluate current provider fundamentals, valuation, technical setup and selected-account fit.",
             }
         : null;
-    if(lookup && !exact){const entry=await db.prepare("SELECT stage,error_code,last_screened_at,last_researched_at FROM discovery_queue WHERE symbol=? AND active").bind(search).first<Row>();if(entry){lookup.status=entry.stage;lookup.reason=entry.error_code||`Screened: ${entry.last_screened_at||"pending"}; deep research: ${entry.last_researched_at||"pending"}`;}}
+    if(lookup && !exact){const entry=await db.prepare("SELECT stage,error_code,last_screened_at,last_researched_at FROM discovery_queue WHERE symbol=? AND active").bind(search).first<Row>();if(entry){lookup.scanned=Boolean(entry.last_screened_at);lookup.status=entry.stage==='RESEARCH_INCOMPLETE'?'DATA_UNAVAILABLE':entry.stage==='RESEARCHED'?'SCANNED':entry.stage==='RESEARCH_PENDING'?'SCANNED':entry.stage;lookup.reason=entry.error_code||`Screened: ${entry.last_screened_at||"pending"}; deep research: ${entry.last_researched_at||"pending"}`;}}
     return Response.json(
       {
         ...result,

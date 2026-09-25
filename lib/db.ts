@@ -1,3 +1,4 @@
+import {validateRequiredServerConfiguration} from '@/lib/server-configuration';
 import {checkWorkBudget} from "@/lib/work-budget";
 import {acquireHealthyDatabaseClient} from "@/lib/database-recovery";
 import pg from "pg";
@@ -82,6 +83,7 @@ export class PostgresDatabase {
 
 export async function database() {
   await loadRuntimeSecrets();
+  validateRequiredServerConfiguration();
   await loadAwsRdsCa();
   // Schema work belongs in deployment/migration jobs. Running it from every
   // serverless cold start consumes scarce RDS slots and serializes requests.

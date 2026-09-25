@@ -1,4 +1,6 @@
 "use client";
+import BuildVersion from "./build-version";
+import {readApiPayload} from '@/lib/api-client';
 import {QuantDataHealth,LazyFlowEvidence} from '@/app/quant-data-evidence';
 import AccountNextOpenSummary from "./account-next-open-summary";
 import SectionAccordion from "@/app/section-accordion";
@@ -3542,7 +3544,7 @@ export function NorthstarWorkspace({
     }
   };
   const dismissHeaderAlert = async (id:string) => {
-    try {const response=await fetch("/api/alerts",{method:"PATCH",headers:financeHeaders(),body:JSON.stringify({id,dismiss:true})});if(!response.ok)throw Error("Unable to close notification. Please retry.");await loadHeaderAlerts();}catch(error){window.alert(error instanceof Error?error.message:"Unable to close notification");}
+    try {const response=await fetch("/api/alerts",{method:"PATCH",headers:financeHeaders(),body:JSON.stringify({id,dismiss:true})});if(!response.ok)throw Error("Unable to close notification. Please retry.");await loadHeaderAlerts();}catch(error){await confirmAction({title:"Notification could not be closed",description:error instanceof Error?error.message:"Unable to close notification",confirmLabel:"OK"});}
   };
   const clearHeaderAlerts = async () => {
     if (!headerAlerts.length && marketUnread === 0) return;
@@ -3669,15 +3671,7 @@ export function NorthstarWorkspace({
       );
     }
   };
-  const apiPayload = async (response: Response) => {
-    const text = await response.text();
-    if (!text) return {};
-    try {
-      return JSON.parse(text);
-    } catch {
-      return { error: text.slice(0, 240) };
-    }
-  };
+  const apiPayload = readApiPayload;
   const loadHousehold = async (manual = false) => {
     if (manual) householdAccessRetries.current = 0;
     setWorkspaceAccess("checking");
@@ -4235,7 +4229,8 @@ export function NorthstarWorkspace({
       name: string;
       quantity: number;
       averageCost: number | null;
-      currentPrice: number;
+      currentPrice: number | null;
+      mode?: "ADD" | "REPLACE" | "MERGE" | "DELETE";
       currentValue: number | null;
       acquisitionDate: string | null;
     },
@@ -12179,7 +12174,7 @@ export function NorthstarWorkspace({
                 </small>
               </div>
             </div>
-            <p><a href="/workspace/configuration">Configuration Center — account risk, providers, market and display settings</a> · <a href="/workspace/notifications">Notification Center</a></p><TransactionNotificationCenter accessToken={accessToken} />
+            <BuildVersion/><p><a href="/workspace/configuration">Configuration Center — account risk, providers, market and display settings</a> · <a href="/workspace/notifications">Notification Center</a></p><TransactionNotificationCenter accessToken={accessToken} />
             <MarketAlertCenter accessToken={accessToken} settings />
             <InvestmentNotificationHealth accessToken={accessToken} />
             <IntelligenceLoopHealth accessToken={accessToken} />
