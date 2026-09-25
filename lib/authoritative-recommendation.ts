@@ -1,3 +1,4 @@
+import {researchMarketFresh} from "@/lib/research-market-freshness";
 import {accountRiskSettings} from "@/lib/account-risk-settings";
 import {discoveryFinnhub} from "@/lib/discovery-queue";
 import {positionSizing} from "@/lib/position-sizing";
@@ -43,6 +44,7 @@ async function fundamentals(db:PostgresDatabase,symbol: string) {
       profile: {},
       metrics: {},
       news: [],
+      newsAvailable:false,newsAsOf:null,
     };
   const base = "https://finnhub.io/api/v1",
     today = new Date(),
@@ -50,20 +52,20 @@ async function fundamentals(db:PostgresDatabase,symbol: string) {
     date = (d: Date) => d.toISOString().slice(0, 10),
     get = (path: string) => discoveryFinnhub(db,path,path.startsWith('/company-news')?300:21600);
   try {
-    const [profile, metricData, news] = await Promise.all([
-      get(`/stock/profile2?symbol=${symbol}`),
-      get(`/stock/metric?symbol=${symbol}&metric=all`),
-      get(
-        `/company-news?symbol=${symbol}&from=${date(from)}&to=${date(today)}`,
-      ),
+    const [profile, metricData, news] = await Promise.allSettled([
+      get('/stock/profile2?symbol='+symbol),
+      get('/stock/metric?symbol='+symbol+'&metric=all'),
+      get('/company-news?symbol='+symbol+'&from='+date(from)+'&to='+date(today)),
     ]);
     return {
-      available: true,
-      provider: "FINNHUB",
-      asOf: metricData.asOf,
-      profile: profile.data,
-      metrics: metricData.data.metric || {},
-      news: Array.isArray(news.data) ? news.data.slice(0, 20) : [],
+      available: metricData.status==='fulfilled',
+      provider: metricData.status==='fulfilled'?'FINNHUB':metricData.reason instanceof Error?metricData.reason.message:'FINNHUB_ERROR',
+      asOf: metricData.status==='fulfilled'?metricData.value.asOf:null,
+      profile: profile.status==='fulfilled'?profile.value.data:{},
+      metrics: metricData.status==='fulfilled'?metricData.value.data.metric||{}:{},
+      newsAvailable: news.status==='fulfilled'&&Array.isArray(news.value.data),
+      newsAsOf: news.status==='fulfilled'?news.value.asOf:null,
+      news: news.status==='fulfilled'&&Array.isArray(news.value.data)?news.value.data.slice(0,20):[],
     };
   } catch (error) {
     return {
@@ -319,7 +321,7 @@ export async function researchRecommendation(
     dataIssues.push(
       "The market provider did not return a valid quote timestamp.",
     );
-  else if (marketAge > marketMaxAgeMs)
+  else if (!researchMarketFresh(marketAsOf,marketMaxAgeMs))
     dataIssues.push(
       `The market quote is ${Math.max(1, Math.round(marketAge / 60000))} minutes old; this ${swing ? "swing" : "long-term"} account requires data no older than ${swing ? "15 minutes" : "24 hours"}.`,
     );
@@ -446,6 +448,7 @@ export async function researchRecommendation(
         market: { provider: quote?.source || quoteSet.feed, asOf: marketAsOf },
         fundamental: { provider: fundamental.provider, asOf: fundamental.asOf },
         technical: { provider: barsSet.feed || quoteSet.feed, asOf: barsAsOf },
+        news: {provider:"FINNHUB",asOf:fundamental.newsAsOf,available:fundamental.newsAvailable},
       },
       fundamentalThesis: {
         fundamentalQuality:coverage>=4?fundamentalQuality:null,
@@ -504,7 +507,7 @@ export async function researchRecommendation(
       marketRegime: "NOT_AVAILABLE",
       catalysts: { ...catalystGate, events: catalystContext.events },
       news: {
-        state: fundamental.news.length ? "MIXED" : "UNAVAILABLE",
+        state: fundamental.newsAvailable ? (fundamental.news.length?"MIXED":"NO_RECENT_EVENTS") : "UNAVAILABLE",
         items: fundamental.news.slice(0, 5).map((item: any) => ({
           headline: item.headline,
           source: item.source,

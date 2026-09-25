@@ -1,3 +1,4 @@
+import {researchMarketFresh} from "@/lib/research-market-freshness";
 import {flowForStrategy,flowDecisionSummary,type FlowEvidence} from "@/lib/flow-evidence";
 import {QuantDataProvider} from "@/lib/providers/quant-data";
 import {entryOrderReady} from "@/lib/entry-plan";
@@ -10,7 +11,7 @@ export function strictDecisionQuality(input:DecisionInput){
   const required=[...new Set([...commonFacts,...input.requiredFacts,...(input.strategy==="OPTIONS"?["underlyingThesis","optionQuote","greeks","liquidity"]:[])])];
   const labels=new Set(input.evidence.filter(e=>e.value!==null&&e.value!==undefined&&e.value!==""&&!(typeof e.value==="number"&&!Number.isFinite(e.value))&&!(typeof e.value==="object"&&!Array.isArray(e.value)&&!Object.keys(e.value as object).length)).map(e=>e.label));
   const missing=required.filter(x=>!labels.has(x));
-  const stale=input.evidence.filter(e=>required.includes(e.label)).filter(e=>{const age=Date.now()-Date.parse(e.asOf||"");const limit=["fundamentals","valuation"].includes(e.label)?7*86400000:input.strategy==="LONG_TERM_SHARES"?86400000:20*60000;return !Number.isFinite(age)||age<0||age>limit;}).map(e=>e.label);
+  const stale=input.evidence.filter(e=>required.includes(e.label)).filter(e=>{const age=Date.now()-Date.parse(e.asOf||"");const limit=["fundamentals","valuation"].includes(e.label)?7*86400000:input.strategy==="LONG_TERM_SHARES"?86400000:20*60000;return ["currentPrice","technical","marketRegime"].includes(e.label)?!researchMarketFresh(e.asOf||"",limit):!Number.isFinite(age)||age<0||age>limit;}).map(e=>e.label);
   if(!Number.isFinite(Date.parse(input.dataTimestamp)))stale.push("snapshotTimestamp");
   const conflicts=[...(input.conflicts||[]),...input.evidence.flatMap(e=>e.conflicts||[])];
   return {score:Math.max(0,100-missing.length*14-stale.length*8-conflicts.length*10),missing,stale,conflicts};
@@ -26,7 +27,9 @@ export function candidateIsSafe(c:DecisionCandidate){
   const sale=["SELL_NOW","SELL_IF","TRIM"].includes(c.action),buy=["BUY_NOW","BUY_IF","ADD","REBUY_IF","ROTATE_CAPITAL"].includes(c.action);
   if(!c.eligible||![c.shares,c.cost,c.proceeds,c.cashBefore,c.cashAfter,...c.targets].every(Number.isFinite)||c.shares<0||c.cost<0||c.proceeds<0||c.cashAfter<0)return false;
   if((sale||buy)&&(!(c.shares>0)||!c.entry||c.entry<=0))return false;
-  if(buy&&(!entryOrderReady(c.entryPlan)||c.entryPlan?.orderPrice!==c.entry||c.entryPlan?.shares!==c.shares))return false;
+  const option=c.instrument==="CALL"||c.instrument==="PUT";
+  if(buy&&option){if(c.action!=="BUY_IF"||!c.contractSymbol||!Number.isInteger(c.shares)||Math.abs(c.cost-c.shares*Number(c.entry)*100)>.02)return false;}
+  else if(buy&&(!entryOrderReady(c.entryPlan)||c.entryPlan?.orderPrice!==c.entry||c.entryPlan?.shares!==c.shares))return false;
   if(buy&&(!c.stop||c.stop>=Number(c.entry)||c.stop<=0||c.cost>c.cashBefore+.01||Math.abs(c.cashBefore-c.cost-c.cashAfter)>.02))return false;
   if(sale&&(!c.sellReason||c.cashAfter>c.cashBefore+c.proceeds+.01))return false;
   if(sale&&c.instrument==="SHARES"&&!["THESIS BROKEN","GOAL/REBALANCE","CAPITAL ROTATION"].includes(c.sellReason||"")&&!c.reentryPlan)return false;
