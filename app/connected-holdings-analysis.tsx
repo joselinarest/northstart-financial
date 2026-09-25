@@ -379,7 +379,8 @@ export default function ConnectedHoldingsAnalysis({
   }, [unique, horizon, marketOpen, accountId]); // Closed sessions require an explicit refresh and do not consume market API quota.
   return (
     <div className="connected-analysis embedded">
-      <details ><summary style={{padding:12,cursor:"pointer",fontWeight:700}}>Holdings · {unique.length} · show / hide</summary>
+      <details ><summary style={{padding:12,cursor:"pointer",fontWeight:700}}>Security analysis · {unique.length} tickers · show / hide</summary>
+      {holdings.some(h=>!h.ticker)&&<p className="m-4">{holdings.filter(h=>!h.ticker).map(h=>String(h.name||"Unidentified holding")).join(", ")} has no stock ticker and is included in the account holdings above, not in ticker analysis.</p>}
       <div className="analysis-controls">
         <div>
           <b>Complete {horizon} review</b>

@@ -1,3 +1,4 @@
+import {strategyForPurpose} from '@/lib/account-purpose';
 import {accountRiskSettings} from '@/lib/account-risk-settings';
 import {saveManualHolding,ManualHoldingError,type ManualHoldingInput} from '@/lib/manual-holdings';
 import { workspace } from "@/lib/db";
@@ -29,7 +30,7 @@ export async function GET(request: Request) {
       .all();
     const holdings = await db
       .prepare(
-        "SELECT h.id holding_id,h.account_id,a.nickname,a.investment_purpose,a.subtype account_subtype,s.ticker,s.name,s.type,h.quantity,h.cost_basis_cents,h.price_cents,h.price_at,(h.quantity*h.price_cents) market_value_cents,COALESCE(a.manual_owner_name,u.display_name,'Household member') owner_name,h.acquisition_date,CASE WHEN a.connection_id IS NULL THEN 'manual' ELSE 'plaid' END source FROM holdings h JOIN securities s ON s.id=h.security_id JOIN accounts a ON a.id=h.account_id JOIN entities e ON e.id=a.entity_id LEFT JOIN connections c ON c.id=a.connection_id LEFT JOIN users u ON u.id=c.connected_by_user_id WHERE e.household_id=? ORDER BY market_value_cents DESC",
+        "SELECT h.id holding_id,h.account_id,a.nickname,a.investment_purpose,a.subtype account_subtype,s.ticker,s.name,s.type,h.quantity,h.cost_basis_cents,h.price_cents,h.price_at,(h.quantity*h.price_cents) market_value_cents,COALESCE(a.manual_owner_name,u.display_name,'Household member') owner_name,h.acquisition_date,CASE WHEN a.connection_id IS NULL THEN 'manual' ELSE 'plaid' END source FROM holdings h JOIN securities s ON s.id=h.security_id JOIN accounts a ON a.id=h.account_id JOIN entities e ON e.id=a.entity_id LEFT JOIN connections c ON c.id=a.connection_id LEFT JOIN users u ON u.id=c.connected_by_user_id WHERE e.household_id=? AND a.hidden=0 ORDER BY market_value_cents DESC",
       )
       .bind(householdId)
       .all();
@@ -137,29 +138,15 @@ export async function PATCH(request: Request) {
       .first<Record<string, any>>();
     if (!account)
       return Response.json({ error: "Account not found" }, { status: 404 });
-    await db
-      .prepare(
-        "UPDATE accounts SET nickname=?,investment_purpose=?,updated_at=CURRENT_TIMESTAMP WHERE id=?",
-      )
-      .bind(
-        String(body.nickname || "")
-          .trim()
-          .slice(0, 80) || null,
-        body.investmentPurpose || null,
-        body.accountId,
-      )
-      .run();
-    if (body.cashBalance !== undefined) {
-      const cashBalance = Number(body.cashBalance);
-      if (account.connection_id)
-        return Response.json({ error: "Plaid cash is read-only and must be refreshed from the institution." }, { status: 400 });
-      if (!Number.isFinite(cashBalance) || cashBalance < 0)
-        return Response.json({ error: "Cash balance must be zero or greater" }, { status: 400 });
-      const cashCents = Math.round(cashBalance * 100);
-      await db.prepare(`UPDATE accounts a SET available_balance_cents=?,current_balance_cents=?+COALESCE((SELECT SUM(ROUND(h.quantity*COALESCE(h.price_cents,0))) FROM holdings h WHERE h.account_id=a.id),0),updated_at=CURRENT_TIMESTAMP WHERE a.id=? AND a.connection_id IS NULL`).bind(cashCents,cashCents,body.accountId).run();
-      await db.prepare("UPDATE investment_account_settings SET available_cash_cents=?,updated_at=CURRENT_TIMESTAMP WHERE account_id=?").bind(cashCents,body.accountId).run();
-      await reviewKidsPlans(db, householdId, "ACCOUNT_CHANGED");
-    }
+    const cashBalance = body.cashBalance === undefined ? undefined : Number(body.cashBalance);
+    if (cashBalance !== undefined && (account.connection_id || !Number.isFinite(cashBalance) || cashBalance < 0))
+      return Response.json({error: account.connection_id ? 'Plaid cash is read-only and must be refreshed from the institution.' : 'Cash balance must be zero or greater'}, {status:400});
+    await db.transaction(async tx => {
+      await tx.prepare('UPDATE accounts SET nickname=?,investment_purpose=COALESCE(?,investment_purpose),updated_at=CURRENT_TIMESTAMP WHERE id=?').bind(String(body.nickname||'').trim().slice(0,80)||null,body.investmentPurpose||null,body.accountId).run();
+      if(body.investmentPurpose) await tx.prepare(`INSERT INTO investment_account_settings(account_id,strategy_type,goal_name) VALUES(?,?,?) ON CONFLICT(account_id) DO UPDATE SET strategy_type=excluded.strategy_type,goal_name=CASE WHEN investment_account_settings.goal_name IN ('Swing','Options','Long-term','Retirement','Dividend income','Mixed') THEN excluded.goal_name ELSE investment_account_settings.goal_name END,updated_at=CURRENT_TIMESTAMP`).bind(body.accountId,strategyForPurpose(body.investmentPurpose),body.investmentPurpose).run();
+      if(cashBalance !== undefined){const cents=Math.round(cashBalance*100);await tx.prepare(`UPDATE accounts a SET available_balance_cents=?,current_balance_cents=?+COALESCE((SELECT SUM(ROUND(h.quantity*COALESCE(h.price_cents,0))) FROM holdings h WHERE h.account_id=a.id),0),updated_at=CURRENT_TIMESTAMP WHERE a.id=?`).bind(cents,cents,body.accountId).run();await tx.prepare('UPDATE investment_account_settings SET available_cash_cents=?,updated_at=CURRENT_TIMESTAMP WHERE account_id=?').bind(cents,body.accountId).run();}
+    });
+    if(cashBalance !== undefined) await reviewKidsPlans(db,householdId,'ACCOUNT_CHANGED');
     const saved = await db
       .prepare(
         "SELECT id,nickname,investment_purpose,updated_at FROM accounts WHERE id=?",

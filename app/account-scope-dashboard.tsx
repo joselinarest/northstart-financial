@@ -83,7 +83,7 @@ export default function AccountScopeDashboard({
     limit = Number(selected?.maximum_position_bps ?? 1000) / 100,
     p = selected ? getPolicy(selected) : {},
     strategy = String(
-      selected?.strategy_type || selected?.investment_purpose || "Custom",
+      selected?.investment_purpose || selected?.strategy_type || "Custom",
     ).replaceAll("_", " "),
     swing = /swing|option|trad/i.test(strategy),
     effectiveHorizon = selected?.horizon_months
