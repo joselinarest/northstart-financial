@@ -34,7 +34,7 @@ body{margin:0;overflow-wrap:break-word}
  .workspace-view table td{font-size:13px!important}
  .notification-modal-layer{align-items:end!important;padding:8px!important}
  .header-notification-modal{width:100%!important;max-width:none!important;height:min(88dvh,760px)!important;margin:0!important;border-radius:20px 20px 10px 10px!important;padding-bottom:env(safe-area-inset-bottom)}
- .confirmation-modal>footer,.header-notification-modal>footer{position:sticky;bottom:0;background:#fff;padding-bottom:max(14px,env(safe-area-inset-bottom))!important}
+ .header-notification-modal>footer{position:sticky;bottom:0;background:#fff;padding-bottom:max(14px,env(safe-area-inset-bottom))!important}
 }
 @media(min-width:768px){.ui-page-container{padding:18px}.ui-responsive-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}.ui-bottom-sheet,.ui-responsive-dialog{top:50%;right:auto;bottom:auto;left:50%;width:min(620px,calc(100vw - 32px));transform:translate(-50%,-50%)}}
 @media(min-width:951px){.ui-page-container{max-width:1440px;padding:24px}.ui-responsive-grid{grid-template-columns:repeat(12,minmax(0,1fr))}.ui-mobile-card{padding:18px}}

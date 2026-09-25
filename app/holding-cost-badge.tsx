@@ -9,7 +9,7 @@ export default function HoldingCostBadge({symbol,accountId,currentPrice,stop}:{s
  const holding=useHoldingCost(symbol||'',accountId);if(!holding)return null;
  const supplied=currentPrice!=null&&Number.isFinite(currentPrice)&&currentPrice>0,price=supplied?currentPrice:holding.storedPrice;
  const change=holding.average!=null&&holding.average>0&&price!=null?(price-holding.average)/holding.average*100:null;
- return <span className="holding-cost-badge" style={{display:'flex',flexWrap:'wrap',gap:'5px 12px',fontSize:12,lineHeight:1.5,padding:'8px 10px',border:'1px solid #78998a',borderRadius:7,marginBlock:8,overflowWrap:'anywhere'}}>
+ return <span className="my-2! flex! min-w-0! flex-wrap! gap-x-3! gap-y-1! rounded-lg! border! border-line! bg-soft! p-3! text-sm! leading-relaxed! text-ink! [overflow-wrap:anywhere]">
   <strong>Your avg. buy: {holding.average==null?'Not provided':money(holding.average)}</strong>
   <span>{holding.shares.toLocaleString(undefined,{maximumFractionDigits:6})} shares · this account</span>
   {price!=null&&<span>{supplied?'Compared price':'Saved holding price'}: {money(price)}{change!=null?` · ${change>=0?'+':''}${change.toFixed(2)}% vs buy`:''}</span>}

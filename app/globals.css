@@ -1,4 +1,7 @@
 @import "tailwindcss";
+@theme inline {
+ --color-ink: var(--ns-ink); --color-muted: var(--ns-muted); --color-surface: var(--ns-surface); --color-soft: var(--ns-surface-soft); --color-line: var(--ns-line); --color-brand: var(--ns-brand); --color-positive: var(--ns-success); --color-negative: var(--ns-danger); --color-warning: var(--ns-warning); --color-info: var(--ns-info);
+}
 
 .account-profile-tactical {
   display: grid;
@@ -11445,48 +11448,12 @@ footer {
   color: #65766e;
   font-size: 0.75rem;
 }
-.recommendation-card > summary {
-  min-width: 0;
-}
 .recommendation-account {
   display: block;
   color: #52665d;
   font-size: 0.72rem;
 }
-.recommendation-primary-facts {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-  gap: 6px;
-  width: 100%;
-  min-width: 0;
-}
-.recommendation-primary-facts > span {
-  min-width: 0;
-  padding: 8px;
-  border: 1px solid #d7e2dc;
-  border-radius: 7px;
-  background: #f8fbf9;
-  color: #5c6c64;
-  font-size: 0.68rem;
-  overflow-wrap: anywhere;
-}
-.recommendation-primary-facts b {
-  display: block;
-  margin-top: 2px;
-  color: #13261e;
-  font-size: 0.74rem;
-}
 @media (max-width: 600px) {
-  .recommendation-primary-facts {
-    grid-template-columns: 1fr 1fr;
-  }
-  .recommendation-card > summary {
-    overflow: hidden;
-  }
-  .recommendation-card > summary > * {
-    max-width: 100%;
-    overflow-wrap: anywhere;
-  }
   .analysis-scope-empty {
     margin-inline: 0;
   }
@@ -11495,9 +11462,6 @@ footer {
   }
 }
 @media (max-width: 380px) {
-  .recommendation-primary-facts {
-    grid-template-columns: 1fr;
-  }
   .home-status-strip,
   .home-health-grid,
   .home-monitor-grid {
