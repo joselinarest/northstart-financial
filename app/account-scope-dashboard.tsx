@@ -1,4 +1,5 @@
 "use client";
+import {cashSymbols,reconcileCash} from "@/lib/investment-cash";
 import { useMemo } from "react";
 type Row = Record<string, any>;
 export const ALL_ACCOUNTS_SCOPE = "ALL_ACCOUNTS";
@@ -20,8 +21,8 @@ const getPolicy = (a: Row) => {
   }
 };
 export default function AccountScopeDashboard({
-  accounts,
-  holdings,
+  accounts: rawAccounts,
+  holdings: rawHoldings,
   selectedScope,
   onSelect,
   onConfigure,
@@ -32,6 +33,8 @@ export default function AccountScopeDashboard({
   onSelect: (scope: string) => void;
   onConfigure?: (accountId: string) => void;
 }) {
+  const accounts=useMemo<Row[]>(()=>rawAccounts.map(a=>{const mapping=reconcileCash(a.connection_id?0:Number(a.available_cash_cents??a.available_balance_cents??0),a.connection_id?Number(a.available_balance_cents||0):0,rawHoldings.filter(h=>String(h.account_id)===String(a.id)).map(h=>({symbol:String(h.ticker||''),securityType:h.type,valueCents:Number(h.market_value_cents||0)})),cashSymbols(a.policy_json));return {...a,available_cash_cents:mapping.cashCents};}),[rawAccounts,rawHoldings]);
+  const holdings=useMemo(()=>rawHoldings.filter(h=>h.type!=='cash'&&!cashSymbols(rawAccounts.find(a=>String(a.id)===String(h.account_id))?.policy_json).includes(String(h.ticker||'').toUpperCase())),[rawAccounts,rawHoldings]);
   const selected = accounts.find((a) => String(a.id) === selectedScope) || null;
   const summary = useMemo(() => {
     const invested = holdings.reduce(
@@ -78,7 +81,7 @@ export default function AccountScopeDashboard({
     )[0],
     weight =
       value && largest
-        ? (Number(largest.market_value_cents || 0) / value) * 100
+        ? (Number(largest.market_value_cents || 0) / total) * 100
         : 0,
     limit = Number(selected?.maximum_position_bps ?? 1000) / 100,
     p = selected ? getPolicy(selected) : {},
@@ -273,7 +276,7 @@ export default function AccountScopeDashboard({
           <div className="account-kpi-strip">
             <div>
               <span>Portfolio value</span>
-              <b>{usd(value)}</b>
+              <b>{usd(total)}</b>
             </div>
             <div>
               <span>Available cash</span>
