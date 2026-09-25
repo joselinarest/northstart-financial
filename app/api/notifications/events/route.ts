@@ -3,13 +3,14 @@ import {workspace} from "@/lib/db";
 import {NOTIFICATION_CATEGORIES} from "@/lib/notification-events";
 export const dynamic="force-dynamic";
 export async function GET(request:Request){try{
-  const {db,householdId,userId}=await workspace(request),url=new URL(request.url),eventId=url.searchParams.get("id");
+  const {db,householdId,userId}=await workspace(request),url=new URL(request.url),eventId=url.searchParams.get("id"),asOf=new Date().toISOString();
   const events=await db.prepare("SELECT e.*,s.read_at,CASE WHEN s.dismissed_at>=e.updated_at THEN s.dismissed_at END dismissed_at,(s.read_at IS NULL OR s.read_at<e.updated_at) unread FROM notification_events e LEFT JOIN notification_event_states s ON s.event_id=e.id AND s.user_id=? WHERE e.household_id=? AND ((?::text IS NULL AND (s.dismissed_at IS NULL OR s.dismissed_at<e.updated_at)) OR e.id=?) ORDER BY CASE e.severity WHEN 'CRITICAL' THEN 0 WHEN 'HIGH' THEN 1 WHEN 'MEDIUM' THEN 2 ELSE 3 END,e.updated_at DESC LIMIT 100").bind(userId,householdId,eventId,eventId).all();
   if(eventId&&!events.results.length)return Response.json({error:"Event not found"},{status:404});
   const timeline=eventId?(await db.prepare("SELECT u.snapshot_json,u.created_at FROM notification_event_updates u JOIN notification_events e ON e.id=u.event_id WHERE u.event_id=? AND e.household_id=? ORDER BY u.created_at").bind(eventId,householdId).all()).results:[];
   const preferences=(await db.prepare("SELECT category,in_app,push,email FROM notification_category_preferences WHERE household_id=? AND user_id=?").bind(householdId,userId).all()).results;
   const deliveries=eventId?(await db.prepare("SELECT d.channel,d.status,d.error_code,d.attempted_at,d.delivered_at FROM alert_deliveries d JOIN notification_event_updates u ON u.alert_id=d.alert_id WHERE u.event_id=? AND d.user_id=?").bind(eventId,userId).all()).results:[];
-  return Response.json({asOf:new Date().toISOString(),events:events.results,timeline,deliveries,preferences,categories:NOTIFICATION_CATEGORIES},{headers:{"Cache-Control":"private, no-store"}});
+  const count=await db.prepare("SELECT count(*)::int unread FROM notification_events e LEFT JOIN notification_event_states s ON s.event_id=e.id AND s.user_id=? WHERE e.household_id=? AND (s.dismissed_at IS NULL OR s.dismissed_at<e.updated_at) AND (s.read_at IS NULL OR s.read_at<e.updated_at)").bind(userId,householdId).first<{unread:number}>();
+  return Response.json({asOf,unreadCount:Number(count?.unread||0),events:events.results,timeline,deliveries,preferences,categories:NOTIFICATION_CATEGORIES},{headers:{"Cache-Control":"private, no-store"}});
 }catch(e){if(e instanceof Response)return e;return Response.json({error:"Notification events unavailable",referenceId:crypto.randomUUID()},{status:503});}}
 export async function PATCH(request:Request){try{
   const {db,householdId,userId}=await workspace(request),body=await request.json() as Record<string,unknown>;

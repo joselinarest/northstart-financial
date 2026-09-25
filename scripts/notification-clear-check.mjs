@@ -1,18 +1,3 @@
-import assert from "node:assert/strict";
-import {readFile} from "node:fs/promises";
-import pg from "pg";
-if(!process.env.DATABASE_URL)throw new Error("DATABASE_URL is required");
-const connectionUrl=new URL(process.env.DATABASE_URL);for(const parameter of ["ssl","sslmode","sslcert","sslkey","sslrootcert","uselibpqcompat"])connectionUrl.searchParams.delete(parameter);const certificateResponse=await fetch("https://truststore.pki.rds.amazonaws.com/global/global-bundle.pem");if(!certificateResponse.ok)throw new Error(`RDS CA download failed: ${certificateResponse.status}`);const client=new pg.Client({connectionString:connectionUrl.toString(),ssl:{ca:await certificateResponse.text(),rejectUnauthorized:true}});
-await client.connect();
-const householdA=`test_clear_${crypto.randomUUID()}`,householdB=`test_other_${crypto.randomUUID()}`;
-const clearSql="UPDATE alerts SET read_at=CURRENT_TIMESTAMP,dismissed_at=CURRENT_TIMESTAMP WHERE household_id=$1 AND dismissed_at IS NULL RETURNING id";
-const unread=async id=>Number((await client.query("SELECT COUNT(*) count FROM alerts WHERE household_id=$1 AND dismissed_at IS NULL AND read_at IS NULL",[id])).rows[0].count);
-try{await client.query("BEGIN");await client.query("INSERT INTO households(id,name,base_currency,timezone) VALUES($1,'Clear test','USD','America/Phoenix'),($2,'Isolation test','USD','America/Phoenix')",[householdA,householdB]);
- assert.equal((await client.query(clearSql,[householdA])).rowCount,0,"zero-notification clear");
- const values=[],params=[];for(let i=0;i<1501;i++){const n=params.length;values.push(`($${n+1},$${n+2},'informational','test','Bulk notification','Regression record','{}',$${n+3})`);params.push(`alert_${crypto.randomUUID()}`,householdA,new Date(Date.now()-i*1000).toISOString())}await client.query(`INSERT INTO alerts(id,household_id,severity,type,title,explanation,evidence_json,created_at) VALUES ${values.join(',')}`,params);await client.query("INSERT INTO alerts(id,household_id,severity,type,title,explanation,evidence_json,created_at) VALUES($1,$2,'important','test','Other household','Must remain','{}',CURRENT_TIMESTAMP)",[`alert_${crypto.randomUUID()}`,householdB]);
- assert.equal(await unread(householdA),1501,"large unread count");const first=await client.query(clearSql,[householdA]);assert.equal(first.rowCount,1501,"clear 1500+");assert.equal(await unread(householdA),0,"unread after clear");assert.equal(await unread(householdB),1,"household isolation");assert.equal((await client.query(clearSql,[householdA])).rowCount,0,"duplicate clear idempotent");
- await client.query("INSERT INTO alerts(id,household_id,severity,type,title,explanation,evidence_json,read_at,created_at) VALUES($1,$2,'informational','future','Future notification','Created after clear','{}',NULL,CURRENT_TIMESTAMP)",[`alert_${crypto.randomUUID()}`,householdA]);assert.equal(await unread(householdA),1,"future notifications arrive");
- const types=await client.query("SELECT column_name,data_type FROM information_schema.columns WHERE table_name='alerts' AND column_name IN ('read_at','created_at','dismissed_at')");for(const row of types.rows)assert.equal(row.data_type,'timestamp with time zone',`${row.column_name} must be timestamptz`);
- const route=await readFile(new URL('../app/api/alerts/route.ts',import.meta.url),'utf8'),history=await readFile(new URL('../app/api/notifications/history/route.ts',import.meta.url),'utf8');assert.doesNotMatch(route,/COALESCE\s*\(\s*read_at/i);assert.doesNotMatch(history,/COALESCE\s*\(\s*read_at/i);assert.match(route,/remainingUnreadCount/);assert.match(route,/household_id=\?/);assert.match(route,/We couldn't clear notifications/);
- console.log("Notification clear regression passed: zero, 1,501 rows, isolation, null timestamps, unread count, timestamptz schema, idempotent retry, and future notification.");
-}finally{await client.query("ROLLBACK").catch(()=>{});await client.end()}
+// Exercise the canonical functions/routes instead of copying obsolete household-wide SQL.
+await import('./notification-bulk-check.mjs');
+await import('./notification-events-check.mjs');

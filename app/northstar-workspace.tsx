@@ -3585,7 +3585,11 @@ export function NorthstarWorkspace({
     if (!signedIn || workspaceAccess !== "granted") return;
     loadHeaderAlerts();
     const timer = window.setInterval(loadHeaderAlerts, 60_000);
-    return () => window.clearInterval(timer);
+    const notificationUpdate = () => void loadHeaderAlerts();
+    window.addEventListener("northstar:notifications-changed", notificationUpdate);
+    const channel = "BroadcastChannel" in window ? new BroadcastChannel("northstar-notifications") : null;
+    if (channel) channel.onmessage = notificationUpdate;
+    return () => { window.clearInterval(timer); channel?.close(); window.removeEventListener("northstar:notifications-changed", notificationUpdate); };
   }, [signedIn, workspaceAccess, accessToken]);
   const saveChartPrediction = async () => {
     if (!advisorAccountId) {

@@ -12,8 +12,7 @@ export default function RealtimeSync({accessToken,onStatus,onEvent,refreshMinute
     const publish=(detail:LiveEvent)=>{
       window.dispatchEvent(new CustomEvent("northstar:realtime",{detail}));
       if(marketOpen)onEvent();
-      if(detail.type!=="alert"||!("Notification" in window)||Notification.permission!=="granted"||localStorage.getItem("northstar-push-enabled")==="false")return;
-      new Notification(detail.title||"Northstar action review",{body:detail.explanation||"Material evidence changed. Open Northstar to review; no order was placed.",tag:detail.id||"northstar-alert"});
+      // Only server deliveries create OS notifications; page refreshes must not duplicate push.
     };
     const pollAlerts=async()=>{
       if(stopped||document.visibilityState!=="visible")return;

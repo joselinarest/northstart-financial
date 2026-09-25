@@ -4,7 +4,7 @@ import {readFileSync} from 'node:fs';
 import vm from 'node:vm';
 import {PGlite} from '@electric-sql/pglite';
 import {migrations} from '../db/migrations.ts';
-registerHooks({resolve(s,c,next){if(s==='@/lib/db')return {url:'data:text/javascript,'+encodeURIComponent('export const id=p=>p+crypto.randomUUID();export const workspace=async()=>globalThis.notificationTestWorkspace;'),shortCircuit:true};if(s.startsWith('@/lib/'))return {url:new URL('../lib/'+s.slice(6)+'.ts',import.meta.url).href,shortCircuit:true};return next(s,c);}});
+registerHooks({resolve(s,c,next){if(s==='@/app/api/notifications/events/route')return {url:new URL('../app/api/notifications/events/route.ts',import.meta.url).href,shortCircuit:true};if(s==='@/lib/db')return {url:'data:text/javascript,'+encodeURIComponent('export const id=p=>p+crypto.randomUUID();export const workspace=async()=>globalThis.notificationTestWorkspace;'),shortCircuit:true};if(s.startsWith('@/lib/'))return {url:new URL('../lib/'+s.slice(6)+'.ts',import.meta.url).href,shortCircuit:true};return next(s,c);}});
 const {indexNotificationEvents,eventLink,quietUntil}=await import('../lib/notification-events.ts');
 const {deliverPushDevices}=await import('../lib/notification-push-delivery.ts');
 const pg=new PGlite();
@@ -46,10 +46,12 @@ assert.equal((await(await route.GET(new Request('http://local/api?id='+event.id)
 await pg.exec('ALTER TABLE alerts ADD COLUMN read_at timestamptz; ALTER TABLE alerts ADD COLUMN dismissed_at timestamptz');
 await pg.query("INSERT INTO alerts(id,household_id,title,explanation,type,severity,evidence_json) VALUES('legacy','h','Account sync','Sync failed','system','warning','{\"eventId\":\"sync-2\"}')");
 const legacyRoute=await import('../app/api/alerts/route.ts');
-assert.equal((await legacyRoute.PATCH(new Request('http://local/api',{method:'PATCH',body:JSON.stringify({id:'legacy',dismiss:true})}))).status,200);
+assert.equal((await legacyRoute.PATCH(new Request('http://local/api',{method:'PATCH',body:JSON.stringify({id:'legacy',dismiss:true})}))).status,404);
 await indexNotificationEvents(db);
-assert.equal((await pg.query("SELECT COUNT(*)::int count FROM alert_deliveries WHERE alert_id='legacy'")).rows[0].count,0,'closing before indexing prevents any later delivery');
-assert.ok((await pg.query("SELECT dismissed_at FROM alerts WHERE id='legacy'")).rows[0].dismissed_at);
+assert.equal((await pg.query("SELECT COUNT(*)::int count FROM alert_deliveries WHERE alert_id='legacy'")).rows[0].count,2,'unindexed alerts are not shown or silently muted by the compatibility endpoint');
+const legacyList=await(await legacyRoute.GET(new Request('http://local/api?unread=false'))).json();assert.ok(legacyList.alerts.every(a=>a.evidence_json.deepLink.startsWith('/workspace/notifications/')));
+assert.equal((await legacyRoute.PATCH(new Request('http://local/api',{method:'PATCH',body:JSON.stringify({id:'legacy',dismiss:true})}))).status,200);
+assert.equal((await pg.query("SELECT dismissed_at FROM alerts WHERE id='legacy'")).rows[0].dismissed_at,null,'legacy adapter must preserve shared audit records');
 globalThis.notificationTestWorkspace.householdId='other';assert.equal((await route.GET(new Request('http://local/api?id='+event.id))).status,404);
 // Exercise the actual service worker click handler, including no open app and hostile URLs.
 const handlers={},opened=[],self={location:{origin:'https://northstar.test',hostname:'northstar.test'},addEventListener:(name,fn)=>handlers[name]=fn,navigator:{},clients:{matchAll:async()=>[],openWindow:async url=>opened.push(url)}};
