@@ -5,7 +5,7 @@ export function recommendedTradingPolicy(input:{accountType:string;value:number;
   const multiplier=input.volatilityPct==null?.75:input.volatilityPct>=5?.5:input.volatilityPct>=3?.75:1;
   const drawdown=Math.min(protectedAccount?150:constrained?150:300,input.maxDrawdownBps??10000);
   const risk=Math.min(Math.floor((protectedAccount?15:constrained?25:50)*multiplier),Math.floor(drawdown/6));
-  return {version:"risk-1",label:"RECOMMENDED DEFAULTS",swingEnabled:swing,dayTradingEnabled:mixed,longTermEnabled:mixed||!swing,optionsEnabled:mixed,swingRiskBps:risk,dayRiskBps:Math.min(risk,constrained?10:20),combinedRiskBps:Math.min(drawdown,protectedAccount?100:constrained?100:200),maxPositionBps:protectedAccount?800:constrained?1000:1500,maxSectorBps:protectedAccount?2000:2500,dailyLossBps:Math.min(drawdown,constrained?50:100),weeklyDrawdownBps:drawdown,maxDayTrades:constrained?1:3,optionsRiskBps:protectedAccount?0:Math.min(25,risk),cashReserveBps:protectedAccount?1000:constrained?2000:1000,fridaySwing:"VERY_STRONG_ONLY",fridayConfidence:90,minimumConfidence:75,minimumRewardRisk:2,requireConfirmation:true,extendedHours:false,maxSwingDays:14,maxDayMinutes:360};
+  return {version:"risk-1",label:"RECOMMENDED DEFAULTS",swingEnabled:swing,dayTradingEnabled:mixed,longTermEnabled:!swing,optionsEnabled:mixed,swingRiskBps:risk,dayRiskBps:Math.min(risk,constrained?10:20),combinedRiskBps:Math.min(drawdown,protectedAccount?100:constrained?100:200),maxPositionBps:protectedAccount?800:constrained?1000:1500,maxSectorBps:protectedAccount?2000:2500,dailyLossBps:Math.min(drawdown,constrained?50:100),weeklyDrawdownBps:drawdown,maxDayTrades:constrained?1:3,optionsRiskBps:protectedAccount?0:Math.min(25,risk),cashReserveBps:protectedAccount?1000:constrained?2000:1000,fridaySwing:"VERY_STRONG_ONLY",fridayConfidence:90,minimumConfidence:75,minimumRewardRisk:2,requireConfirmation:true,extendedHours:false,maxSwingDays:14,maxDayMinutes:360};
 }
 export function validateTradingPolicy(value:unknown,recommended:TradingPolicy,capabilities:{intraday:boolean;options:boolean},acceptHigherRisk=false):TradingPolicy{
   if(!value||typeof value!=="object"||Array.isArray(value))throw Error("Trading policy must be an object");
@@ -34,3 +34,4 @@ export function fridaySwingGate(date:Date,style:TradeStyle,p:TradingPolicy,e:{fu
   const strong=p.fridaySwing==="VERY_STRONG_ONLY"&&e.fundamentals&&e.trend&&e.market&&e.sector&&e.technical&&e.liquid&&e.weekendCatalystClear&&e.rewardRisk>=Math.max(3,p.minimumRewardRisk)&&e.confidence>=p.fridayConfidence;
   return {allowed:strong,reason:strong?"VERY STRONG OPPORTUNITY — independent Friday confirmations passed":"WAIT UNTIL NEXT SESSION — do not open new swing risk before the weekend"};
 }
+

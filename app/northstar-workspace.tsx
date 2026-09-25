@@ -2728,7 +2728,7 @@ export function NorthstarWorkspace({
     [investmentAccounts],
   );
   const longTermAccounts = useMemo(
-    () => investmentAccounts.filter((account) => /mixed/i.test(String(account.investment_purpose)) || !isSwingAccount(account)),
+    () => investmentAccounts.filter((account) => !isSwingAccount(account)),
     [investmentAccounts],
   );
   const homeDefaultScopeApplied = useRef(false);
@@ -12936,3 +12936,4 @@ export function NorthstarWorkspace({
     </main></HoldingCostProvider>
   );
 }
+
