@@ -1,3 +1,4 @@
+import {coalesceRefreshJobs} from '@/lib/worker-refresh-queue';
 import {exchangeDay} from '@/lib/exchange-calendar';
 import {scheduleQuantFlow,monitorQuantFlow} from "@/lib/quant-data-monitor";
 import {withWorkBudget} from "@/lib/work-budget";
@@ -71,12 +72,13 @@ async function processNotifications(request: Request,limits:{totalMs:number;jobM
   // Claim work atomically. EventBridge can invoke more than once and an SSR
   // request can die mid-job; SKIP LOCKED plus stale-lock recovery prevents both
   // duplicate execution and permanently RUNNING work.
+  await coalesceRefreshJobs(db);
   const jobs={results:[] as Record<string, any>[]};
   const claimJob = async()=>await db.prepare(`WITH claimable AS (
       SELECT id FROM background_jobs
       WHERE attempts<6 AND available_at<=CURRENT_TIMESTAMP
         AND (status IN ('QUEUED','FAILED') OR (status='RUNNING' AND locked_at<CURRENT_TIMESTAMP-INTERVAL '10 minutes'))
-      ORDER BY CASE WHEN created_at<CURRENT_TIMESTAMP-INTERVAL '15 minutes' THEN 0 ELSE 1 END,CASE job_type WHEN 'AI_EVENT_REVIEW' THEN 0 WHEN 'PLAID_INVESTMENT_SYNC' THEN 1 WHEN 'PLAID_SYNC' THEN 1 WHEN 'NOTIFICATION_DELIVERY' THEN 2 WHEN 'ACCOUNT_INTELLIGENCE_LOOP' THEN 3 WHEN 'MARKET_DISCOVERY' THEN 4 WHEN 'MARKET_INTELLIGENCE' THEN 5 ELSE 5 END,created_at FOR UPDATE SKIP LOCKED LIMIT 1
+      ORDER BY CASE job_type WHEN 'AI_EVENT_REVIEW' THEN 0 WHEN 'PLAID_INVESTMENT_SYNC' THEN 1 WHEN 'PLAID_SYNC' THEN 1 WHEN 'NOTIFICATION_DELIVERY' THEN 2 WHEN 'ACCOUNT_INTELLIGENCE_LOOP' THEN 3 WHEN 'MARKET_DISCOVERY' THEN 4 WHEN 'MARKET_INTELLIGENCE' THEN 5 ELSE 5 END,created_at FOR UPDATE SKIP LOCKED LIMIT 1
     ) UPDATE background_jobs j SET status='RUNNING',attempts=j.attempts+1,
       locked_at=CURRENT_TIMESTAMP,updated_at=CURRENT_TIMESTAMP
       FROM claimable c WHERE j.id=c.id RETURNING j.*`).all<Record<string, any>>();
@@ -90,7 +92,7 @@ async function processNotifications(request: Request,limits:{totalMs:number;jobM
     );
   let jobsCompleted = 0,
     jobsFailed = 0;
-  for (let claimCount=0;claimCount<5&&Date.now()<jobDeadline;claimCount++) {
+  for (let claimCount=0;claimCount<20&&Date.now()<jobDeadline;claimCount++) {
     const job=(await claimJob()).results[0];if(!job)break;jobs.results.push(job);
     try {
       await withWorkBudget(Math.max(1,Math.min(limits.jobMs,jobDeadline-Date.now())),async()=>{
