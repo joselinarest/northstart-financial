@@ -85,8 +85,8 @@ export default function AccountScopeDashboard({
     strategy = String(
       selected?.investment_purpose || selected?.strategy_type || "Custom",
     ).replaceAll("_", " "),
-    swing = /swing|option|trad/i.test(strategy),
-    effectiveHorizon = selected?.horizon_months
+    swing = /swing|option|trad|mixed/i.test(strategy),
+    effectiveHorizon = /mixed/i.test(strategy) ? "2–10 trading days · Options ≤30 calendar days" : selected?.horizon_months
       ? `${selected.horizon_months} months`
       : `Suggested ${swing ? "3–12" : "60–120"} months · configure`,
     effectiveBenchmark =

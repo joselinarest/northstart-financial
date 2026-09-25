@@ -94,7 +94,7 @@ export default function SwingOptionsAdvisor({
   const [symbol, setSymbol] = useState(initialSymbol);
   const [maxRisk, setMaxRisk] = useState(0);
   const accountGeneration=useRef(0),defaultRiskAccount=useRef("");
-  const [targetDte, setTargetDte] = useState(45);
+  const [targetDte, setTargetDte] = useState(21);
   const [loading, setLoading] = useState(false);
   const [notice, setNotice] = useState("");
   const [results, setResults] = useState<OptionResult[]>([]);
@@ -112,7 +112,7 @@ export default function SwingOptionsAdvisor({
   const loadResults=async()=>{if(!accountId)return;const generation=accountGeneration.current;const response=await fetch('/api/market/options/scan?accountId='+encodeURIComponent(accountId),{headers});const body=await response.json();if(generation!==accountGeneration.current)return;if(!response.ok)throw Error(body.error||'Coverage unavailable');setResults(body.results||[]);setCoverage(body.coverage);setAccountPolicy(body.policy);setScreens(body.screens||[]);if(defaultRiskAccount.current!==accountId&&body.policy){setMaxRisk(Math.max(0,Math.floor(body.policy.premiumCap||0)));defaultRiskAccount.current=accountId;}};
   useEffect(()=>{accountGeneration.current++;setResults([]);setCoverage(null);setScreens([]);setAccountPolicy(null);setNotice('');setMaxRisk(0);defaultRiskAccount.current='';let active=true;const load=()=>{if(active)void loadResults().catch(e=>{if(active)setNotice(e.message)});};load();const timer=setInterval(load,15000);return()=>{active=false;accountGeneration.current++;clearInterval(timer)};},[accountId,headers]);
   const analyze=async()=>{if(!accountId)return;setLoading(true);try{const response=await fetch('/api/market/options/scan',{method:'POST',headers,body:JSON.stringify({accountId,symbol,maxRisk,targetDte})});const body=await response.json();if(!response.ok)throw Error(body.error);setNotice(body.symbol+' · '+body.message);await loadResults();}catch(e){setNotice(e instanceof Error?e.message:'Analysis unavailable')}finally{setLoading(false)}};
-  const reset=()=>{setMaxRisk(Math.floor(accountPolicy?.premiumCap||0));setTargetDte(45);void loadResults().catch(e=>setNotice(e.message));};
+  const reset=()=>{setMaxRisk(Math.floor(accountPolicy?.premiumCap||0));setTargetDte(21);void loadResults().catch(e=>setNotice(e.message));};
   return <section id="options-advisor" className="option-contract-advisor swing-options-advisor">
     <div className="option-advisor-head">
       <div>
@@ -126,7 +126,7 @@ export default function SwingOptionsAdvisor({
     {!accountId && <div className="option-account-required" role="alert"><div><b>Investment account data is unavailable</b><span>{accountStatus}</span></div><div><button type="button" onClick={onRefreshAccounts}>Refresh accounts</button><button type="button" onClick={onConfigureAccount}>Open account settings</button></div></div>}
     <div className="option-fields">
       <label>Stock to analyze<input value={symbol} onChange={event => setSymbol(event.target.value.toUpperCase().replace(/[^A-Z.]/g, "").slice(0, 10))} /></label>
-      <label>How much time should it have?<select value={targetDte} onChange={event => setTargetDte(Number(event.target.value))}><option value="21">About 3 weeks</option><option value="45">About 6 weeks</option><option value="60">About 2 months</option><option value="90">About 3 months</option></select></label>
+      <label>How much time should it have?<select value={targetDte} onChange={event => setTargetDte(Number(event.target.value))}><option value="14">About 2 weeks</option><option value="21">About 3 weeks</option><option value="30">Up to 30 days · maximum</option></select></label>
       <label>Most I am willing to lose<div className="money-input"><b>$</b><input type="number" min="0" step="1" value={maxRisk} onChange={event => setMaxRisk(Math.max(0, Number(event.target.value) || 0))} /></div></label>
       <button type="button" disabled={loading || !accountId} onClick={analyze}>{loading ? "Checking options…" : "Find options"}</button><button type="button" className="secondary" disabled={loading} onClick={reset}>Reset</button>
     </div>

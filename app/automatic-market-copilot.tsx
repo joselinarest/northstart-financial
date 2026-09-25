@@ -165,7 +165,7 @@ export default function AutomaticMarketCopilot({
   }>({});
   const [loading, setLoading] = useState(true),
     [refresh, setRefresh] = useState(0),
-    strategy: Strategy = initialStrategy;
+    strategy: Strategy = /mixed/i.test(accountPurpose) ? "swing" : initialStrategy;
   const [accountSize, setAccountSize] = useState(25000),
     [riskPercent, setRiskPercent] = useState(0.5),
     [holdingPeriod, setHoldingPeriod] = useState("2–10 trading days"),

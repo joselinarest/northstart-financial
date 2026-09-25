@@ -2593,7 +2593,7 @@ export function NorthstarWorkspace({
       advisorAccount?.subtype || advisorAccount?.type || "Investment account",
     ),
     advisorPurposeKey = `${advisorPurpose} ${advisorAccountType}`.toLowerCase();
-  const advisorStrategy: "swing" | "long-term" = /swing|option|trad/.test(
+  const advisorStrategy: "swing" | "long-term" = /swing|option|trad|mixed/.test(
     advisorPurposeKey,
   )
     ? "swing"
@@ -4114,7 +4114,7 @@ export function NorthstarWorkspace({
       const purpose = String(account.investment_purpose || "").toLowerCase(),
         strategyType = String(
           account.strategy_type ||
-            (/swing|option|trad/.test(purpose)
+            (/swing|option|trad|mixed/.test(purpose)
               ? "SWING"
               : /retirement|ira|401/.test(`${purpose} ${account.subtype || ""}`)
                 ? "RETIREMENT"
