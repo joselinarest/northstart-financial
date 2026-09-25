@@ -7226,7 +7226,7 @@ export function NorthstarWorkspace({
                 <button onClick={() => navigate("Portfolio")}>Full account evaluation →</button>
               </header>
               <ActionGuidancePanel key={advisorAccountId} accountId={advisorAccountId} accessToken={accessToken} mode="today" marketOpen={marketPhase === "open"} sessionOnly />
-              {advisorStrategy === "swing" && <SwingOptionsAdvisor accountId={advisorAccountId} accountName={advisorAccountName} accessToken={accessToken} sessionOnly />}
+              <SwingOptionsAdvisor accountId={advisorAccountId} accountName={advisorAccountName} accessToken={accessToken} sessionOnly />
             </section>
           )}
           {tab === "New Candidates" && (
