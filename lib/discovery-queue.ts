@@ -20,7 +20,14 @@ export async function claimDiscovery(db:PostgresDatabase,kind:'SCREEN'|'RESEARCH
  return db.transaction(async tx=>{const picks=await tx.prepare(`SELECT symbol,asset_json,seed_json,priority,last_screened_at FROM discovery_queue WHERE active AND ${eligible} AND ${due}<=CURRENT_TIMESTAMP AND (lease_until IS NULL OR lease_until<CURRENT_TIMESTAMP) ORDER BY CASE WHEN priority>=100 THEN 0 ELSE 1 END,priority DESC,${due},symbol FOR UPDATE SKIP LOCKED LIMIT ?`).bind(Math.ceil(limit/2)).all<any>();const rest=await tx.prepare(`SELECT symbol,asset_json,seed_json,priority,last_screened_at FROM discovery_queue WHERE active AND ${eligible} AND ${due}<=CURRENT_TIMESTAMP AND (lease_until IS NULL OR lease_until<CURRENT_TIMESTAMP) AND NOT(symbol=ANY(?::text[])) ORDER BY ${due},symbol FOR UPDATE SKIP LOCKED LIMIT ?`).bind(picks.results.map(x=>x.symbol),limit-picks.results.length).all<any>();const rows=[...picks.results,...rest.results];if(rows.length)await tx.prepare(`UPDATE discovery_queue SET lease_until=CURRENT_TIMESTAMP+INTERVAL '3 minutes' WHERE symbol=ANY(?::text[])`).bind(rows.map(x=>x.symbol)).run();return rows});
 }
 export async function queueDiscoveryRefresh(db:PostgresDatabase,symbol:string){return db.prepare(`UPDATE discovery_queue SET priority=GREATEST(priority,200),next_screen_at=CURRENT_TIMESTAMP,next_research_at=CURRENT_TIMESTAMP WHERE symbol=? AND active RETURNING symbol`).bind(symbol).first()}
+const inFlight = new WeakMap<PostgresDatabase, Map<string, Promise<{data:any;asOf:string}>>>();
 export async function discoveryFinnhub(db:PostgresDatabase,path:string,ttlSeconds:number){
+ let requests=inFlight.get(db);if(!requests){requests=new Map();inFlight.set(db,requests)}
+ const pending=requests.get(path);if(pending)return pending;
+ const request=loadDiscoveryFinnhub(db,path,ttlSeconds);requests.set(path,request);
+ try{return await request}finally{requests.delete(path)}
+}
+async function loadDiscoveryFinnhub(db:PostgresDatabase,path:string,ttlSeconds:number){
  const cached=await db.prepare(`SELECT payload_json,fetched_at FROM discovery_provider_cache WHERE cache_key=? AND expires_at>CURRENT_TIMESTAMP`).bind(path).first<any>();if(cached)return{data:cached.payload_json,asOf:new Date(cached.fetched_at).toISOString()};
  const paused=await db.prepare(`SELECT 1 blocked FROM discovery_control WHERE id='finnhub' AND cooldown_until>CURRENT_TIMESTAMP`).first();if(paused)throw Error('FINNHUB_RATE_LIMIT_COOLDOWN');
  const response=await fetch('https://finnhub.io/api/v1'+path,{headers:{'X-Finnhub-Token':process.env.FINNHUB_API_KEY||''},signal:providerSignal(10000),cache:'no-store'});

@@ -33,7 +33,7 @@ export async function barsFor(symbols:string[],headers:Record<string,string>){
 }
 async function enrich(db:PostgresDatabase,symbol:string){
  const date=(d:Date)=>d.toISOString().slice(0,10),q=encodeURIComponent(symbol);
- const profile=await discoveryFinnhub(db,`/stock/profile2?symbol=${q}`,86400),metric=await discoveryFinnhub(db,`/stock/metric?symbol=${q}&metric=all`,21600),news=await discoveryFinnhub(db,`/company-news?symbol=${q}&from=${date(new Date(Date.now()-32*86400000))}&to=${date(new Date())}`,300);
+ const profile=await discoveryFinnhub(db,`/stock/profile2?symbol=${q}`,86400),metric=await discoveryFinnhub(db,`/stock/metric?symbol=${q}&metric=all`,21600),news=await discoveryFinnhub(db,`/company-news?symbol=${q}&from=${date(new Date(Date.now()-30*86400000))}&to=${date(new Date())}`,300);
  if(!profile.data?.name||!metric.data?.metric||Object.keys(metric.data.metric).length<4||!Array.isArray(news.data))throw Error("FINNHUB_INCOMPLETE_DATA");
  return{profile:profile.data as Record<string,any>,metric:metric.data.metric as Record<string,number>,news:news.data.slice(0,20) as Array<{headline?:string;summary?:string;datetime?:number}>,fundamentalsAsOf:metric.asOf,newsAsOf:news.asOf};
 }

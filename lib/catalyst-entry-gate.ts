@@ -1,4 +1,5 @@
-import {providerSignal} from "@/lib/work-budget";
+import {discoveryFinnhub} from "@/lib/discovery-queue";
+import type {PostgresDatabase} from "@/lib/db";
 export type CatalystEvent = {
   kind: "EARNINGS" | "NEWS" | "MACRO" | "OTHER";
   label: string;
@@ -23,20 +24,17 @@ const day = 86400000;
 const dateOnly = (value: Date) => value.toISOString().slice(0, 10);
 const daysUntil = (value: string) => Math.ceil((new Date(`${value}T12:00:00Z`).getTime() - Date.now()) / day);
 
-export async function loadCatalystContext(symbol: string): Promise<CatalystContext> {
+export async function loadCatalystContext(symbol: string, db: PostgresDatabase): Promise<CatalystContext> {
   const token = process.env.FINNHUB_API_KEY;
   if (!token) return { available: false, provider: "FINNHUB_NOT_CONFIGURED", asOf: null, events: [], recentNewsCount: 0, adverseNewsCount: 0 };
-  const today = new Date(), from = new Date(Date.now() - 7 * day), to = new Date(Date.now() + 120 * day), base = "https://finnhub.io/api/v1";
-  const get = async (path: string) => {
-    const response = await fetch(`${base}${path}`, { headers: { "X-Finnhub-Token": token }, cache: "no-store", signal: providerSignal(10000) });
-    if (!response.ok) throw new Error(`FINNHUB_${response.status}`);
-    return response.json();
-  };
+  const today = new Date(), from = new Date(Date.now() - 30 * day), to = new Date(Date.now() + 120 * day);
+  const get = (path: string) => discoveryFinnhub(db,path,path.startsWith('/company-news')?300:3600);
   try {
-    const [newsRaw, earningsRaw] = await Promise.all([
+    const [newsResponse, earningsResponse] = await Promise.all([
       get(`/company-news?symbol=${symbol}&from=${dateOnly(from)}&to=${dateOnly(today)}`),
       get(`/calendar/earnings?symbol=${symbol}&from=${dateOnly(today)}&to=${dateOnly(to)}`),
     ]);
+    const newsRaw = newsResponse.data, earningsRaw = earningsResponse.data;
     const news = Array.isArray(newsRaw) ? newsRaw : [], earnings = Array.isArray(earningsRaw?.earningsCalendar) ? earningsRaw.earningsCalendar : [];
     const recent = news.filter((item: Record<string, unknown>) => Number(item.datetime || 0) * 1000 >= Date.now() - 72 * 3600000);
     const events: CatalystEvent[] = [];
@@ -48,7 +46,7 @@ export async function loadCatalystContext(symbol: string): Promise<CatalystConte
       const date = String(item.date || "");
       if (date) events.push({ kind: "EARNINGS", label: `Earnings scheduled ${date}`, date, daysAway: daysUntil(date), material: true });
     }
-    return { available: true, provider: "FINNHUB", asOf: new Date().toISOString(), events, recentNewsCount: recent.length, adverseNewsCount: events.filter(event => event.kind === "NEWS" && event.adverse).length };
+    return { available: true, provider: "FINNHUB", asOf: [newsResponse.asOf, earningsResponse.asOf].sort()[0], events, recentNewsCount: recent.length, adverseNewsCount: events.filter(event => event.kind === "NEWS" && event.adverse).length };
   } catch (error) {
     return { available: false, provider: error instanceof Error ? error.message : "CATALYST_PROVIDER_ERROR", asOf: null, events: [], recentNewsCount: 0, adverseNewsCount: 0 };
   }

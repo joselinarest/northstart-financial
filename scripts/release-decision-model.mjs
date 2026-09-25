@@ -26,6 +26,9 @@ const url=new URL(process.env.DATABASE_URL);for(const k of ['ssl','sslmode','ssl
 const response=await fetch('https://truststore.pki.rds.amazonaws.com/global/global-bundle.pem');if(!response.ok)throw Error('RDS CA unavailable');
 const db=new pg.Client({connectionString:url.toString(),ssl:{ca:await response.text(),rejectUnauthorized:true}});await db.connect();
 try{await db.query('BEGIN');await db.query("SELECT pg_advisory_xact_lock(hashtext('northstar_model_release'))");
+ const existing=await db.query('SELECT prompt_hash,provider_model FROM ai_model_versions WHERE version=$1',[version]);
+ const requestedHash=createHash('sha256').update(readFileSync('lib/ai-provider.ts')).digest('hex');
+ if(existing.rows.some(row=>row.prompt_hash!==requestedHash||row.provider_model!==model))throw Error('Release versions are immutable; choose a new version for a changed prompt or model');
  const policy=await db.query("UPDATE ai_strategy_versions SET status='APPROVED',approved_at=CURRENT_TIMESTAMP WHERE version='lifecycle-1.0.0' RETURNING version");if(!policy.rowCount)throw Error('Expected tested strategy version is missing');
  const hash=createHash('sha256').update(readFileSync('lib/ai-provider.ts')).digest('hex');
  for(const strategy of ['SWING_SHARES','LONG_TERM_SHARES','OPTIONS']){

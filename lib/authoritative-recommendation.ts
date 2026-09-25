@@ -126,7 +126,7 @@ export async function researchRecommendation(
       market.getQuotes([symbol]),
       market.getBars(symbol, { timeframe: "1Day", start, limit: 260 }),
       fundamentals(db,symbol),
-      loadCatalystContext(symbol),
+      loadCatalystContext(symbol,db),
     ]),
     quote = quoteSet.quotes[symbol],
     bars = barsSet.bars || [],

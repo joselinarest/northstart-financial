@@ -97,7 +97,7 @@ async function processNotifications(request: Request,limits:{totalMs:number;jobM
     );
   let jobsCompleted = 0,
     jobsFailed = 0;
-  for (let claimCount=0;claimCount<20&&Date.now()<jobDeadline;claimCount++) {
+  for (let claimCount=0;claimCount<20&&Date.now()+8_000<jobDeadline;claimCount++) {
     const job=(await claimJob(claimCount===0)).results[0];if(!job)break;jobs.results.push(job);
     try {
       await withWorkBudget(Math.max(1,Math.min(limits.jobMs,jobDeadline-Date.now())),async()=>{
