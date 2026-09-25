@@ -21,7 +21,7 @@ export type Evidence = {
   pullbackProbability?: number; expectedPullback?: number; breakoutRisk?: number;
   options?: { premium: number; entryPremium: number; iv: number; entryIv: number; theta: number; dte: number; underlyingInvalid: boolean; catalystRisk: boolean; bid?:number;ask?:number;delta?:number|null;gamma?:number|null;vega?:number|null };
 };
-export type AccountRisk = { cash: number; value: number; maxPositionBps: number; maxRiskBps: number; taxRate: number | null; slippageBps: number; commission: number; reservedElsewhere: number };
+export type AccountRisk = { cash: number; value: number; maxPositionBps: number; maxRiskBps: number; taxRate: number | null; slippageBps: number; commission: number; reservedElsewhere: number; cashReserveBps?:number; sectorRoom?:number|null; remainingOpenRisk?:number|null; liquidityShares?:number|null };
 export type ReentryPlan = {
   low: number; high: number; invalidation: number; breakout: number; breakoutLimit: number; trigger: string;
   expiresAt: string; reservedCash: number; estimatedShares: number; status: "WATCH" | "READY" | "CANCELLED" | "EXPIRED" | "REENTERED";
@@ -39,11 +39,11 @@ const money = (n: number) => Math.round(n * 100) / 100;
 export const fresh = (e: Evidence, now: number, strategy: Strategy) => e.complete && Number.isFinite(Date.parse(e.asOf)) && now >= Date.parse(e.asOf) && now - Date.parse(e.asOf) <= (strategy === "LONG_TERM" ? 86400000 : 20 * 60000);
 export function sizeReentry(cash: number, price: number, stop: number, p: PositionState, a: AccountRisk) {
   if (![cash,price,stop,a.value,a.cash,a.maxRiskBps,a.maxPositionBps].every(Number.isFinite) || price <= 0 || stop <= 0 || stop >= price) return 0;
-  const budget = Math.max(0, Math.min(cash, a.cash - a.reservedElsewhere) - a.commission);
+  const budget = Math.max(0, Math.min(cash, a.cash - a.reservedElsewhere - a.value*(a.cashReserveBps??0)/10000) - a.commission);
   const unitCost = price * (1 + a.slippageBps / 10000);
   const room = Math.max(0, a.value * a.maxPositionBps / 10000 - p.shares * price);
   const risk = Math.max(0, a.value * a.maxRiskBps / 10000 - p.shares * Math.max(0, price - stop));
-  return Math.max(0, Math.floor(Math.min(budget / unitCost, room / price, risk / (price - stop))));
+  return Math.max(0, Math.floor(Math.min(budget / unitCost, room / price, risk / (price - stop), (a.sectorRoom===null?0:a.sectorRoom??Infinity)/price,(a.remainingOpenRisk===null?0:a.remainingOpenRisk??Infinity)/(price-stop),a.liquidityShares===null?0:a.liquidityShares??Infinity)));
 }
 export function makeReentry(p: PositionState, e: Evidence, a: AccountRisk, cash: number, now: number): ReentryPlan | null {
   if (e.thesis !== "VALID" || p.strategy === "OPTIONS" || e.support <= 0 || e.atr <= 0) return null;
@@ -101,7 +101,7 @@ export function evaluatePosition(p: PositionState, e: Evidence, a: AccountRisk, 
   }
   if (e.thesis === "VALID" && trend && e.valuationAttractive && e.newsClear && e.marketStrong && e.sectorStrong && e.relativeStrength > 0 && e.volumeRatio >= 1.2 && p.strategy !== "OPTIONS") {
     const stop = e.support - e.atr*.5, shares = sizeReentry(a.cash,e.price,stop,p,a);
-    if (shares > 0) return {...result,action:p.shares ? "ADD":"BUY NOW",shares,cost:money(shares*e.price*(1+a.slippageBps/10000)+a.commission),cashAfter:money(a.cash-shares*e.price*(1+a.slippageBps/10000)-a.commission),stop,reason:"Thesis, valuation, trend, volume, regime and account risk agree."};
+    if (shares > 0) return {...result,action:p.shares ? "ADD":"BUY NOW",shares,remainingShares:p.shares+shares,cost:money(shares*e.price*(1+a.slippageBps/10000)+a.commission),cashAfter:money(a.cash-shares*e.price*(1+a.slippageBps/10000)-a.commission),stop,reason:"Thesis, valuation, trend, volume, regime and account risk agree."};
   }
   return result;
 }

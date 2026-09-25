@@ -1,3 +1,5 @@
+import {accountRiskSettings} from "@/lib/account-risk-settings";
+import {positionSizing} from "@/lib/position-sizing";
 import {QuantDataProvider} from "@/lib/providers/quant-data";
 import {providerSignal} from "@/lib/work-budget";
 import { id, type PostgresDatabase } from "@/lib/db";
@@ -112,6 +114,7 @@ export async function researchRecommendation(
     : Infinity;
   const priorActionableBuy = ["BUY", "ACCUMULATE"].includes(String(prior?.action || ""));
   const priorNeedsRefresh =
+    !priorChecks?.portfolioFit?.riskPolicy ||
     priorChecks?.freshness?.stale === true ||
     /^FINNHUB_(?:401|403|429|5\d\d|NOT_CONFIGURED|ERROR)$/.test(String(priorChecks?.sources?.fundamental?.provider||"")) ||
     /DATA REFRESH REQUIRED/i.test(String(prior?.reason || "")) ||
@@ -408,6 +411,14 @@ export async function researchRecommendation(
     action = "WAIT";
     reason = `${conflicts.join("; ")} — WAIT.`;
   }
+  const riskSettings=await accountRiskSettings(db,input.householdId,input.accountId);
+  const riskPolicy=riskSettings.effective;
+  const exposures=(await db.prepare("SELECT s.ticker,h.quantity::text,h.price_cents::text,p.state_json FROM holdings h JOIN securities s ON s.id=h.security_id LEFT JOIN position_states p ON p.account_id=h.account_id AND p.security_id=h.security_id WHERE h.account_id=? AND h.quantity>0").bind(input.accountId).all<Json>()).results;
+  // Unknown sector membership and protective stops consume conservative capacity.
+  const invested=exposures.reduce((sum,h)=>sum+Number(h.quantity)*Number(h.price_cents)/100,0);
+  const existingPosition=exposures.filter(h=>h.ticker===symbol).reduce((sum,h)=>sum+Number(h.quantity)*Number(h.price_cents)/100,0);
+  const openRisk=exposures.reduce((sum,h)=>{const stop=Number(parse(h.state_json).stop||0);return sum+Number(h.quantity)*Math.max(0,Number(h.price_cents)/100-stop)},0);
+  const equity=riskSettings.value,sectorRoom=Math.max(0,equity*riskPolicy.maxSectorBps/10000-invested),remainingOpenRisk=Math.max(0,equity*riskPolicy.combinedRiskBps/10000-openRisk),liquidityShares=Number(quote?.volume)>0?Math.floor(Number(quote?.volume)*.001):null;
   const reservation = await db.prepare("SELECT COALESCE(SUM((plan_json->>'reservedCash')::numeric),0)::text total FROM trade_lifecycle_exits WHERE account_id=? AND status IN ('REENTRY_WATCH','REENTRY_READY')").bind(input.accountId).first<Json>();
   const price = Number(quote?.last || 0),
     risk = Math.max(0.01, price - Number(support || price * 0.94)),
@@ -420,13 +431,8 @@ export async function researchRecommendation(
       .bind(input.accountId)
       .first<Json>(),
     accountValue = Number(accountValueRow?.value_cents || 0) / 100 + cash,
-    shares = Math.max(
-      0,
-      Math.min(
-        Math.floor((accountValue * maxRisk) / risk),
-        Math.floor(cash / Math.max(0.01, price)),
-      ),
-    ),
+    sizing = positionSizing({entry:price,stop:Number(support),equity,cash:Number(account.cash_cents||0)/100,reservedCash:Number(reservation?.total||0),cashReserveBps:riskPolicy.cashReserveBps,riskBps:riskPolicy.swingRiskBps,positionBps:riskPolicy.maxPositionBps,existingPosition,sectorRoom,remainingOpenRisk,liquidityShares}),
+    shares = sizing.shares,
     generatedAt = new Date(),
     expiresAt = new Date(
       generatedAt.getTime() + (swing ? 30 * 60_000 : 24 * 3600_000),
@@ -513,6 +519,7 @@ export async function researchRecommendation(
       },
       flow: await new QuantDataProvider(db).getEvidence(symbol).catch(()=>({state:"UNAVAILABLE",canAuthorizeTrade:false})),
       portfolioFit: {
+        sectorRoomCents:sectorRoom*100,remainingOpenRiskCents:remainingOpenRisk*100,liquidityShares,sizingReason:sizing.reason,riskPolicy,capacityBasis:"Unknown sectors grouped together; missing stops reserve full position value",
         state: shares > 0 ? "GOOD" : "INSUFFICIENT_CASH_OR_RISK_CAPACITY",
         cash,
         accountValue,
