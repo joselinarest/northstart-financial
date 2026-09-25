@@ -1,4 +1,4 @@
-import {providerSignal} from './work-budget';
+import {providerSignal,remainingWorkMs} from './work-budget';
 import type {PostgresDatabase} from './db';
 export async function discoveryCoverage(db:PostgresDatabase){
  const coverage=await db.prepare(`SELECT count(*) FILTER(WHERE active)::int eligible,count(*) FILTER(WHERE active AND last_screened_at IS NOT NULL)::int screened,count(*) FILTER(WHERE active AND last_researched_at IS NOT NULL)::int researched,count(*) FILTER(WHERE active AND stage='NOT_SCANNED')::int not_scanned,count(*) FILTER(WHERE active AND stage='RESEARCH_PENDING')::int research_pending,count(*) FILTER(WHERE active AND stage='RESEARCH_INCOMPLETE')::int incomplete,count(*) FILTER(WHERE active AND stage='REJECTED')::int rejected,count(*) FILTER(WHERE active AND stage='RESEARCHED')::int researched_candidates,min(last_screened_at) FILTER(WHERE active) oldest_screen,max(last_screened_at) newest_screen FROM discovery_queue`).first<Record<string,any>>();
@@ -28,9 +28,15 @@ export async function discoveryFinnhub(db:PostgresDatabase,path:string,ttlSecond
  try{return await request}finally{requests.delete(path)}
 }
 async function loadDiscoveryFinnhub(db:PostgresDatabase,path:string,ttlSeconds:number){
- const cached=await db.prepare(`SELECT payload_json,fetched_at FROM discovery_provider_cache WHERE cache_key=? AND expires_at>CURRENT_TIMESTAMP`).bind(path).first<any>();if(cached)return{data:cached.payload_json,asOf:new Date(cached.fetched_at).toISOString()};
+ const cached=await db.prepare(`SELECT payload_json,fetched_at FROM discovery_provider_cache WHERE cache_key=? AND expires_at>CURRENT_TIMESTAMP AND fetched_at>CURRENT_TIMESTAMP-(?::int*INTERVAL '1 second')`).bind(path,ttlSeconds).first<any>();if(cached)return{data:cached.payload_json,asOf:new Date(cached.fetched_at).toISOString()};
+ const fallback=async(error:unknown)=>{if(/^\/stock\/(metric|profile2)\?/.test(path)){const saved=await db.prepare("SELECT payload_json,fetched_at FROM discovery_provider_cache WHERE cache_key=? AND fetched_at>CURRENT_TIMESTAMP-INTERVAL '7 days'").bind(path).first<any>();if(saved&&Object.keys(saved.payload_json?.metric||saved.payload_json||{}).length)return {data:saved.payload_json,asOf:new Date(saved.fetched_at).toISOString()};}throw error;};
+ try{
  const paused=await db.prepare(`SELECT 1 blocked FROM discovery_control WHERE id='finnhub' AND cooldown_until>CURRENT_TIMESTAMP`).first();if(paused)throw Error('FINNHUB_RATE_LIMIT_COOLDOWN');
+ // Shared pacing across workers and web instances, leaving room for provider health calls.
+ const slot=await db.prepare("INSERT INTO discovery_control(id,cooldown_until) VALUES('finnhub-pacing',CURRENT_TIMESTAMP+INTERVAL '1500 milliseconds') ON CONFLICT(id) DO UPDATE SET cooldown_until=GREATEST(COALESCE(discovery_control.cooldown_until,CURRENT_TIMESTAMP),CURRENT_TIMESTAMP)+INTERVAL '1500 milliseconds' WHERE discovery_control.cooldown_until<CURRENT_TIMESTAMP+INTERVAL '8 seconds' RETURNING EXTRACT(EPOCH FROM (cooldown_until-CURRENT_TIMESTAMP))*1000-1500 delay_ms").first<any>();
+ if(!slot)throw Error('FINNHUB_REQUEST_BUDGET_DEFERRED');const delay=Math.max(0,Number(slot.delay_ms));if(remainingWorkMs()<delay+11000)throw Error('FINNHUB_REQUEST_BUDGET_DEFERRED');if(delay)await new Promise(resolve=>setTimeout(resolve,delay));
  const response=await fetch('https://finnhub.io/api/v1'+path,{headers:{'X-Finnhub-Token':process.env.FINNHUB_API_KEY||''},signal:providerSignal(10000),cache:'no-store'});
  if(!response.ok){if(response.status===429)await db.prepare(`INSERT INTO discovery_control(id,cooldown_until,last_error) VALUES('finnhub',CURRENT_TIMESTAMP+INTERVAL '2 minutes','FINNHUB_429') ON CONFLICT(id) DO UPDATE SET cooldown_until=EXCLUDED.cooldown_until,last_error=EXCLUDED.last_error`).run();throw Error('FINNHUB_'+response.status)}
  const data=await response.json();if(data?.error)throw Error('FINNHUB_INVALID_RESPONSE');const asOf=new Date().toISOString();await db.prepare(`INSERT INTO discovery_provider_cache(cache_key,payload_json,fetched_at,expires_at) VALUES(?,?::jsonb,?::timestamptz,?::timestamptz+(?::int*INTERVAL '1 second')) ON CONFLICT(cache_key) DO UPDATE SET payload_json=EXCLUDED.payload_json,fetched_at=EXCLUDED.fetched_at,expires_at=EXCLUDED.expires_at`).bind(path,JSON.stringify(data),asOf,asOf,ttlSeconds).run();return{data,asOf};
+ }catch(error){return fallback(error)}
 }

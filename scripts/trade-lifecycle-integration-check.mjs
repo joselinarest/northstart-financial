@@ -66,6 +66,8 @@ const research=async()=>{
 };
 const provider={async getQuotes(symbols){return {feed:'test',asOf:new Date(now).toISOString(),quotes:Object.fromEntries(symbols.map(s=>[s,{last:s==='NVDA'?price:500,ask:s==='NVDA'?price+.01:500.01,changePct:s==='NVDA'?2:1,timestamp:new Date(now).toISOString()}]))};},async getBars(symbol,input){if(input.timeframe==='1Min')return {bars:[{time:new Date(now-120000).toISOString(),open:price-.2,high:price,low:price-.3,close:price-.1,volume:1000},{time:new Date(now-60000).toISOString(),open:price-.1,high:price+.1,low:price-.2,close:price,volume:1500}],feed:'test',asOf:new Date(now).toISOString()};return {bars:Array.from({length:60},(_,i)=>({time:new Date(now-(60-i)*86400000).toISOString(),open:90,high:95,low:85,close:90,volume:1000})),feed:'test',asOf:new Date(now).toISOString()};}};
 const aiProvider={name:'TEST',async analyze(input){const c=input.snapshot.candidates.find(c=>c.id==='lifecycle'&&c.eligible)||input.snapshot.candidates[0];return {requestId:'test',output:{snapshotId:input.snapshotId,candidateId:c.id,confidence:80,interpretation:c.reason,reasonsFor:[c.reason],reasonsAgainst:['Consider HOLD'],risks:['Thesis change'],whatWouldChange:['Support breaks'],evidenceIds:input.evidenceIds,scenarios:{bull:30,base:40,bear:30},instrument:c.instrument}};}};
+// Connected cash must use the same reconciliation in research and publication.
+await pg.exec("UPDATE accounts SET connection_id='connected' WHERE id='a'; UPDATE investment_account_settings SET available_cash_cents=84 WHERE account_id='a'");
 await runTradeLifecycle(db,'h','a',{provider,research,aiProvider});
 let view=await lifecycleAccountView(db,'h','a');
 assert.equal(view.actions[0].action.action,'TRIM');
@@ -73,6 +75,7 @@ assert.equal(view.actions[0].action.shares,5);
 assert.equal(view.audits[0].pipeline_status,'COMPLETE');
 const rec=(await pg.query("SELECT id FROM recommendations WHERE action='REDUCE' ORDER BY created_at DESC LIMIT 1")).rows[0];
 assert.ok(rec);
+await pg.exec("UPDATE accounts SET connection_id=NULL WHERE id='a'; UPDATE investment_account_settings SET available_cash_cents=100000 WHERE account_id='a'");
 // Confirm a full disposal rather than relying on holdings to retain the symbol.
 await pg.query("INSERT INTO investment_transactions(id,account_id,security_id,transaction_type,trade_at,price_cents,amount_cents,quantity) VALUES('sell','a','nvda','SELL',$1,10000,200000,20)",[new Date().toISOString()]);
 await pg.exec("DELETE FROM holdings; UPDATE investment_account_settings SET available_cash_cents=300000 WHERE account_id='a'; INSERT INTO tax_lot_disposals(sell_transaction_id,realized_pnl_cents) VALUES('sell',60000)");

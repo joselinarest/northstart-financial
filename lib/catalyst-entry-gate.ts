@@ -1,3 +1,4 @@
+import {researchNews} from '@/lib/research-news';
 import {discoveryFinnhub} from "@/lib/discovery-queue";
 import type {PostgresDatabase} from "@/lib/db";
 export type CatalystEvent = {
@@ -28,13 +29,14 @@ export async function loadCatalystContext(symbol: string, db: PostgresDatabase):
   const token = process.env.FINNHUB_API_KEY;
   if (!token) return { available: false, provider: "FINNHUB_NOT_CONFIGURED", asOf: null, events: [], recentNewsCount: 0, adverseNewsCount: 0 };
   const today = new Date(), from = new Date(Date.now() - 30 * day), to = new Date(Date.now() + 120 * day);
-  const get = (path: string) => discoveryFinnhub(db,path,path.startsWith('/company-news')?300:3600);
+  const get = (path: string) => discoveryFinnhub(db,path,900);
   try {
     const [newsResponse, earningsResponse] = await Promise.all([
-      get(`/company-news?symbol=${symbol}&from=${dateOnly(from)}&to=${dateOnly(today)}`),
+      researchNews(db,symbol,dateOnly(from),dateOnly(today)),
       get(`/calendar/earnings?symbol=${symbol}&from=${dateOnly(today)}&to=${dateOnly(to)}`),
     ]);
     const newsRaw = newsResponse.data, earningsRaw = earningsResponse.data;
+    if(!Array.isArray(newsRaw)||!Array.isArray(earningsRaw?.earningsCalendar))throw Error('CATALYST_INVALID_RESPONSE');
     const news = Array.isArray(newsRaw) ? newsRaw : [], earnings = Array.isArray(earningsRaw?.earningsCalendar) ? earningsRaw.earningsCalendar : [];
     const recent = news.filter((item: Record<string, unknown>) => Number(item.datetime || 0) * 1000 >= Date.now() - 72 * 3600000);
     const events: CatalystEvent[] = [];
@@ -46,7 +48,7 @@ export async function loadCatalystContext(symbol: string, db: PostgresDatabase):
       const date = String(item.date || "");
       if (date) events.push({ kind: "EARNINGS", label: `Earnings scheduled ${date}`, date, daysAway: daysUntil(date), material: true });
     }
-    return { available: true, provider: "FINNHUB", asOf: [newsResponse.asOf, earningsResponse.asOf].sort()[0], events, recentNewsCount: recent.length, adverseNewsCount: events.filter(event => event.kind === "NEWS" && event.adverse).length };
+    return { available: true, provider: newsResponse.provider==='FINNHUB'?'FINNHUB':'ALPACA_NEWS_FINNHUB_EARNINGS', asOf: [newsResponse.asOf, earningsResponse.asOf].sort()[0], events, recentNewsCount: recent.length, adverseNewsCount: events.filter(event => event.kind === "NEWS" && event.adverse).length };
   } catch (error) {
     return { available: false, provider: error instanceof Error ? error.message : "CATALYST_PROVIDER_ERROR", asOf: null, events: [], recentNewsCount: 0, adverseNewsCount: 0 };
   }

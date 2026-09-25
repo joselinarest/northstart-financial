@@ -1,0 +1,16 @@
+import {build} from 'esbuild';import {writeFileSync} from 'node:fs';
+writeFileSync('work/after-close-check.ts',`import assert from 'node:assert/strict';
+import {buildNextOpenOptionCandidates,nextOpenResearch,optionQuoteResearchFresh} from '../lib/options-next-open';
+import {currentOptionsResult} from '../lib/options-result-freshness';
+import {candidateIsSafe} from '../lib/ai-decision-core';
+const weekend=Date.parse('2026-09-26T15:00:00Z'),opened=Date.parse('2026-09-28T14:00:00Z'),quote='2026-09-25T19:59:00Z';
+assert(nextOpenResearch(weekend));assert(!nextOpenResearch(opened));assert(optionQuoteResearchFresh(quote,weekend));assert(!optionQuoteResearchFresh(quote,opened));
+const c={contractSymbol:'TEST261016C00100000',type:'CALL',strike:100,bid:1.95,ask:2,dte:21,spreadPct:2.5,volume:100,openInterest:1000,impliedVolatility:.3,delta:.5,gamma:.03,theta:-.02,vega:.1,volatility:{researchAllowed:true}};
+const thesis={providerStatus:'AVAILABLE',thesisStatus:'VALID',evidenceSources:[{label:'technical',value:{state:'BULLISH',price:100,sma20:95,sma50:90}}]} as any;
+const plans=buildNextOpenOptionCandidates([c],thesis,0);assert.equal(plans.length,2);assert(candidateIsSafe(plans[1]));assert.equal(plans[1].action,'WAIT');assert.equal(plans[1].shares,0);assert.equal(plans[1].cost,0);
+for(const bad of [{dte:31},{openInterest:null},{vega:null},{volatility:{researchAllowed:false}},{spreadPct:20}])assert.equal(buildNextOpenOptionCandidates([{...c,...bad}],thesis,1000).length,1);
+assert.equal(buildNextOpenOptionCandidates([c],null,1000).length,1);
+const saved={asOf:quote,quoteAsOf:quote,researchQualified:true,contract:c,decision:{action:'WAIT',shares:0}};
+assert.equal(currentOptionsResult(saved,weekend).status,'RESEARCH');const old=currentOptionsResult(saved,opened);assert.equal(old.status,'NO_TRADE');assert.equal(old.executionReady,false);assert.equal(old.contract,c);
+console.log('PASS: after-close CALL research, no approved size/cost, contract quality gates, weekend preservation, next-open revalidation.');`);
+await build({entryPoints:['work/after-close-check.ts'],outfile:'work/after-close-check.cjs',bundle:true,platform:'node',packages:'external',logLevel:'silent'});await import('../work/after-close-check.cjs');

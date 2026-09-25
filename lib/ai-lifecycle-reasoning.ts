@@ -1,3 +1,4 @@
+import {investmentCash} from '@/lib/investment-cash';
 import {id,type PostgresDatabase} from "@/lib/db";
 import {decideInvestment,type DecisionCandidate,type EvidenceItem,type DecisionOutput} from "@/lib/ai-investment-decision-engine";
 import type {AIProvider} from "@/lib/ai-provider";
@@ -57,7 +58,8 @@ export async function reasonLifecycle(db:PostgresDatabase,householdId:string,sec
     const current=await tx.prepare("SELECT state_json FROM position_states WHERE account_id=? AND security_id=? FOR UPDATE").bind(p.investmentAccountId,securityId).first<{state_json:PositionState}>();
     if(current?.state_json.lastAnalysisAt!==p.lastAnalysisAt)return;
     const live=await tx.prepare("SELECT COALESCE(s.available_cash_cents,a.available_balance_cents,0)::text cash,(SELECT COALESCE(SUM(h.quantity),0) FROM holdings h WHERE h.account_id=a.id AND h.security_id=?)::text shares FROM accounts a LEFT JOIN investment_account_settings s ON s.account_id=a.id WHERE a.id=?").bind(securityId,p.investmentAccountId).first<{cash:string;shares:string}>();
-    if(!live||Number(live.cash)/100!==risk.cash||Number(live.shares)!==p.shares){
+    const liveCash=await investmentCash(tx,householdId,p.investmentAccountId);
+    if(!live||liveCash.cashCents/100!==risk.cash||Number(live.shares)!==p.shares){
       Object.assign(decision,{providerStatus:"SNAPSHOT_CHANGED",action:"WAIT",shares:0,interpretation:"Account cash or holdings changed during analysis. Rebuild the snapshot."});
       await tx.prepare("UPDATE ai_decision_runs SET status='REJECTED_BY_GATE',output_json=?,error_code='SNAPSHOT_CHANGED' WHERE id=?").bind(JSON.stringify(decision),decision.decisionId).run();
       await tx.prepare("UPDATE ai_current_decisions SET expires_at=CURRENT_TIMESTAMP WHERE decision_id=?").bind(decision.decisionId).run();

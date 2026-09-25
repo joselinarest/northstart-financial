@@ -7,7 +7,7 @@ export async function optionsChain(symbol:string){
  if(prior&&prior.until>Date.now())return prior.promise;
  const promise=(async()=>{
   const headers={'APCA-API-KEY-ID':process.env.ALPACA_API_KEY||'','APCA-API-SECRET-KEY':process.env.ALPACA_API_SECRET||''};
-  const from=new Date(Date.now()+14*86400000).toISOString().slice(0,10),to=new Date(Date.now()+120*86400000).toISOString().slice(0,10);
+  const from=new Date(Date.now()+14*86400000).toISOString().slice(0,10),to=new Date(Date.now()+30*86400000).toISOString().slice(0,10);
   const get=async(url:string)=>{const r=await fetch(url,{headers,signal:providerSignal(8000),cache:'no-store'});if(!r.ok)throw Error(`Options provider HTTP ${r.status}`);return r.json();};
   const snapshots:J={},limitations:string[]=[];let token:string|undefined,pages=0;
   do{const q=new URLSearchParams({feed,limit:'1000',expiration_date_gte:from,expiration_date_lte:to});if(token)q.set('page_token',token);const data=await get(`https://data.alpaca.markets/v1beta1/options/snapshots/${encodeURIComponent(symbol)}?${q}`);Object.assign(snapshots,data.snapshots||{});token=data.next_page_token;pages++;}while(token&&pages<3);

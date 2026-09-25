@@ -23,6 +23,6 @@ assert.equal((await pg.query(bind(claim),[false,'MARKET_DISCOVERY','MARKET_DISCO
 const fresh={asOf:new Date().toISOString(),contract:{symbol:'CIEN'},decision:{action:'BUY_NOW'}};
 assert.equal(currentOptionsResult(fresh),fresh);
 for(const asOf of [null,'invalid',new Date(Date.now()-121000).toISOString(),new Date(Date.now()+10000).toISOString()]){
- const stale=currentOptionsResult({...fresh,asOf});assert.equal(stale.contract,null);assert.equal(stale.decision.action,'WAIT');assert.equal(stale.decision.shares,0);
+ const stale=currentOptionsResult({...fresh,asOf});assert.equal(stale.contract,fresh.contract);assert.equal(stale.executionReady,false);assert.equal(stale.decision.action,'WAIT');assert.equal(stale.decision.shares,0);
 }
 await pg.close();console.log('PASS: production queue SQL, account exclusion, deduplication, fair atomic claims and stale/future option entry blocking.');

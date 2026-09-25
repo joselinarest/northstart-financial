@@ -1,3 +1,4 @@
+import {researchNews} from './research-news';
 import {researchMarketFresh} from "@/lib/research-market-freshness";
 import {accountRiskSettings} from "@/lib/account-risk-settings";
 import {discoveryFinnhub} from "@/lib/discovery-queue";
@@ -55,7 +56,7 @@ async function fundamentals(db:PostgresDatabase,symbol: string) {
     const [profile, metricData, news] = await Promise.allSettled([
       get('/stock/profile2?symbol='+symbol),
       get('/stock/metric?symbol='+symbol+'&metric=all'),
-      get('/company-news?symbol='+symbol+'&from='+date(from)+'&to='+date(today)),
+      researchNews(db,symbol,date(from),date(today)),
     ]);
     return {
       available: metricData.status==='fulfilled',
@@ -65,6 +66,7 @@ async function fundamentals(db:PostgresDatabase,symbol: string) {
       metrics: metricData.status==='fulfilled'?metricData.value.data.metric||{}:{},
       newsAvailable: news.status==='fulfilled'&&Array.isArray(news.value.data),
       newsAsOf: news.status==='fulfilled'?news.value.asOf:null,
+      newsProvider: news.status==='fulfilled'?news.value.provider:null,
       news: news.status==='fulfilled'&&Array.isArray(news.value.data)?news.value.data.slice(0,20):[],
     };
   } catch (error) {
@@ -449,7 +451,7 @@ export async function researchRecommendation(
         market: { provider: quote?.source || quoteSet.feed, asOf: marketAsOf },
         fundamental: { provider: fundamental.provider, asOf: fundamental.asOf },
         technical: { provider: barsSet.feed || quoteSet.feed, asOf: barsAsOf },
-        news: {provider:"FINNHUB",asOf:fundamental.newsAsOf,available:fundamental.newsAvailable},
+        news: {provider:fundamental.newsProvider||"UNAVAILABLE",asOf:fundamental.newsAsOf,available:fundamental.newsAvailable},
       },
       fundamentalThesis: {
         fundamentalQuality:coverage>=4?fundamentalQuality:null,
@@ -677,7 +679,7 @@ export async function authoritativeRecommendation(db:PostgresDatabase,input:{hou
   await researchRecommendation(db,input);
   const {runTradeLifecycle}=await import("@/lib/trade-lifecycle-service");
   await runTradeLifecycle(db,input.householdId,input.accountId,{symbol:input.symbol.toUpperCase()});
-  const published=await db.prepare("SELECT r.*,s.ticker FROM recommendations r JOIN securities s ON s.id=r.security_id WHERE r.household_id=? AND r.account_id=? AND s.ticker=? AND r.checks_json->'aiEvidence' IS NOT NULL ORDER BY r.created_at DESC LIMIT 1").bind(input.householdId,input.accountId,input.symbol.toUpperCase()).first<Json>();
+  const published=await db.prepare("SELECT r.*,s.ticker FROM recommendations r JOIN securities s ON s.id=r.security_id WHERE r.household_id=? AND r.account_id=? AND s.ticker=? AND r.checks_json->'aiEvidence' IS NOT NULL AND r.lifecycle IN ('MONITORING','TRIGGERED') ORDER BY r.created_at DESC LIMIT 1").bind(input.householdId,input.accountId,input.symbol.toUpperCase()).first<Json>();
   if(!published)throw new Error("CENTRAL_DECISION_UNAVAILABLE");
   return {recommendation:published,checks:parse(published.checks_json),source:"CENTRAL_AI"};
 }

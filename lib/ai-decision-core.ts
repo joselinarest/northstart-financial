@@ -1,3 +1,4 @@
+import {nextOpenResearch} from "@/lib/options-next-open";
 import {researchMarketFresh} from "@/lib/research-market-freshness";
 import {flowForStrategy,flowDecisionSummary,type FlowEvidence} from "@/lib/flow-evidence";
 import {QuantDataProvider} from "@/lib/providers/quant-data";
@@ -11,7 +12,7 @@ export function strictDecisionQuality(input:DecisionInput){
   const required=[...new Set([...commonFacts,...input.requiredFacts,...(input.strategy==="OPTIONS"?["underlyingThesis","optionQuote","greeks","liquidity"]:[])])];
   const labels=new Set(input.evidence.filter(e=>e.value!==null&&e.value!==undefined&&e.value!==""&&!(typeof e.value==="number"&&!Number.isFinite(e.value))&&!(typeof e.value==="object"&&!Array.isArray(e.value)&&!Object.keys(e.value as object).length)).map(e=>e.label));
   const missing=required.filter(x=>!labels.has(x));
-  const stale=input.evidence.filter(e=>required.includes(e.label)).filter(e=>{const age=Date.now()-Date.parse(e.asOf||"");const limit=["fundamentals","valuation"].includes(e.label)?7*86400000:input.strategy==="LONG_TERM_SHARES"?86400000:20*60000;return ["currentPrice","technical","marketRegime"].includes(e.label)?!researchMarketFresh(e.asOf||"",limit):!Number.isFinite(age)||age<0||age>limit;}).map(e=>e.label);
+  const stale=input.evidence.filter(e=>required.includes(e.label)).filter(e=>{const age=Date.now()-Date.parse(e.asOf||"");const limit=["fundamentals","valuation"].includes(e.label)?7*86400000:input.strategy==="LONG_TERM_SHARES"?86400000:20*60000;return (["currentPrice","technical","marketRegime"].includes(e.label)||(input.requestType==="OPTIONS_NEXT_OPEN_RESEARCH"&&nextOpenResearch()&&["underlyingPrice","optionQuote","greeks","liquidity"].includes(e.label)))?!researchMarketFresh(e.asOf||"",limit):!Number.isFinite(age)||age<0||age>limit;}).map(e=>e.label);
   if(!Number.isFinite(Date.parse(input.dataTimestamp)))stale.push("snapshotTimestamp");
   const conflicts=[...(input.conflicts||[]),...input.evidence.flatMap(e=>e.conflicts||[])];
   return {score:Math.max(0,100-missing.length*14-stale.length*8-conflicts.length*10),missing,stale,conflicts};
