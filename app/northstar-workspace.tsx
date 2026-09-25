@@ -7216,213 +7216,18 @@ export function NorthstarWorkspace({
           {tab === "Real Estate" && (
             <RealEstateCommandCenter accessToken={accessToken} />
           )}
-          {tab === "Daily Action Plan" && <CapitalRotationPanel accountId={advisorAccount ? String(advisorAccount.id) : ""} />}
-          {tab === "Daily Action Plan" && (
-            <section className="daily-plan-intro card">
+          {(tab === "Daily Action Plan" || tab === "Prepare Trade") && (
+            <section id="today-recommendations" className="daily-plan-intro card">
               <header>
-                <span>{marketPhase === "open" ? "MARKET OPEN · LIVE MONITORING" : "NEXT-SESSION PREPARATION"}</span>
-                <h2>{marketPhase === "open" ? "Your next move, with the evidence." : "Prepare now. Confirm at the next open."}</h2>
-                <p>{advisorAccountName} · Review risk first, then confirmed opportunities. HOLD and WAIT are valid decisions.</p>
-                {!marketClock.isOpen && clockTargetLabel && <p>Next U.S. market open: <b>{clockTargetLabel}</b></p>}
+                <span>{marketPhase === "open" ? "CURRENT MARKET SESSION" : "NEXT MARKET OPEN"}</span>
+                <h2>Actions for {advisorAccountName}</h2>
+                <p>{advisorStrategy === "swing" ? "Swing and day trades · options up to 30 days" : "Long-term buys, sells and trims"}. Only proposed actions appear here.</p>
+                {!marketClock.isOpen && clockTargetLabel && <p>Next market open: <b>{clockTargetLabel}</b>. Reconfirm prices and conditions before acting.</p>}
+                <button onClick={() => navigate("Portfolio")}>Full account evaluation →</button>
               </header>
-              <nav className="today-section-links" aria-label="Today sections">
-                <a href="#today-market-context">Market suggestions ↓</a>
-                <a href="#today-recommendations">My account plan ↓</a>
-                <a href="#today-ai-health">AI availability ↓</a>
-              </nav>
-              <details className="today-how-it-works"><summary>How this plan updates</summary><p>During the session, provider data refreshes every {intradayRefreshMinutes} minutes. Background workers monitor triggers independently of this page. Closed-market plans use completed session data and require fresh confirmation before entry. {decisionAlarmEnabled ? `Review alarm: ${decisionTimeLabel}.` : "Review alarm is off; configure it in Settings."} Recommendations never place orders.</p></details>
+              <ActionGuidancePanel key={advisorAccountId} accountId={advisorAccountId} accessToken={accessToken} mode="today" marketOpen={marketPhase === "open"} sessionOnly />
+              {advisorStrategy === "swing" && <SwingOptionsAdvisor accountId={advisorAccountId} accountName={advisorAccountName} accessToken={accessToken} sessionOnly />}
             </section>
-          )}
-          {tab === "Daily Action Plan" && advisorStrategy === "swing" && (
-            <section className="options-advisor-entry card">
-              <header>
-                <div>
-                  <span>OPTIONS · CALLS AND PUTS</span>
-                  <h2>Account-specific options suggestions</h2>
-                  <p>
-                    Compare a defined-risk CALL and PUT using the selected account,
-                    current option-chain liquidity, Greeks, premium risk, and the
-                    underlying Swing thesis.
-                  </p>
-                </div>
-                <b>{advisorAccount ? advisorAccountName : "ACCOUNT REQUIRED"}</b>
-              </header>
-              <SwingOptionsAdvisor
-                accountId={advisorAccount ? String(advisorAccount.id) : ""}
-                accountName={String(
-                  advisorAccount?.nickname ||
-                    advisorAccount?.official_name ||
-                    advisorAccount?.name ||
-                    "No eligible account selected",
-                )}
-                accountStatus={
-                  advisorAccount
-                    ? "ready"
-                    : financeDataReady
-                      ? plaidNotice || "No Swing, Options, or Mixed account was returned."
-                      : "Investment account synchronization is still loading or timed out."
-                }
-                accessToken={accessToken}
-                initialSymbol={String(
-                  advisorHoldings[0]?.ticker ||
-                    advisorHoldings[0]?.symbol ||
-                    "SPY",
-                )}
-                onConfigureAccount={() => navigate("Accounts")}
-                onRefreshAccounts={() => loadConnectedFinance(true)}
-                universeSymbols={advisorHoldings.map(holding => String(holding.ticker || holding.symbol || "")).filter(Boolean)}
-              />
-            </section>
-          )}
-          {tab === "Daily Action Plan" && (
-            <details open key={advisorAccountId} id="today-recommendations" className="daily-account-action-plans selected-account-only"><summary style={{padding:16,cursor:"pointer",fontWeight:700}}>Account recommendations · show / hide</summary>
-              <header>
-                <span>SELECTED INVESTMENT ACCOUNT · ACCOUNT-SPECIFIC GUIDANCE</span>
-                <h2>{advisorAccountName}</h2>
-                <p>
-                  {advisorAccount
-                    ? `Every item below uses only this ${advisorPurpose} account’s ${advisorHoldings.length} holding${advisorHoldings.length === 1 ? "" : "s"}, cash, buying power, horizon, risk limits, and action history. Change accounts with the selector above.`
-                    : "Choose or configure an investment account above."}
-                </p>
-              </header>
-              {advisorAccount ? (
-                <ActionGuidancePanel
-                  key={`today-guidance:${advisorAccountId}`}
-                  accountId={advisorAccountId}
-                  accessToken={accessToken}
-                  mode="today"
-                  marketOpen={marketPhase === "open"}
-                />
-              ) : (
-                <div className="purpose-empty">
-                  <b>No investment account is selected.</b>
-                  <span>Select an account above or configure an investment account.</span>
-                  <button onClick={() => navigate("Accounts")}>
-                    Configure an account →
-                  </button>
-                </div>
-              )}
-            </details>
-          )}
-          {tab === "Daily Action Plan" && (
-            <SectionAccordion title="Market session report"><MarketSessionReport marketOpen={marketPhase === "open"} /></SectionAccordion>
-          )}
-          {tab === "Daily Action Plan" && (
-            <SectionAccordion title="Daily close review">{marketPhase !== "open" && investmentAccounts.filter(account => analysisScope === ALL_ACCOUNTS_SCOPE || String(account.id) === advisorAccountId).map(account => <AccountNextOpenSummary key={String(account.id)} accountId={String(account.id)} accountName={String(account.nickname || account.name)} accessToken={accessToken} />)}<DailyCloseReview
-              marketOpen={marketPhase === "open"}
-              onOpen={(symbol) =>
-                navigatePath(
-                  `/workspace/research/${encodeURIComponent(symbol.toLowerCase())}`,
-                )
-              }
-            /></SectionAccordion>
-          )}
-          {tab === "Daily Action Plan" && advisorAccountId && <SectionAccordion defaultOpen title="Trade lifecycle and saved plans"><TradeLifecyclePanel accountId={advisorAccountId} accessToken={accessToken} /></SectionAccordion>}
-          {tab === "Daily Action Plan" && <AIHealthPanel accessToken={accessToken} />}
-
-
-          {tab === "Daily Action Plan" && (
-            <AutomaticMarketCopilot
-              key={`today-copilot:${advisorAccountId}:${advisorStrategy}`}
-              accessToken={accessToken}
-              initialStrategy={advisorStrategy}
-              marketPhase={marketPhase}
-              refreshMinutes={intradayRefreshMinutes}
-              ownedSymbols={advisorHoldings
-                .map((holding) => String(holding.ticker || "").toUpperCase())
-                .filter(Boolean)}
-              holdings={advisorHoldings}
-              accountName={advisorAccountName}
-              accountPurpose={advisorPurpose}
-              selectedAccountType={String(
-                advisorAccount?.subtype ||
-                  advisorAccount?.type ||
-                  "Investment account",
-              )}
-              onPrepare={(symbol, action) => {
-                sessionStorage.setItem("northstar-chart-symbol", symbol);
-                sessionStorage.setItem(
-                  "northstar-prepared-action",
-                  JSON.stringify({
-                    symbol,
-                    action,
-                    accountId: advisorAccount
-                      ? String(advisorAccount.id)
-                      : null,
-                    accountName: advisorAccountName,
-                    accountPurpose: advisorPurpose,
-                  }),
-                );
-                navigate("Prepare Trade");
-              }}
-              onSelect={(symbol) => {
-                sessionStorage.setItem("northstar-chart-symbol", symbol);
-                setChartSymbol(symbol);
-                setMarketLookup(symbol);
-                navigate("Professional Charts");
-              }}
-            />
-          )}
-          {tab === "Daily Action Plan" && advisorHoldings.length > 0 && (
-            <details  className="daily-swing-holdings card"><summary style={{padding:16,cursor:"pointer",fontWeight:700}}>Current holdings analysis · show / hide</summary>
-              <header>
-                <span>SELECTED INVESTMENT ACCOUNT · CURRENT HOLDINGS</span>
-                <h2>
-                  {advisorAccountName}: live action review for every holding
-                </h2>
-                <p>
-                  Northstar automatically evaluates each owned position using
-                  current trend, valuation, risk, cost, account weight,
-                  invalidation, and possible buy-more or trim quantity.
-                </p>
-              </header>
-              <ConnectedHoldingsAnalysis
-                key={`today-holdings:${advisorAccountId}:${advisorStrategy}`}
-                marketOpen={marketPhase === "open"}
-                holdings={advisorHoldings}
-                mode={advisorStrategy === "swing" ? "swing" : "long-term"}
-                horizon={advisorStrategy === "swing" ? "next session to 2–10 trading days" : advisorPurpose}
-                accessToken={accessToken}
-                onOpen={(symbol) => {
-                  sessionStorage.setItem("northstar-chart-symbol", symbol);
-                  setChartSymbol(symbol);
-                  navigate("Professional Charts");
-                }}
-              />
-            </details>
-          )}
-          {tab === "Prepare Trade" && advisorStrategy === "swing" && (
-            <AutomaticMarketCopilot
-              accessToken={accessToken}
-              initialStrategy="swing"
-              marketPhase={marketPhase}
-              refreshMinutes={intradayRefreshMinutes}
-              ownedSymbols={ownedInvestmentSymbols}
-              holdings={advisorHoldings}
-              accountName={advisorAccountName}
-              accountPurpose={advisorPurpose}
-              selectedAccountType={advisorAccountType}
-              onPrepare={(symbol, action) => {
-                sessionStorage.setItem("northstar-chart-symbol", symbol);
-                sessionStorage.setItem(
-                  "northstar-prepared-action",
-                  JSON.stringify({
-                    symbol,
-                    action,
-                    accountId: advisorAccountId,
-                    accountName: advisorAccountName,
-                    accountPurpose: advisorPurpose,
-                  }),
-                );
-                setRealtimeTick((value) => value + 1);
-              }}
-              onSelect={(symbol) => {
-                sessionStorage.setItem("northstar-chart-symbol", symbol);
-                setChartSymbol(symbol);
-                setMarketLookup(symbol);
-                navigate("Professional Charts");
-              }}
-            />
           )}
           {tab === "New Candidates" && (
             <NewCandidateDiscovery
@@ -7440,7 +7245,6 @@ export function NorthstarWorkspace({
             "Market Intel",
             "Growth Finder",
             "Professional Charts",
-            "Prepare Trade",
             "Portfolio",
           ].includes(tab) && (
             <MarketWatchlist
@@ -7484,138 +7288,6 @@ export function NorthstarWorkspace({
               </span>
             </button>
           </nav>
-          {tab === "Prepare Trade" && (
-            <section className="purpose-account-review card">
-              <header>
-                <div>
-                  <span>PLAID ACCOUNTS · SWING & OPTIONS</span>
-                  <h2>Your purpose-matched trading accounts</h2>
-                  <p>
-                    These accounts appear here because their saved purpose is
-                    Swing or Options. Suggestions use short-term risk rules and
-                    remain read-only.
-                  </p>
-                </div>
-                <strong>
-                  {swingAccounts.length}
-                  <small>matched accounts</small>
-                </strong>
-              </header>
-              {swingAccounts.length ? (
-                <>
-                  <div className="purpose-account-list">
-                    {swingAccounts.map((account) => (
-                      <article key={account.id}>
-                        <div>
-                          <b>
-                            {account.nickname ||
-                              account.official_name ||
-                              account.name}
-                          </b>
-                          <small>
-                            {account.investment_purpose} ·{" "}
-                            {account.subtype || "investment"}
-                          </small>
-                        </div>
-                        <strong>
-                          {
-                            swingHoldings.filter(
-                              (holding) =>
-                                String(holding.account_id) ===
-                                String(account.id),
-                            ).length
-                          }
-                          <small> holdings</small>
-                        </strong>
-                      </article>
-                    ))}
-                  </div>
-                  <div className="purpose-holding-review">
-                    {swingHoldings.map((holding) => {
-                      const market = Number(holding.market_value_cents || 0),
-                        cost = Number(holding.cost_basis_cents || 0),
-                        gain = market - cost,
-                        gainPct = cost > 0 ? (gain / cost) * 100 : null,
-                        symbol = String(holding.ticker || "");
-                      return (
-                        <article
-                          className={
-                            gainPct !== null && gainPct <= -8
-                              ? "decision-risk"
-                              : "decision-review"
-                          }
-                          key={`${holding.account_id}_${symbol}_${holding.name}`}
-                        >
-                          <div>
-                            <b>{symbol || "Ticker unavailable"}</b>
-                            <small>{holding.nickname || holding.name}</small>
-                          </div>
-                          <strong>
-                            {gainPct === null
-                              ? "Cost basis needed"
-                              : `${gainPct >= 0 ? "+" : ""}${gainPct.toFixed(1)}%`}
-                            <small>institution gain/loss</small>
-                          </strong>
-                          <p>
-                            {gainPct !== null && gainPct <= -8
-                              ? "RISK REVIEW · Loss requires checking the original stop and thesis. Do not average down automatically."
-                              : "CHART REVIEW NEEDED · Confirm Daily/4H trend, volume, support, entry, stop and target before any decision."}
-                          </p>
-                          <button
-                            disabled={!symbol}
-                            onClick={() => {
-                              sessionStorage.setItem(
-                                "northstar-chart-symbol",
-                                symbol,
-                              );
-                              setChartSymbol(symbol);
-                              navigate("Professional Charts");
-                            }}
-                          >
-                            Analyze chart →
-                          </button>
-                        </article>
-                      );
-                    })}
-                  </div>
-                </>
-              ) : (
-                <div className="purpose-empty">
-                  <b>No account is assigned to Swing or Options.</b>
-                  <span>
-                    Open Financial Adviser → Accounts, expand the Plaid
-                    investment account, select Swing or Options, and save the
-                    account profile.
-                  </span>
-                  <button onClick={() => navigate("Accounts")}>
-                    Assign an account →
-                  </button>
-                </div>
-              )}
-              <footer>
-                <b>
-                  Current holdings are not automatically correct or incorrect.
-                </b>{" "}
-                Northstar requires current chart, liquidity, volume, news,
-                position size and invalidation evidence before suggesting keep,
-                reduce, or exit.
-              </footer>
-            </section>
-          )}
-          {tab === "Prepare Trade" && advisorHoldings.length > 0 && (
-            <ConnectedHoldingsAnalysis
-              key={`prepare-holdings:${advisorAccountId}:${advisorStrategy}`}
-              marketOpen={marketPhase === "open"}
-              holdings={advisorHoldings}
-              mode={advisorStrategy}
-              accessToken={accessToken}
-              onOpen={(symbol) => {
-                sessionStorage.setItem("northstar-chart-symbol", symbol);
-                setChartSymbol(symbol);
-                navigate("Professional Charts");
-              }}
-            />
-          )}
           {tab === "Account Transactions" && (
             <section className="account-transactions-page route-page">
               <nav>
@@ -8386,21 +8058,11 @@ export function NorthstarWorkspace({
                 targetMix={portfolioMix}
               />
             )}
+          {tab === "Portfolio" && investmentAccounts.filter(account=>analysisScope===ALL_ACCOUNTS_SCOPE||String(account.id)===advisorAccountId).map(account=><HoldingCostProvider key={'evaluation:'+account.id} holdings={connectedFinance.holdings} accountId={String(account.id)} accounts={investmentAccounts}><section className="card"><h2>{String(account.nickname||account.name)} · Account evaluation</h2><ActionGuidancePanel accountId={String(account.id)} accessToken={accessToken} mode="today" marketOpen={marketPhase === "open"}/><details><summary>Cash plan and saved trade lifecycle</summary><CapitalRotationPanel accountId={String(account.id)}/><TradeLifecyclePanel accountId={String(account.id)} accessToken={accessToken}/></details></section></HoldingCostProvider>)}
           {tab === "Portfolio" && investmentAccounts.filter(account=>analysisScope===ALL_ACCOUNTS_SCOPE||String(account.id)===advisorAccountId).map(account=><section key={`growth:${account.id}`} className="portfolio-account-growth card" style={{minWidth:0,padding:16}}><h2>{String(account.nickname||account.name)} · Growth history</h2><AccountGrowthChart accountId={String(account.id)} accessToken={accessToken}/></section>)}
           <section
             className={`portfolio-builder card ${tab === "Portfolio" && analysisScope !== ALL_ACCOUNTS_SCOPE ? "" : "account-scope-hidden"}`}
           >
-            {tab === "Portfolio" && (
-              <ActionGuidancePanel
-                key={`portfolio-guidance:${advisorAccountId}:${advisorStrategy}`}
-                accountId={advisorAccountId}
-                accessToken={accessToken}
-                mode={advisorStrategy === "swing" ? "today" : "month"}
-                marketOpen={
-                  advisorStrategy === "swing" && marketPhase === "open"
-                }
-              />
-            )}
             {tab === "Portfolio" && !!advisorHoldings.length && (
               <section className="holdings-table analysis-holdings">
                 <details >
