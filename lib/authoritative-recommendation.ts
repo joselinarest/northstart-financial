@@ -1,5 +1,6 @@
 import {accountRiskSettings} from "@/lib/account-risk-settings";
 import {positionSizing} from "@/lib/position-sizing";
+import {holdingOpenRisk} from "@/lib/holding-open-risk";
 import {QuantDataProvider} from "@/lib/providers/quant-data";
 import {providerSignal} from "@/lib/work-budget";
 import { id, type PostgresDatabase } from "@/lib/db";
@@ -417,7 +418,7 @@ export async function researchRecommendation(
   // Unknown sector membership and protective stops consume conservative capacity.
   const invested=exposures.reduce((sum,h)=>sum+Number(h.quantity)*Number(h.price_cents)/100,0);
   const existingPosition=exposures.filter(h=>h.ticker===symbol).reduce((sum,h)=>sum+Number(h.quantity)*Number(h.price_cents)/100,0);
-  const openRisk=exposures.reduce((sum,h)=>{const stop=Number(parse(h.state_json).stop||0);return sum+Number(h.quantity)*Math.max(0,Number(h.price_cents)/100-stop)},0);
+  const openRisk=exposures.reduce((sum,h)=>sum+holdingOpenRisk(h.quantity,h.price_cents,h.state_json),0);
   const equity=riskSettings.value,sectorRoom=Math.max(0,equity*riskPolicy.maxSectorBps/10000-invested),remainingOpenRisk=Math.max(0,equity*riskPolicy.combinedRiskBps/10000-openRisk),liquidityShares=Number(quote?.volume)>0?Math.floor(Number(quote?.volume)*.001):null;
   const reservation = await db.prepare("SELECT COALESCE(SUM((plan_json->>'reservedCash')::numeric),0)::text total FROM trade_lifecycle_exits WHERE account_id=? AND status IN ('REENTRY_WATCH','REENTRY_READY')").bind(input.accountId).first<Json>();
   const price = Number(quote?.last || 0),
