@@ -1,3 +1,4 @@
+import {investmentCash} from "@/lib/investment-cash";
 import {detectPatternEvidence} from "@/lib/pattern-evidence";
 import {reviewClosedTrades} from "@/lib/post-trade-review-service";
 import type {DecisionOutput} from "@/lib/ai-investment-decision-engine";
@@ -42,12 +43,14 @@ async function alert(db:PostgresDatabase, household:string, account:string, key:
 export async function runTradeLifecycle(db:PostgresDatabase, householdId:string, accountId:string, dependencies: {provider?:ReturnType<typeof marketDataProvider>;research?:typeof authoritativeRecommendation;symbol?:string;aiProvider?:AIProvider} = {}) {
   const account = await db.prepare(`SELECT a.id,COALESCE(s.strategy_type,a.investment_purpose) strategy,COALESCE(s.available_cash_cents,a.available_balance_cents,0)::text cash_cents,s.maximum_position_bps,s.maximum_risk_bps,s.policy_json FROM accounts a JOIN entities e ON e.id=a.entity_id LEFT JOIN investment_account_settings s ON s.account_id=a.id WHERE a.id=? AND e.household_id=?`).bind(accountId,householdId).first<Row>();
   if (!account) throw new Error("LIFECYCLE_ACCOUNT_NOT_FOUND");
+  const cashMapping=await investmentCash(db,householdId,accountId);account.cash_cents=String(cashMapping.cashCents);
   const policy=json(account.policy_json), provider=dependencies.provider||marketDataProvider(), research=dependencies.research||authoritativeRecommendation;
   const universe = (await db.prepare(`SELECT DISTINCT sec.id security_id,sec.ticker,sec.type FROM securities sec WHERE sec.ticker IS NOT NULL AND sec.id IN (SELECT security_id FROM holdings WHERE account_id=? AND quantity>0 UNION SELECT security_id FROM position_states WHERE account_id=? UNION SELECT security_id FROM investment_transactions WHERE account_id=? AND transaction_type='SELL' UNION SELECT security_id FROM recommendations WHERE account_id=? AND lifecycle IN ('MONITORING','TRIGGERED')) AND (?::text IS NULL OR sec.ticker=?) ORDER BY sec.ticker`).bind(accountId,accountId,accountId,accountId,dependencies.symbol||null,dependencies.symbol||null).all<Row>()).results;
   const value = await db.prepare("SELECT COALESCE(SUM(quantity*price_cents),0)::text value FROM holdings WHERE account_id=?").bind(accountId).first<Row>();
-  const risk: AccountRisk = {cash:Number(account.cash_cents)/100,value:Number(account.cash_cents)/100+Number(value?.value||0)/100,maxPositionBps:Number(account.maximum_position_bps??1000),maxRiskBps:Number(account.maximum_risk_bps??50),taxRate:policy.taxRatePct==null?null:Number(policy.taxRatePct)/100,slippageBps:Number(policy.slippageBps??15),commission:Number(policy.commissionCents??0)/100,reservedElsewhere:0};
+  const risk: AccountRisk = {cash:Number(account.cash_cents)/100,value:Number(account.cash_cents)/100+(Number(value?.value||0)-cashMapping.mappedCents)/100,maxPositionBps:Number(account.maximum_position_bps??1000),maxRiskBps:Number(account.maximum_risk_bps??50),taxRate:policy.taxRatePct==null?null:Number(policy.taxRatePct)/100,slippageBps:Number(policy.slippageBps??15),commission:Number(policy.commissionCents??0)/100,reservedElsewhere:0};
   let monitored=0;
   for (const security of universe) {
+    if(security.type==="cash"||cashMapping.symbols.includes(security.ticker))continue;
     const underlying=underlyingForContract(security.ticker),isOption=Boolean(underlying)||/option/i.test(security.type),researchTicker=underlying||security.ticker;
     // Refresh research even when holdings are zero. A provider failure remains an explicit evidence gap.
     let researchError:string|null=null;

@@ -28,8 +28,8 @@ const pg=new PGlite();
 await pg.exec(`
 CREATE TABLE households(id text primary key);
 CREATE TABLE entities(id text primary key,household_id text);
-CREATE TABLE accounts(id text primary key,entity_id text,investment_purpose text,available_balance_cents bigint);
-CREATE TABLE securities(id text primary key,ticker text,type text);
+CREATE TABLE accounts(id text primary key,entity_id text,investment_purpose text,available_balance_cents bigint,connection_id text,type text default 'investment');
+CREATE TABLE securities(id text primary key,ticker text,type text,currency text default 'USD');
 CREATE TABLE investment_account_settings(account_id text primary key,strategy_type text,available_cash_cents bigint,maximum_position_bps int,maximum_risk_bps int,policy_json jsonb);
 CREATE TABLE holdings(account_id text,security_id text,quantity numeric,price_cents bigint,cost_basis_cents bigint);
 CREATE TABLE investment_theses(account_id text,security_id text,state text,reviewed_at timestamptz);
@@ -44,9 +44,9 @@ CREATE TABLE notification_preferences(household_id text,user_id text,in_app_enab
 CREATE TABLE alert_deliveries(id text primary key,alert_id text,user_id text,channel text,status text,available_at timestamptz,unique(alert_id,user_id,channel));
 CREATE TABLE background_jobs(id text primary key,household_id text,job_type text,idempotency_key text unique,payload_json jsonb);
 INSERT INTO households VALUES('h'),('other'); INSERT INTO entities VALUES('entity','h');
-INSERT INTO accounts VALUES('a','entity','SWING',100000);
+INSERT INTO accounts(id,entity_id,investment_purpose,available_balance_cents) VALUES('a','entity','SWING',100000);
 INSERT INTO investment_account_settings VALUES('a','SWING',100000,5000,1000,'{"taxRatePct":0,"slippageBps":0,"sectorBenchmarks":{"NVDA":"XLK"}}');
-INSERT INTO securities VALUES('nvda','NVDA','equity');
+INSERT INTO securities(id,ticker,type) VALUES('nvda','NVDA','equity');
 INSERT INTO holdings VALUES('a','nvda',20,10000,140000);
 INSERT INTO investment_theses VALUES('a','nvda','INTACT',current_timestamp);
 INSERT INTO household_members VALUES('h','user','active');
@@ -130,7 +130,7 @@ assert.equal(cancelled.status,'CLOSED','cancelled plan does not silently revive 
 await pg.exec("UPDATE position_states SET state_json=jsonb_set(state_json,'{target1}','120'::jsonb)");
 await runTradeLifecycle(db,'h','a',{provider,research,aiProvider});
 await seedExit('sell-rotate');
-await pg.exec("INSERT INTO securities VALUES('msft','MSFT','equity')");
+await pg.exec("INSERT INTO securities(id,ticker,type) VALUES('msft','MSFT','equity')");
 await pg.query("INSERT INTO recommendations(id,household_id,account_id,security_id,action,actionable,confidence,expires_at,evidence_as_of,targets_json,invalidation_cents,checks_json,created_at) VALUES('replacement','h','a','msft','BUY',true,85,$1,$2,'[20000]',9000,$3,current_timestamp)",[new Date(Date.now()+86400000).toISOString(),new Date().toISOString(),JSON.stringify({technical:{price:100,state:'BULLISH'},fundamentalThesis:{thesisStatus:'INTACT',valuationAttractiveness:70},portfolioFit:{state:'GOOD'}})]);
 const originalRun=(await pg.query("SELECT * FROM ai_decision_runs WHERE status='COMPLETED' ORDER BY created_at DESC LIMIT 1")).rows[0];
 const replacementCandidate={id:'lifecycle',action:'BUY_IF',shares:2,entry:100,trigger:100,stop:90,targets:[200],cost:200,proceeds:0,cashBefore:3000,cashAfter:2800,thesisStatus:'VALID',sellReason:null,reentryPlan:null,instrument:'SHARES',eligible:true,reason:'Verified replacement candidate'};

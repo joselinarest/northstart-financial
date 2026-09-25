@@ -408,8 +408,9 @@ export async function researchRecommendation(
     reason = `${conflicts.join("; ")} — WAIT.`;
   }
   const riskSettings=await accountRiskSettings(db,input.householdId,input.accountId);
+  account.cash_cents=String(Math.round(riskSettings.cash*100));
   const riskPolicy=riskSettings.effective;
-  const exposures=(await db.prepare("SELECT s.ticker,h.quantity::text,h.price_cents::text,p.state_json FROM holdings h JOIN securities s ON s.id=h.security_id LEFT JOIN position_states p ON p.account_id=h.account_id AND p.security_id=h.security_id WHERE h.account_id=? AND h.quantity>0").bind(input.accountId).all<Json>()).results;
+  const exposures=(await db.prepare("SELECT s.ticker,s.type security_type,h.quantity::text,h.price_cents::text,p.state_json FROM holdings h JOIN securities s ON s.id=h.security_id LEFT JOIN position_states p ON p.account_id=h.account_id AND p.security_id=h.security_id WHERE h.account_id=? AND h.quantity>0").bind(input.accountId).all<Json>()).results.filter(h=>h.security_type!=="cash"&&!riskSettings.cashMapping.symbols.includes(h.ticker));
   // Unknown sector membership and protective stops consume conservative capacity.
   const invested=exposures.reduce((sum,h)=>sum+Number(h.quantity)*Number(h.price_cents)/100,0);
   const existingPosition=exposures.filter(h=>h.ticker===symbol).reduce((sum,h)=>sum+Number(h.quantity)*Number(h.price_cents)/100,0);
@@ -426,7 +427,7 @@ export async function researchRecommendation(
       )
       .bind(input.accountId)
       .first<Json>(),
-    accountValue = Number(accountValueRow?.value_cents || 0) / 100 + cash,
+    accountValue = riskSettings.value,
     sizing = positionSizing({entry:price,stop:Number(support),equity,cash:Number(account.cash_cents||0)/100,reservedCash:Number(reservation?.total||0),cashReserveBps:riskPolicy.cashReserveBps,riskBps:riskPolicy.swingRiskBps,positionBps:riskPolicy.maxPositionBps,existingPosition,sectorRoom,remainingOpenRisk,liquidityShares}),
     shares = sizing.shares,
     generatedAt = new Date(),
