@@ -77,14 +77,16 @@ async function processNotifications(request: Request,limits:{totalMs:number;jobM
   // duplicate execution and permanently RUNNING work.
   await coalesceRefreshJobs(db);
   const jobs={results:[] as Record<string, any>[]};
+  const lanes=["MARKET_DISCOVERY","OPTIONS_DISCOVERY","OPTIONS_ACCOUNT_REVIEW","ACCOUNT_INTELLIGENCE_LOOP","MARKET_INTELLIGENCE","MAINTENANCE"];
+  const preferredLane=lanes[Math.floor(Date.now()/60000)%lanes.length];
   const claimJob = async(preferBroad=false)=>await db.prepare(`WITH claimable AS (
       SELECT id FROM background_jobs
       WHERE attempts<6 AND available_at<=CURRENT_TIMESTAMP
         AND (status IN ('QUEUED','FAILED') OR (status='RUNNING' AND locked_at<CURRENT_TIMESTAMP-INTERVAL '10 minutes'))
-      ORDER BY CASE WHEN ?::boolean AND job_type IN ('MARKET_DISCOVERY','OPTIONS_DISCOVERY') THEN 0 ELSE 1 END,CASE job_type WHEN 'AI_EVENT_REVIEW' THEN 0 WHEN 'PLAID_INVESTMENT_SYNC' THEN 1 WHEN 'PLAID_SYNC' THEN 1 WHEN 'NOTIFICATION_DELIVERY' THEN 2 WHEN 'ACCOUNT_INTELLIGENCE_LOOP' THEN 3 WHEN 'MARKET_DISCOVERY' THEN 4 WHEN 'OPTIONS_DISCOVERY' THEN 4 WHEN 'OPTIONS_ACCOUNT_REVIEW' THEN 4 WHEN 'MARKET_INTELLIGENCE' THEN 5 ELSE 5 END,created_at FOR UPDATE SKIP LOCKED LIMIT 1
+      ORDER BY CASE WHEN ?::boolean AND (job_type=?::text OR (?::text='MAINTENANCE' AND job_type IN ('DAILY_CLOSE_REVIEW','OVERNIGHT_OUTLOOK_REFRESH','TACTICAL_REENTRY_MONITOR','INVESTMENT_COVERAGE_AUDIT','KIDS_PLAN_REVIEW'))) THEN 0 ELSE 1 END,CASE WHEN created_at<CURRENT_TIMESTAMP-INTERVAL '10 minutes' THEN 0 ELSE 1 END,CASE job_type WHEN 'AI_EVENT_REVIEW' THEN 0 WHEN 'PLAID_INVESTMENT_SYNC' THEN 1 WHEN 'PLAID_SYNC' THEN 1 WHEN 'NOTIFICATION_DELIVERY' THEN 2 WHEN 'ACCOUNT_INTELLIGENCE_LOOP' THEN 3 WHEN 'MARKET_DISCOVERY' THEN 4 WHEN 'OPTIONS_DISCOVERY' THEN 4 WHEN 'OPTIONS_ACCOUNT_REVIEW' THEN 4 WHEN 'MARKET_INTELLIGENCE' THEN 5 ELSE 5 END,created_at FOR UPDATE SKIP LOCKED LIMIT 1
     ) UPDATE background_jobs j SET status='RUNNING',attempts=j.attempts+1,
       locked_at=CURRENT_TIMESTAMP,updated_at=CURRENT_TIMESTAMP
-      FROM claimable c WHERE j.id=c.id RETURNING j.*`).bind(preferBroad).all<Record<string, any>>();
+      FROM claimable c WHERE j.id=c.id RETURNING j.*`).bind(preferBroad,preferredLane,preferredLane).all<Record<string, any>>();
   if (process.env.VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY)
     webpush.setVapidDetails(
       process.env.EMAIL_FROM?.match(/<([^>]+)>/)?.[1]

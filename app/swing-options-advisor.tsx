@@ -89,7 +89,8 @@ export default function SwingOptionsAdvisor({
   universeSymbols?: string[];
 }) {
   const [symbol, setSymbol] = useState(initialSymbol);
-  const [maxRisk, setMaxRisk] = useState(500);
+  const [maxRisk, setMaxRisk] = useState(0);
+  const accountGeneration=useRef(0),defaultRiskAccount=useRef("");
   const [targetDte, setTargetDte] = useState(45);
   const [loading, setLoading] = useState(false);
   const [notice, setNotice] = useState("");
@@ -105,10 +106,10 @@ export default function SwingOptionsAdvisor({
     ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
   }), [accessToken]);
 
-  const loadResults=async()=>{if(!accountId)return;const response=await fetch('/api/market/options/scan?accountId='+encodeURIComponent(accountId),{headers});const body=await response.json();if(!response.ok)throw Error(body.error||'Coverage unavailable');setResults(body.results||[]);setCoverage(body.coverage);setAccountPolicy(body.policy);setScreens(body.screens||[]);};
-  useEffect(()=>{setResults([]);setCoverage(null);setScreens([]);let active=true;const load=()=>{if(active)void loadResults().catch(e=>setNotice(e.message));};load();const timer=setInterval(load,15000);return()=>{active=false;clearInterval(timer)};},[accountId,headers]);
+  const loadResults=async()=>{if(!accountId)return;const generation=accountGeneration.current;const response=await fetch('/api/market/options/scan?accountId='+encodeURIComponent(accountId),{headers});const body=await response.json();if(generation!==accountGeneration.current)return;if(!response.ok)throw Error(body.error||'Coverage unavailable');setResults(body.results||[]);setCoverage(body.coverage);setAccountPolicy(body.policy);setScreens(body.screens||[]);if(defaultRiskAccount.current!==accountId&&body.policy){setMaxRisk(Math.max(0,Math.floor(body.policy.premiumCap||0)));defaultRiskAccount.current=accountId;}};
+  useEffect(()=>{accountGeneration.current++;setResults([]);setCoverage(null);setScreens([]);setAccountPolicy(null);setNotice('');setMaxRisk(0);defaultRiskAccount.current='';let active=true;const load=()=>{if(active)void loadResults().catch(e=>{if(active)setNotice(e.message)});};load();const timer=setInterval(load,15000);return()=>{active=false;accountGeneration.current++;clearInterval(timer)};},[accountId,headers]);
   const analyze=async()=>{if(!accountId)return;setLoading(true);try{const response=await fetch('/api/market/options/scan',{method:'POST',headers,body:JSON.stringify({accountId,symbol,maxRisk,targetDte})});const body=await response.json();if(!response.ok)throw Error(body.error);setNotice(body.symbol+' · '+body.message);await loadResults();}catch(e){setNotice(e instanceof Error?e.message:'Analysis unavailable')}finally{setLoading(false)}};
-  const reset=()=>{setMaxRisk(500);setTargetDte(45);void loadResults().catch(e=>setNotice(e.message));};
+  const reset=()=>{setMaxRisk(Math.floor(accountPolicy?.premiumCap||0));setTargetDte(45);void loadResults().catch(e=>setNotice(e.message));};
   return <section id="options-advisor" className="option-contract-advisor swing-options-advisor">
     <div className="option-advisor-head">
       <div>
@@ -123,7 +124,7 @@ export default function SwingOptionsAdvisor({
     <div className="option-fields">
       <label>Stock to analyze<input value={symbol} onChange={event => setSymbol(event.target.value.toUpperCase().replace(/[^A-Z.]/g, "").slice(0, 10))} /></label>
       <label>How much time should it have?<select value={targetDte} onChange={event => setTargetDte(Number(event.target.value))}><option value="21">About 3 weeks</option><option value="45">About 6 weeks</option><option value="60">About 2 months</option><option value="90">About 3 months</option></select></label>
-      <label>Most I am willing to lose<div className="money-input"><b>$</b><input type="number" min="50" step="50" value={maxRisk} onChange={event => setMaxRisk(Math.max(50, Number(event.target.value) || 50))} /></div></label>
+      <label>Most I am willing to lose<div className="money-input"><b>$</b><input type="number" min="0" step="1" value={maxRisk} onChange={event => setMaxRisk(Math.max(0, Number(event.target.value) || 0))} /></div></label>
       <button type="button" disabled={loading || !accountId} onClick={analyze}>{loading ? "Checking options…" : "Find options"}</button><button type="button" className="secondary" disabled={loading} onClick={reset}>Reset</button>
     </div>
     <section aria-label="Broad market options scan" className="my-4 rounded-xl border border-line p-4"><h3>Broad-market discovery · server monitored</h3><p>Every supported active stock enters the rotating price/liquidity screen. Deep chain and account research follow qualifying screens. No fixed popular-stock list. Coverage below counts completed work, not promised coverage.</p>{coverage?<div className="flex flex-wrap gap-5">{Object.entries(coverage).filter(([k])=>k!=='last_scan').map(([k,v])=><span key={k}><b>{String(v??'—')}</b> {k.replaceAll('_',' ')}</span>)}<time>Last scan {coverage.last_scan?new Date(coverage.last_scan).toLocaleString():'Not yet run'}</time></div>:<p>Coverage unavailable or awaiting first server scan.</p>}<details><summary>Recent screening outcomes ({screens.length} shown)</summary>{screens.map(row=><p key={row.symbol}><b>{row.symbol} · {row.stage||'NOT_SCANNED'}</b> — {row.reason||'Awaiting screen'}</p>)}</details></section>

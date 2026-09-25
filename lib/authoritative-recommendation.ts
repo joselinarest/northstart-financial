@@ -10,7 +10,7 @@ import { evaluateCatalystEntryGate, loadCatalystContext } from "@/lib/catalyst-e
 
 type Json = Record<string, any>;
 const num = (value: unknown) =>
-  Number.isFinite(Number(value)) ? Number(value) : null;
+  value !== null && value !== undefined && value !== "" && Number.isFinite(Number(value)) ? Number(value) : null;
 const avg = (values: number[]) =>
   values.length
     ? values.reduce((sum, value) => sum + value, 0) / values.length

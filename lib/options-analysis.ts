@@ -38,12 +38,17 @@ async function loadMarketSnapshot(symbol:string){
 }
 export async function analyzeOptions(db:PostgresDatabase,householdId:string,body:J){try{
  await loadRuntimeSecrets();
- const accountId=String(body.accountId||""),symbol=String(body.symbol||"SPY").toUpperCase().trim(),outlook=body.outlook==="bearish"?"bearish":"bullish",maxRisk=Math.max(50,Math.min(100000,Number(body.maxRisk)||500)),targetDte=Math.max(14,Math.min(365,Number(body.targetDte)||60));
+ const accountId=String(body.accountId||""),symbol=String(body.symbol||"SPY").toUpperCase().trim(),outlook=body.outlook==="bearish"?"bearish":"bullish",targetDte=Math.max(14,Math.min(365,Number(body.targetDte)||60));
  if(!accountId)return Response.json({error:"Select a Swing investment account before analyzing Calls & Puts."},{status:400});
  const account=await db.prepare("SELECT a.id,COALESCE(a.nickname,a.name) name,COALESCE(s.strategy_type,'CUSTOM') strategy_type,COALESCE(s.available_cash_cents,a.available_balance_cents,0) available_cash_cents,s.policy_json,s.maximum_risk_bps FROM accounts a JOIN entities e ON e.id=a.entity_id LEFT JOIN investment_account_settings s ON s.account_id=a.id WHERE a.id=? AND e.household_id=? AND a.type='investment'").bind(accountId,householdId).first<J>();
  if(!account)return Response.json({error:"Investment account not found"},{status:404});
  const noOption=(reason:string,changes:string[],status="NO OPTION TRADE")=>Response.json({status:"NO_TRADE",decisionLabel:status,underlying:symbol,underlyingPrice:null,asOf:new Date().toISOString(),account:{id:account.id,name:account.name,strategy:account.strategy_type},contract:null,chain:[],rationale:[reason],warnings:[],decision:{action:"NO_ACTION",confidence:null,confidenceBand:"UNAVAILABLE",interpretation:reason,invalidation:"No option entry is authorized.",reasoningFactors:[reason],whatWouldChange:changes,dataQuality:null}},{headers:{"Cache-Control":"private, no-store"}});
  const limits=await accountRiskSettings(db,householdId,accountId);
+ const recommendedRisk=Math.max(0,limits.value*limits.effective.optionsRiskBps/10000);
+ const requestedRisk=body.maxRisk==null?recommendedRisk:Number(body.maxRisk);
+ if(!Number.isFinite(requestedRisk)||requestedRisk<0)return Response.json({error:"Maximum premium risk must be a non-negative number."},{status:400});
+ const maxRisk=Math.min(100000,requestedRisk,recommendedRisk);
+ if(maxRisk===0)return noOption("No option premium is available under this account's risk budget.",["Review available cash and the account's option risk limit."]);
 
   if(!/^[A-Z.]{1,10}$/.test(symbol))return Response.json({error:"Invalid underlying symbol"},{status:400});
  if(!process.env.ALPACA_API_KEY||!process.env.ALPACA_API_SECRET)return noOption("Option market data is not configured.",["Connect a supported option-chain provider."],"WAIT");
