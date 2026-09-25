@@ -2720,7 +2720,7 @@ export function NorthstarWorkspace({
   const visibleFinanceAccounts =
     tab === "Portfolio" ? investmentAccounts : connectedFinance.accounts;
   const isSwingAccount = (account: Record<string, any>) =>
-    /swing|option/i.test(
+    /swing|option|mixed/i.test(
       `${account.investment_purpose || ""} ${account.strategy_type || ""} ${account.goal_name || ""}`,
     );
   const swingAccounts = useMemo(
@@ -2728,7 +2728,7 @@ export function NorthstarWorkspace({
     [investmentAccounts],
   );
   const longTermAccounts = useMemo(
-    () => investmentAccounts.filter((account) => !isSwingAccount(account)),
+    () => investmentAccounts.filter((account) => /mixed/i.test(String(account.investment_purpose)) || !isSwingAccount(account)),
     [investmentAccounts],
   );
   const homeDefaultScopeApplied = useRef(false);
