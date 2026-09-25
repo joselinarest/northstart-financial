@@ -40,9 +40,9 @@ const deviceTwo=await(await route.GET(new Request('http://local/api?id='+event.i
 assert.equal((await route.PATCH(new Request('http://local/api',{method:'PATCH',body:JSON.stringify({eventId:event.id,action:'DISMISSED'})}))).status,200);
 const countBefore=(await pg.query('SELECT COUNT(*)::int count FROM alert_deliveries')).rows[0].count;
 await add('a4','Updated earnings evidence after dismissal');await indexNotificationEvents(db);
-assert.equal((await pg.query('SELECT COUNT(*)::int count FROM alert_deliveries')).rows[0].count,countBefore,'dismissed event updates must never requeue delivery');
-assert.equal((await pg.query("SELECT COUNT(*)::int count FROM alert_deliveries WHERE status <> 'DISMISSED'")).rows[0].count,0,'dismissal cancels pending deliveries');
-assert.ok((await(await route.GET(new Request('http://local/api?id='+event.id))).json()).events[0].dismissed_at,'dismissal survives reload');
+assert.equal((await pg.query('SELECT COUNT(*)::int count FROM alert_deliveries')).rows[0].count,countBefore+2,'a new material update after dismissal must still deliver');
+assert.equal((await pg.query("SELECT COUNT(*)::int count FROM alert_deliveries WHERE alert_id<>'a4' AND status IN ('QUEUED','PENDING','FAILED')")).rows[0].count,0,'dismissal cancels pending deliveries');
+assert.equal((await(await route.GET(new Request('http://local/api?id='+event.id))).json()).events[0].dismissed_at,null,'new material update revives the event');
 await pg.exec('ALTER TABLE alerts ADD COLUMN read_at timestamptz; ALTER TABLE alerts ADD COLUMN dismissed_at timestamptz');
 await pg.query("INSERT INTO alerts(id,household_id,title,explanation,type,severity,evidence_json) VALUES('legacy','h','Account sync','Sync failed','system','warning','{\"eventId\":\"sync-2\"}')");
 const legacyRoute=await import('../app/api/alerts/route.ts');
