@@ -260,7 +260,7 @@ export async function researchRecommendation(
       ...(coverage < 6 ? ["Fundamental provider coverage is incomplete"] : []),
     ],
     valuation =
-      valuationAttractiveness >= 65
+      forwardPe===null||forwardPe<=0 ? "UNAVAILABLE" : valuationAttractiveness >= 65
         ? "CHEAP_OR_ATTRACTIVE"
         : valuationAttractiveness >= 45
           ? "FAIR"
@@ -448,13 +448,13 @@ export async function researchRecommendation(
         technical: { provider: barsSet.feed || quoteSet.feed, asOf: barsAsOf },
       },
       fundamentalThesis: {
-        fundamentalQuality,
-        growthQuality,
-        balanceSheetQuality,
-        valuationAttractiveness,
+        fundamentalQuality:coverage>=4?fundamentalQuality:null,
+        growthQuality:revenueGrowth!==null&&epsGrowth!==null?growthQuality:null,
+        balanceSheetQuality:debtEquity!==null?balanceSheetQuality:null,
+        valuationAttractiveness:valuation==='UNAVAILABLE'?null:valuationAttractiveness,
         capitalEfficiency: roe,
-        earningsQuality,
-        competitivePosition,
+        earningsQuality:operatingMargin!==null&&fcfPerShare!==null?earningsQuality:null,
+        competitivePosition:null,
         fundamentalRisks,
         bullCase:
           "Growth and cash generation exceed expectations while valuation remains supportable.",

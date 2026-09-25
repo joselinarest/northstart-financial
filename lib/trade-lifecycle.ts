@@ -5,7 +5,7 @@ export const SELL_REASONS = ["THESIS BROKEN", "TECHNICAL EXIT", "STOP/INVALIDATI
 export type SellReason = typeof SELL_REASONS[number];
 export type Strategy = "LONG_TERM" | "SWING" | "OPTIONS";
 export type PositionState = {
-  entryPlan?:EntryPlan; investmentAccountId: string; ticker: string; strategy: Strategy; shares: number; averageCost: number;
+  entryPlan?:EntryPlan; basisKnown?:boolean; investmentAccountId: string; ticker: string; strategy: Strategy; shares: number; averageCost: number;
   currentPrice: number; thesisStatus: "VALID" | "BROKEN" | "RESEARCH_REQUIRED";
   positionState: "CANDIDATE" | "ENTRY_READY" | "OPEN" | "ADD" | "HOLD" | "TRIM" | "EXIT" | "REENTRY_WATCH" | "REENTRY_READY" | "REENTER" | "CLOSED";
   recommendationId: string | null; sellReason: SellReason | null; exitPrice: number | null; exitDate: string | null;
