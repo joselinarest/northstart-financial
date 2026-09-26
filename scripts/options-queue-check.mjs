@@ -25,3 +25,4 @@ assert.equal(researchMarketFresh('2026-09-25T20:00:00Z',120000,Date.parse('2026-
 assert.equal(researchMarketFresh('2026-09-24T20:00:00Z',120000,Date.parse('2026-09-26T06:00:00Z')),false);
 assert.equal(researchMarketFresh('2026-09-25T20:00:00Z',120000,Date.parse('2026-09-28T14:00:00Z')),false);
 console.log('PASS: stale/future option entry blocking and research freshness. Run research-pipeline-check for queue SQL.');
+const calendarStart=performance.now();for(let i=0;i<10000;i++)assert.equal(researchMarketFresh('2026-09-25T20:00:00Z',120000,Date.parse('2026-09-26T18:00:00Z')),true);assert.ok(performance.now()-calendarStart<2000,'chain freshness must reuse the session calculation');console.log('PASS: 10,000 contract freshness checks stay within the research CPU budget.');
