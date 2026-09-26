@@ -1,3 +1,4 @@
+import {vapidSubject} from '@/lib/vapid-subject';
 import {POST as syncPlaid} from '@/app/api/connections/plaid/sync/route';
 import {runOptionsDiscovery} from '@/lib/options-discovery';
 import {runOptionsResearch} from '@/lib/options-research-engine';
@@ -90,9 +91,7 @@ async function processNotifications(request: Request,limits:{totalMs:number;jobM
       FROM claimable c WHERE j.id=c.id RETURNING j.*`).bind(preferBroad,preferredLane,preferredLane).all<Record<string, any>>();
   if (process.env.VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY)
     webpush.setVapidDetails(
-      process.env.EMAIL_FROM?.match(/<([^>]+)>/)?.[1]
-        ? `mailto:${process.env.EMAIL_FROM.match(/<([^>]+)>/)![1]}`
-        : "mailto:security@northstar.local",
+      vapidSubject(process.env),
       process.env.VAPID_PUBLIC_KEY,
       process.env.VAPID_PRIVATE_KEY,
     );
