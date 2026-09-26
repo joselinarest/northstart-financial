@@ -1,7 +1,13 @@
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {PGlite} from '@electric-sql/pglite';
-import {currentOptionsResult} from '../lib/options-result-freshness.ts';
+import {build} from 'esbuild';
+import {createRequire} from 'node:module';
+await build({entryPoints:['lib/options-result-freshness.ts','lib/options-scan-status.ts','lib/research-market-freshness.ts'],outdir:'work/options-check',bundle:true,platform:'node',format:'cjs',outExtension:{'.js':'.cjs'}});
+const require=createRequire(import.meta.url);
+const {currentOptionsResult}=require('../work/options-check/options-result-freshness.cjs');
+const {summarizeOptionAnalysis,optionScanMessage,optionAnalysisState}=require('../work/options-check/options-scan-status.cjs');
+const {researchMarketFresh}=require('../work/options-check/research-market-freshness.cjs');
 const pg=new PGlite();
 await pg.exec(`CREATE TABLE entities(id text,household_id text);
 CREATE TABLE accounts(id text,entity_id text,hidden int,type text);
@@ -25,4 +31,20 @@ assert.equal(currentOptionsResult(fresh),fresh);
 for(const asOf of [null,'invalid',new Date(Date.now()-121000).toISOString(),new Date(Date.now()+10000).toISOString()]){
  const stale=currentOptionsResult({...fresh,asOf});assert.equal(stale.contract,fresh.contract);assert.equal(stale.executionReady,false);assert.equal(stale.decision.action,'WAIT');assert.equal(stale.decision.shares,0);
 }
+await pg.exec("UPDATE background_jobs SET status='FAILED',attempts=6 WHERE id='testactive'");
+await pg.query(bind(sql),['retry','retry','CIEN','CIEN']);
+assert.equal((await pg.query("SELECT count(*)::int n FROM background_jobs WHERE payload_json->>'symbol'='CIEN'")).rows[0].n,2);
+await pg.exec("UPDATE background_jobs SET status='SUCCEEDED';INSERT INTO background_jobs(id,job_type,payload_json,created_at) VALUES('old','OPTIONS_ACCOUNT_REVIEW','{}',current_timestamp-interval '1 hour'),('manual','OPTIONS_ACCOUNT_REVIEW','{\"manual\":true}',current_timestamp)");
+assert.equal((await pg.query(bind(claim),[true,'OPTIONS_ACCOUNT_REVIEW','OPTIONS_ACCOUNT_REVIEW'])).rows[0].id,'manual');
+const incomplete={decision:{providerStatus:'INSUFFICIENT_DATA'},status:'NO_TRADE'};
+assert.equal(optionAnalysisState(incomplete),'INCOMPLETE');
+assert.equal(optionAnalysisState({analysisState:'QUALIFIED',freshness:'STALE'}),'STALE');
+assert.equal(optionAnalysisState({analysisState:'COMPLETE',decision:{}}),'COMPLETE');
+assert.equal(optionAnalysisState({decision:{}}),'INCOMPLETE');
+const summary=summarizeOptionAnalysis([incomplete,{analysisState:'COMPLETE'}]);assert.equal(summary.incomplete,1);assert.equal(summary.complete,1);
+assert.match(optionScanMessage({...summary,pending:220},{}),/Analysis incomplete.*220/);
+assert.match(optionScanMessage({reviewed:15},{universe:6000,screened:3000}),/15 stocks.*3000 stocks/);
+assert.equal(researchMarketFresh('2026-09-25T20:00:00Z',120000,Date.parse('2026-09-26T06:00:00Z')),true);
+assert.equal(researchMarketFresh('2026-09-24T20:00:00Z',120000,Date.parse('2026-09-26T06:00:00Z')),false);
+assert.equal(researchMarketFresh('2026-09-25T20:00:00Z',120000,Date.parse('2026-09-28T14:00:00Z')),false);
 await pg.close();console.log('PASS: production queue SQL, account exclusion, deduplication, fair atomic claims and stale/future option entry blocking.');

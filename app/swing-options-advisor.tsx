@@ -1,5 +1,6 @@
 "use client";
 
+import {optionScanMessage} from "@/lib/options-scan-status";
 import OptionBrokerIdentity from "./option-broker-identity";
 import HoldingCostBadge from "@/app/holding-cost-badge";
 import OptionsVolatilityPanel from "@/app/options-volatility-panel";
@@ -102,6 +103,7 @@ export default function SwingOptionsAdvisor({
   const [results, setResults] = useState<OptionResult[]>([]);
   const [outcomeFilter,setOutcomeFilter]=useState("ALL");
   const [accountPolicy,setAccountPolicy]=useState<Record<string,any>|null>(null);
+  const [analysisSummary,setAnalysisSummary]=useState<Record<string,any>|null>(null);
   const [coverage,setCoverage]=useState<Record<string,any>|null>(null);
   const [screens,setScreens]=useState<Array<Record<string,any>>>([]);
 
@@ -110,8 +112,8 @@ export default function SwingOptionsAdvisor({
     ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
   }), [accessToken]);
 
-  const loadResults=async()=>{if(!accountId)return;const generation=accountGeneration.current;const response=await fetch('/api/market/options/scan?accountId='+encodeURIComponent(accountId),{headers});const body=await response.json();if(generation!==accountGeneration.current)return;if(!response.ok)throw Error(body.error||'Coverage unavailable');setResults(body.results||[]);setCoverage(body.coverage);setAccountPolicy(body.policy);setScreens(body.screens||[]);if(defaultRiskAccount.current!==accountId&&body.policy){setMaxRisk(Math.max(0,Math.floor(body.policy.premiumCap||0)));setTargetDte(body.policy.suggestedDte||21);defaultRiskAccount.current=accountId;}};
-  useEffect(()=>{accountGeneration.current++;setResults([]);setCoverage(null);setScreens([]);setAccountPolicy(null);setNotice('');setMaxRisk(0);defaultRiskAccount.current='';let active=true;const load=()=>{if(active)void loadResults().catch(e=>{if(active)setNotice(e.message)});};load();const timer=setInterval(load,15000);return()=>{active=false;accountGeneration.current++;clearInterval(timer)};},[accountId,headers]);
+  const loadResults=async()=>{if(!accountId)return;const generation=accountGeneration.current;const response=await fetch('/api/market/options/scan?accountId='+encodeURIComponent(accountId),{headers});const body=await response.json();if(generation!==accountGeneration.current)return;if(!response.ok)throw Error(body.error||'Coverage unavailable');setResults(body.results||[]);setAnalysisSummary(body.analysis);setCoverage(body.coverage);setAccountPolicy(body.policy);setScreens(body.screens||[]);if(defaultRiskAccount.current!==accountId&&body.policy){setMaxRisk(Math.max(0,Math.floor(body.policy.premiumCap||0)));setTargetDte(body.policy.suggestedDte||21);defaultRiskAccount.current=accountId;}};
+  useEffect(()=>{accountGeneration.current++;setResults([]);setAnalysisSummary(null);setCoverage(null);setScreens([]);setAccountPolicy(null);setNotice('');setMaxRisk(0);defaultRiskAccount.current='';let active=true;const load=()=>{if(active)void loadResults().catch(e=>{if(active)setNotice(e.message)});};load();const timer=setInterval(load,15000);return()=>{active=false;accountGeneration.current++;clearInterval(timer)};},[accountId,headers]);
   const analyze=async()=>{if(!accountId)return;setLoading(true);try{const response=await fetch('/api/market/options/scan',{method:'POST',headers,body:JSON.stringify({accountId,symbol,maxRisk,targetDte})});const body=await response.json();if(!response.ok)throw Error(body.error);setNotice(body.symbol+' · '+body.message);await loadResults();}catch(e){setNotice(e instanceof Error?e.message:'Analysis unavailable')}finally{setLoading(false)}};
   const reset=()=>{setMaxRisk(Math.floor(accountPolicy?.premiumCap||0));setTargetDte(accountPolicy?.suggestedDte||21);void loadResults().catch(e=>setNotice(e.message));};
   const setups=results.filter(item=>item.contract&&((item.status==='CANDIDATE'&&item.decision.action==='BUY_IF'&&Number(item.decision.shares)>0)||(item.status==='RESEARCH'&&item.researchQualified)));
@@ -139,7 +141,8 @@ export default function SwingOptionsAdvisor({
     <section aria-label="Broad market options scan" className="my-4 rounded-xl border border-line p-4"><h3>Broad-market discovery · server monitored</h3><p>Every supported active stock enters the rotating price/liquidity screen. Deep chain and account research follow qualifying screens. No fixed popular-stock list. Coverage below counts completed work, not promised coverage.</p>{coverage?<div className="flex flex-wrap gap-5">{Object.entries(coverage).filter(([k])=>k!=='last_scan').map(([k,v])=><span key={k}><b>{String(v??'—')}</b> {k.replaceAll('_',' ')}</span>)}<time>Last scan {coverage.last_scan?new Date(coverage.last_scan).toLocaleString():'Not yet run'}</time></div>:<p>Coverage unavailable or awaiting first server scan.</p>}<details><summary>Recent screening outcomes ({screens.length} shown)</summary>{screens.map(row=><p key={row.symbol}><b>{row.symbol} · {row.stage||'NOT_SCANNED'}</b> — {row.reason||'Awaiting screen'}</p>)}</details></section>
     {notice && <div className="option-notice">{notice}</div>}
     <label className="m-4 block">Setup type <select value={outcomeFilter} onChange={e=>setOutcomeFilter(e.target.value)}><option value="ALL">All setups</option><option value="CALL">Call setups</option><option value="PUT">Put setups</option></select></label>
-    {!visibleSetups.length&&<p className="m-4" role="status">{setups.length ? 'No '+outcomeFilter.toLowerCase()+' setups currently qualify for this account.' : results.length ? 'No high-quality option setup currently meets your account and risk requirements.' : 'Account-specific option analysis is in progress. Use Find options to prioritize a stock.'}</p>}
+    {!visibleSetups.length&&<p className="m-4" role="status">{setups.length ? 'No '+outcomeFilter.toLowerCase()+' setups currently qualify for this account.' : optionScanMessage(analysisSummary,coverage)}</p>}
+    {!!analysisSummary?.blockers?.length&&<details className="m-4"><summary>What is blocking completed research?</summary>{analysisSummary.blockers.map((item:{reason:string;count:number})=><p key={item.reason}>{item.count} stocks: {item.reason}</p>)}</details>}
     {visibleSetups.length > 0 && <div className="swing-option-results">{visibleSetups.map((result, rank) => {
       if(!result.contract)return null;
       const actionable = result.status === "CANDIDATE" && result.decision.action === "BUY_IF";

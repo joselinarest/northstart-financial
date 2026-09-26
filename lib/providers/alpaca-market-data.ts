@@ -1,4 +1,5 @@
 import {providerCached} from '@/lib/provider-response-cache';
+import {exchangeDay} from '@/lib/exchange-calendar';
 import {providerSignal} from "@/lib/work-budget";
 import{loadRuntimeSecrets}from"@/lib/runtime-secrets";
 import{freshness,MarketProviderError,type MarketClock,type MarketDataProvider,type MarketSession,type NormalizedBar,type NormalizedQuote}from"@/lib/providers/market-data";
@@ -13,4 +14,13 @@ export class AlpacaMarketDataProvider implements MarketDataProvider{readonly nam
 const sharedProvider=new AlpacaMarketDataProvider();
 export const marketDataProvider=()=>sharedProvider;
 
-export function selectSnapshotPrice(value:Snapshot,session:MarketSession){const closed=session==='CLOSED';const useTrade=!closed&&Number(value.latestTrade?.p)>0;return {last:Number(useTrade?value.latestTrade?.p:value.dailyBar?.c)||null,timestamp:(useTrade?value.latestTrade?.t:value.dailyBar?.t)||null};}
+/** Daily bars are dated at session midnight. Their completed close belongs to that
+ * session's close, never to retrieval time. Preserve old dates and reject unfinished bars. */
+export function completedBarTimestamp(timestamp:string|undefined,now=Date.now()){
+ if(!timestamp||!Number.isFinite(Date.parse(timestamp)))return null;
+ const day=exchangeDay(timestamp);if(!day.tradingDay||day.minute!==0)return timestamp;
+ const date=new Date(timestamp);
+ for(const hour of [17,18,20,21]){const close=Date.UTC(date.getUTCFullYear(),date.getUTCMonth(),date.getUTCDate(),hour),candidate=exchangeDay(close);if(candidate.date===day.date&&candidate.minute===day.closeMinute&&close<=now)return new Date(close).toISOString();}
+ return timestamp;
+}
+export function selectSnapshotPrice(value:Snapshot,session:MarketSession,now=Date.now()){const closed=session==='CLOSED';const useTrade=!closed&&Number(value.latestTrade?.p)>0;return {last:Number(useTrade?value.latestTrade?.p:value.dailyBar?.c)||null,timestamp:useTrade?value.latestTrade?.t||null:closed?completedBarTimestamp(value.dailyBar?.t,now):value.dailyBar?.t||null};}
