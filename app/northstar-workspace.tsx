@@ -53,6 +53,7 @@ const AcademyLab = dynamic(() => import("@/app/academy-lab")),
   ),
   DailyCloseReview = dynamic(() => import("@/app/daily-close-review")),
   TradeLifecyclePanel = dynamic(() => import("@/app/trade-lifecycle-panel")),
+  TransactionPipelineHealth = dynamic(() => import("@/app/transaction-pipeline-health")),
   AIHealthPanel = dynamic(() => import("@/app/ai-health-panel")),
   PaperTradingSimulator = dynamic(
     () => import("@/app/paper-trading-simulator"),
@@ -5533,7 +5534,7 @@ export function NorthstarWorkspace({
     : [
         { name: "Trading", label: "Trading", icon: "☀" },
         { name: "Portfolio", label: "Portfolio", icon: "◫" },
-        { name: "Market Intel", label: "Markets", icon: "⌁" },
+        { name: "Options Advisor", label: "Options", icon: "◎" },
         { name: "Bills & cards", label: "Finance", icon: "$" },
       ];
   const mobileActive = (name: string) =>
@@ -11820,7 +11821,7 @@ export function NorthstarWorkspace({
             </div>
             <BuildVersion/><p><a href="/workspace/configuration">Configuration Center — account risk, providers, market and display settings</a> · <a href="/workspace/notifications">Notification Center</a></p><TransactionNotificationCenter accessToken={accessToken} />
             <MarketAlertCenter accessToken={accessToken} settings />
-            <InvestmentNotificationHealth accessToken={accessToken} />
+            <TransactionPipelineHealth accessToken={accessToken} /><InvestmentNotificationHealth accessToken={accessToken} />
             <IntelligenceLoopHealth accessToken={accessToken} />
             <SystemCapabilityAudit accessToken={accessToken} />
             <FoundationAuditPanel accessToken={accessToken} />
@@ -12597,4 +12598,3 @@ export function NorthstarWorkspace({
     </main></HoldingCostProvider>
   );
 }
-

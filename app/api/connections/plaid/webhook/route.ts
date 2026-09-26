@@ -31,12 +31,13 @@ export async function POST(request: Request) {
       .bind(id("plaid_hook"), itemId, type, code, hash, JSON.stringify(payload))
       .run();
     if (
-      ["TRANSACTIONS","INVESTMENTS"].includes(type) &&
+      ["TRANSACTIONS","INVESTMENTS","HOLDINGS","INVESTMENTS_TRANSACTIONS"].includes(type) &&
       [
         "SYNC_UPDATES_AVAILABLE",
         "DEFAULT_UPDATE",
         "INITIAL_UPDATE",
         "HISTORICAL_UPDATE",
+        "TRANSACTIONS_REMOVED",
       ].includes(code)
     ) {
       const connection = await db
@@ -53,13 +54,13 @@ export async function POST(request: Request) {
           .bind(
             id("job"),
             connection.household_id,
-            type === "INVESTMENTS" ? "PLAID_INVESTMENT_SYNC" : "PLAID_SYNC",
+            type !== "TRANSACTIONS" ? "PLAID_INVESTMENT_SYNC" : "PLAID_SYNC",
             `plaid:${hash}`,
             JSON.stringify({
               connectionId: connection.id,
               householdId: connection.household_id,
-              investmentOnly: type === "INVESTMENTS",
-              trigger: type === "INVESTMENTS" ? `WEBHOOK_${code}` : `WEBHOOK_${type}_${code}`,
+              investmentOnly: type !== "TRANSACTIONS",
+              trigger: type !== "TRANSACTIONS" ? `WEBHOOK_${code}` : `WEBHOOK_${type}_${code}`,
               webhookHash: hash,
             }),
           )

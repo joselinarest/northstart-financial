@@ -16,3 +16,5 @@ export async function providerCached<T>(key:string,ttlMs:number,load:()=>Promise
   pending.set(key,request);
   return request;
 }
+
+export function invalidateProviderResponse(key:string){values.delete(key);}

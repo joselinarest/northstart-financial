@@ -19,6 +19,7 @@ async function plaid(
   extra: Record<string, unknown> = {},
 ) {
   const response = await fetch(`${plaidHost()}${path}`, {
+    signal: AbortSignal.timeout(15000),
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
@@ -159,7 +160,7 @@ export async function POST(request: Request) {
     while (hasMore) {
       const data = await plaid("/transactions/sync", token, {
           cursor,
-          count: 250,
+          count: 50,
         }),
         writes: DbStatement[] = [],
         events: Array<{
@@ -249,11 +250,12 @@ export async function POST(request: Request) {
         }
         const duplicate = await db
           .prepare(
-            "SELECT id FROM transactions WHERE account_id=? AND id<>? AND LOWER(COALESCE(merchant,description))=LOWER(?) AND ABS(amount_cents)=? AND ABS(EXTRACT(EPOCH FROM (NULLIF(posted_at,'')::timestamptz-?::timestamptz)))<=86400 LIMIT 1",
+            "SELECT id FROM transactions WHERE account_id=? AND id<>? AND id<>? AND LOWER(COALESCE(merchant,description))=LOWER(?) AND ABS(amount_cents)=? AND ABS(EXTRACT(EPOCH FROM (NULLIF(posted_at,'')::timestamptz-?::timestamptz)))<=86400 LIMIT 1",
           )
           .bind(
             `plaid_${transaction.account_id}`,
             transactionId,
+            `plaid_txn_${transaction.pending_transaction_id || "none"}`,
             merchantName,
             amount,
             transaction.datetime || transaction.date,
@@ -293,7 +295,7 @@ export async function POST(request: Request) {
         else if (amount >= 100000) type = "LARGE_TRANSACTION";
         else if (merchantCount === 0 && transaction.amount >= 0) type = "NEW_MERCHANT";
         else if (!existing && transaction.amount < 0) type = "DEPOSIT";
-        else if (!existing && accountById.get(transaction.account_id)?.type === "credit") type = "CARD_PURCHASE";
+        else if (!existing && (accountById.get(transaction.account_id)?.type === "credit" || transaction.payment_channel === "in store" || /FOOD_AND_DRINK|RESTAURANT/.test(transaction.personal_finance_category?.primary||""))) type = "CARD_PURCHASE";
         else if (!existing) type = "WITHDRAWAL";
         writes.push(
           db
@@ -373,6 +375,7 @@ export async function POST(request: Request) {
             .bind(`plaid_txn_${transaction.transaction_id}`, entityId),
         );
       }
+      await db.transaction(async db=>{
       if (writes.length) await db.batch(writes);
       for (const event of [...events, ...removedEvents]) {
         const transaction = event.transaction,
@@ -423,12 +426,15 @@ export async function POST(request: Request) {
           notificationsQueued += recurring.queued;
         }
       }
+      await db.prepare("UPDATE connections SET cursor=?,last_synced_at=CURRENT_TIMESTAMP WHERE id=? AND household_id=?").bind(data.next_cursor,body.connectionId,householdId).run();
+      });
       added += (data.added || []).length;
       modified += (data.modified || []).length;
       removed += (data.removed || []).length;
       cursor = data.next_cursor;
       hasMore = Boolean(data.has_more);
     }
+    if(body.webhookHash&&!body.investmentOnly)await db.prepare("UPDATE plaid_webhook_events SET processed_at=CURRENT_TIMESTAMP,processing_error=NULL WHERE request_hash=?").bind(body.webhookHash).run();
     let investments:Record<string,any>|null=null,investmentError:{code:string;message:string}|null=null;
     try{investments=await plaid("/investments/holdings/get",token)}catch(error){investmentError=plaidError(error)}
     let holdingCount = 0,holdingsAdded=0,holdingsChanged=0,holdingsClosed=0;

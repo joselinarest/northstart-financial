@@ -78,12 +78,12 @@ const quietDelay = (quiet: Record<string, any>, timezone: string) => {
   return new Date(Date.now() + wait * 60000);
 };
 
-export async function enqueueTransactionNotification(
+async function enqueueTransactionNotificationAtomic(
   db: PostgresDatabase,
   input: TransactionNotificationInput,
 ) {
   const stable = JSON.stringify([
-      input.providerTransactionId || input.transactionId,
+      input.householdId,input.accountId,input.providerTransactionId || input.transactionId,
       input.eventType,
       input.amountCents,
       input.pending,
@@ -103,6 +103,7 @@ export async function enqueueTransactionNotification(
           ? "WATCH"
           : "INFO";
   const snapshot = {
+    accountId:input.accountId,transactionId:input.transactionId,
     institution: input.institution || "Financial institution",
     accountName: input.accountName,
     mask: input.mask || null,
@@ -190,13 +191,14 @@ export async function enqueueTransactionNotification(
   for (const recipient of recipients.results) {
     const suspicious = input.eventType === "SUSPICIOUS",
       override = suspicious && recipient.suspicious_override !== false;
-    if (recipient.account_enabled === false && !override) continue;
+    const suppress=async(reason:string)=>db.prepare("INSERT INTO transaction_notification_audit(event_id,user_id,household_id,reason) VALUES(?,?,?,?) ON CONFLICT DO NOTHING").bind(eventId,recipient.user_id,input.householdId,reason).run();
+    if (recipient.account_enabled === false && !override) {await suppress('Account notifications disabled');continue;}
     const mode =
         recipient.account_mode && recipient.account_mode !== "INHERIT"
           ? recipient.account_mode
           : recipient.transaction_mode || "MATERIAL",
       every = mode === "EVERY_TRANSACTION";
-    if (mode === "OFF" && !override) continue;
+    if (mode === "OFF" && !override) {await suppress("Transaction notifications switched off");continue;}
     const filters = {
         ...parse(recipient.transaction_filters_json),
         ...parse(recipient.account_filters),
@@ -204,31 +206,31 @@ export async function enqueueTransactionNotification(
       minimum = Number(
         recipient.account_minimum ?? recipient.minimum_amount_cents ?? 0,
       );
-    if (!every && !override && ["IMPORTED", "UPDATED", "REMOVED"].includes(input.eventType)) continue;
-    if (!every && !override && Math.abs(input.amountCents) < minimum) continue;
+    if (!every && !override && ["IMPORTED", "UPDATED", "REMOVED"].includes(input.eventType)) {await suppress("Routine update excluded by material-events mode");continue;}
+    if (!every && !override && Math.abs(input.amountCents) < minimum) {await suppress("Below configured minimum amount");continue;}
     if (
       !every &&
       !override &&
       filters.expensesOnly &&
       input.direction !== "outflow"
     )
-      continue;
+      {await suppress("Transaction excluded by configured filters");continue;}
     if (
       !every &&
       !override &&
       filters.depositsOnly &&
       input.direction !== "inflow"
     )
-      continue;
-    if (!every && !override && filters.foreignOnly && !input.foreign) continue;
+      {await suppress("Transaction excluded by configured filters");continue;}
+    if (!every && !override && filters.foreignOnly && !input.foreign) {await suppress("Transaction excluded by configured filters");continue;}
     if (!every && !override && filters.newMerchantsOnly && !input.newMerchant)
-      continue;
-    if (!every && !override && filters.suspiciousOnly && !suspicious) continue;
-    if (!every && !override && filters.largeOnly && input.eventType !== "LARGE_TRANSACTION") continue;
-    if (!every && !override && filters.recurringOnly && !["RECURRING_IDENTIFIED", "SUBSCRIPTION_INCREASE"].includes(input.eventType)) continue;
-    if (!every && !override && filters.atmOnly && input.eventType !== "ATM_WITHDRAWAL") continue;
-    if (!every && !override && filters.feesOnly && input.eventType !== "FEE") continue;
-    if (!every && !override && filters.duplicatesOnly && input.eventType !== "DUPLICATE_CHARGE") continue;
+      {await suppress("Transaction excluded by configured filters");continue;}
+    if (!every && !override && filters.suspiciousOnly && !suspicious) {await suppress("Transaction excluded by configured filters");continue;}
+    if (!every && !override && filters.largeOnly && input.eventType !== "LARGE_TRANSACTION") {await suppress("Transaction excluded by configured filters");continue;}
+    if (!every && !override && filters.recurringOnly && !["RECURRING_IDENTIFIED", "SUBSCRIPTION_INCREASE"].includes(input.eventType)) {await suppress("Transaction excluded by configured filters");continue;}
+    if (!every && !override && filters.atmOnly && input.eventType !== "ATM_WITHDRAWAL") {await suppress("Transaction excluded by configured filters");continue;}
+    if (!every && !override && filters.feesOnly && input.eventType !== "FEE") {await suppress("Transaction excluded by configured filters");continue;}
+    if (!every && !override && filters.duplicatesOnly && input.eventType !== "DUPLICATE_CHARGE") {await suppress("Transaction excluded by configured filters");continue;}
     const overrides = parse(recipient.channels_json),
       channels = [
         recipient.in_app_enabled !== false && overrides.inApp !== false
@@ -247,6 +249,7 @@ export async function enqueueTransactionNotification(
             parse(recipient.quiet_hours_json),
             recipient.timezone || "America/Phoenix",
           );
+    await db.prepare("INSERT INTO transaction_notification_audit(event_id,user_id,household_id,reason,channels_json,available_at) VALUES(?,?,?,?,?::jsonb,?) ON CONFLICT DO NOTHING").bind(eventId,recipient.user_id,input.householdId,channels.length?(availableAt.getTime()>Date.now()+1000?'Queued after quiet hours':'Rules matched; delivery queued'):'All delivery channels disabled',JSON.stringify(channels),availableAt.toISOString()).run();
     for (const channel of channels) {
       await db
         .prepare(
@@ -277,3 +280,5 @@ export async function enqueueTransactionNotification(
       .run();
   return { queued, duplicate: false, eventId, alertId };
 }
+
+export async function enqueueTransactionNotification(db:PostgresDatabase,input:TransactionNotificationInput){return db.transaction(tx=>enqueueTransactionNotificationAtomic(tx,input));}

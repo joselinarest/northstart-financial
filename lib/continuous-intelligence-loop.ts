@@ -1,3 +1,4 @@
+import {startAccountSearch} from '@/lib/account-market-search';
 import {measureRotationReviews,reviewAccountRotation} from "@/lib/capital-rotation-service";
 import {queueLifecycleTickers} from "@/lib/lifecycle-work-queue";
 import {id,type PostgresDatabase} from "@/lib/db";
@@ -13,6 +14,7 @@ const stage=async(db:PostgresDatabase,runId:string,name:string,status:string,inp
 export async function runAccountIntelligenceLoop(db:PostgresDatabase,input:{householdId:string;accountId:string;trigger:string;cycleKey:string}){
  const account=await db.prepare(`SELECT a.id,a.connection_id,COALESCE(a.nickname,a.name) account_name,a.current_balance_cents,a.last_investment_sync_at,a.last_provider_update_at,a.investment_sync_status,a.investment_sync_error,COALESCE(s.strategy_type,a.investment_purpose,'UNCONFIGURED') strategy,COALESCE(s.available_cash_cents,a.available_balance_cents,a.current_balance_cents,0) cash_cents,COALESCE(s.risk_profile,'BALANCED') risk_profile,COALESCE(s.maximum_position_bps,1000) maximum_position_bps,COALESCE(s.maximum_risk_bps,50) maximum_risk_bps,s.policy_json FROM accounts a JOIN entities e ON e.id=a.entity_id LEFT JOIN investment_account_settings s ON s.account_id=a.id WHERE a.id=? AND e.household_id=? AND a.hidden=0`).bind(input.accountId,input.householdId).first<Record<string,any>>();
  if(!account)throw new Error('INVESTMENT_ACCOUNT_NOT_FOUND');
+ await startAccountSearch(db,input.householdId,input.accountId,input.trigger==='MANUAL');
  const runId=id('intelligence_loop');
  const inserted=await db.prepare(`INSERT INTO intelligence_loop_runs(id,household_id,account_id,strategy,status,trigger,cycle_key) VALUES(?,?,?,?, 'RUNNING',?,?) ON CONFLICT(cycle_key) DO NOTHING RETURNING id`).bind(runId,input.householdId,input.accountId,account.strategy,input.trigger,input.cycleKey).first<{id:string}>();
  if(!inserted)return{deduplicated:true,cycleKey:input.cycleKey};

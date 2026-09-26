@@ -25,14 +25,14 @@ const day = 86400000;
 const dateOnly = (value: Date) => value.toISOString().slice(0, 10);
 const daysUntil = (value: string) => Math.ceil((new Date(`${value}T12:00:00Z`).getTime() - Date.now()) / day);
 
-export async function loadCatalystContext(symbol: string, db: PostgresDatabase): Promise<CatalystContext> {
+export async function loadCatalystContext(symbol: string, db: PostgresDatabase,force=false): Promise<CatalystContext> {
   const token = process.env.FINNHUB_API_KEY;
   if (!token) return { available: false, provider: "FINNHUB_NOT_CONFIGURED", asOf: null, events: [], recentNewsCount: 0, adverseNewsCount: 0 };
   const today = new Date(), from = new Date(Date.now() - 30 * day), to = new Date(Date.now() + 120 * day);
-  const get = (path: string) => discoveryFinnhub(db,path,900);
+  const get = (path: string) => discoveryFinnhub(db,path,force?0:900);
   try {
     const [newsResponse, earningsResponse] = await Promise.all([
-      researchNews(db,symbol,dateOnly(from),dateOnly(today)),
+      researchNews(db,symbol,dateOnly(from),dateOnly(today),force),
       get(`/calendar/earnings?symbol=${symbol}&from=${dateOnly(today)}&to=${dateOnly(to)}`),
     ]);
     const newsRaw = newsResponse.data, earningsRaw = earningsResponse.data;

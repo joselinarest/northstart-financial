@@ -1,0 +1,91 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Northstar research consumer independent of transaction notification delivery
+Parameters:
+  WorkerCodeBucket: {Type: String}
+  WorkerCodeKey: {Type: String}
+  SecretArn: {Type: String}
+  AppUrl: {Type: String}
+  ScheduleState: {Type: String, Default: DISABLED, AllowedValues: [ENABLED, DISABLED]}
+Resources:
+  FailureQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      SqsManagedSseEnabled: true
+      MessageRetentionPeriod: 1209600
+  Role:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal: {Service: lambda.amazonaws.com}
+            Action: sts:AssumeRole
+      ManagedPolicyArns: [arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole]
+      Policies:
+        - PolicyName: WorkerConfigurationAndRecovery
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action: secretsmanager:GetSecretValue
+                Resource: !Ref SecretArn
+              - Effect: Allow
+                Action: sqs:SendMessage
+                Resource: !GetAtt FailureQueue.Arn
+  Worker:
+    Type: AWS::Lambda::Function
+    Properties:
+      Runtime: nodejs22.x
+      Handler: index.handler
+      Timeout: 300
+      MemorySize: 512
+      ReservedConcurrentExecutions: 1
+      Role: !GetAtt Role.Arn
+      Code: {S3Bucket: !Ref WorkerCodeBucket, S3Key: !Ref WorkerCodeKey}
+      Environment:
+        Variables:
+          NORTHSTAR_SECRET_ID: !Ref SecretArn
+          APP_URL: !Ref AppUrl
+          NODE_ENV: production
+          AUTO_MIGRATE_DATABASE: 'false'
+      DeadLetterConfig: {TargetArn: !GetAtt FailureQueue.Arn}
+  InvocationPolicy:
+    Type: AWS::Lambda::EventInvokeConfig
+    Properties:
+      FunctionName: !Ref Worker
+      Qualifier: $LATEST
+      MaximumEventAgeInSeconds: 120
+      MaximumRetryAttempts: 1
+  Schedule:
+    Type: AWS::Events::Rule
+    Properties:
+      ScheduleExpression: rate(1 minute)
+      State: !Ref ScheduleState
+      Targets:
+        - Id: QueueWorker
+          Arn: !GetAtt Worker.Arn
+          RetryPolicy: {MaximumEventAgeInSeconds: 120, MaximumRetryAttempts: 1}
+  Permission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !Ref Worker
+      Principal: events.amazonaws.com
+      SourceArn: !GetAtt Schedule.Arn
+  ErrorAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      Namespace: AWS/Lambda
+      MetricName: Errors
+      Dimensions: [{Name: FunctionName, Value: !Ref Worker}]
+      Statistic: Sum
+      Period: 60
+      EvaluationPeriods: 3
+      Threshold: 1
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      TreatMissingData: breaching
+Outputs:
+  WorkerName: {Value: !Ref Worker}
+  ScheduleName: {Value: !Ref Schedule}
+  FailureQueueUrl: {Value: !Ref FailureQueue}

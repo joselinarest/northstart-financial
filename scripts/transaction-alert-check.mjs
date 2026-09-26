@@ -16,7 +16,7 @@ for (const eventType of [
 ]) assert.match(notifications + sync, new RegExp(`\\b${eventType}\\b`));
 
 assert.match(webhook, /verifyPlaidWebhook/);
-assert.match(alerts, /read_at=CURRENT_TIMESTAMP/);
+assert.match(alerts, /return updateEvents/);
 assert.doesNotMatch(alerts, /CURRENT_TIMESTAMP::text/);
 assert.doesNotMatch(history, /CURRENT_TIMESTAMP::text/);
 assert.match(webhook, /PLAID_SYNC/);

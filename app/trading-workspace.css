@@ -62,3 +62,6 @@
   .page-trading .trading-position { padding: 12px; }
   .page-trading #trading-recommendations .trading-board { gap: 14px; }
 }
+
+.option-research-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,390px),1fr));gap:16px}.option-research-grid article{overflow-wrap:anywhere}.option-research-grid details{margin-top:12px}
+.swing-options-advisor > section {padding: 1rem;} .swing-options-advisor > p,.swing-options-advisor > details {margin: 1rem;} .option-research-grid article p {margin: .6rem 0;font-size: .875rem;line-height: 1.55;} .option-research-grid article h3 {font-size: 1.05rem;font-weight: 700;} .swing-options-advisor > section > header {display: flex;gap: 1rem;align-items: center;justify-content: space-between;flex-wrap: wrap;margin-bottom: .8rem;} .swing-options-advisor button {min-height: 44px;padding: .5rem .8rem;border: 1px solid #b9cec4;border-radius: .5rem;font-size: .875rem;font-weight: 600;} .swing-options-advisor > section h2 {font-size: 1.1rem;font-weight: 700;} .option-research-grid article details {margin-top: .75rem;} .option-research-grid article a {display: inline-block;padding: .6rem;} .option-research-grid article {overflow-wrap: anywhere;}
