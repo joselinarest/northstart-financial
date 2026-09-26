@@ -1810,13 +1810,14 @@ export function NorthstarWorkspace({
     const slug =
       pathname.match(/^\/workspace\/([^/]+)\/?$/)?.[1] || "dashboard";
     setResearchDetailOpen(false);
-    setTab(slug === "daily-action-plan" ? "Trading" : tabByPath[slug] || "Dashboard");
+    setTab(["daily-action-plan","planner","growth","dividend-growth"].includes(slug) ? "Trading" : tabByPath[slug] || "Dashboard");
   };
   const navigatePath = (
     pathname: string,
     { replace = false }: { replace?: boolean } = {},
   ) => {
     const destination = new URL(pathname, window.location.origin);
+    if(["/workspace/daily-action-plan","/workspace/planner","/workspace/growth","/workspace/dividend-growth"].includes(destination.pathname)) destination.pathname="/workspace/trading";
     setRouteLoading(true);
     applyWorkspacePath(destination.pathname, destination.search);
     window.history[replace ? "replaceState" : "pushState"](
@@ -5494,20 +5495,20 @@ export function NorthstarWorkspace({
             : "disabled";
   const navigationGroups = [
     {name:'Home',items:[['Dashboard','⌂']]},
-    {name:'Trading',items:[['Trading','↗'],['Prepare Trade','↗'],['Journal','▤'],['Paper Simulator','◎']]},
+    {name:'Trading',items:[['Trading','↗'],['Journal','▤']]},
     {name:'Portfolio',items:[['Portfolio','◫'],['Accounts','▣'],['Kids / Goals','◇']]},
-    {name:'Research',items:[['Professional Charts','⌁'],['New Candidates','◎'],['Growth Finder','↗'],['Market News','●']]},
+    {name:'Research',items:[['Professional Charts','⌁'],['New Candidates','◎'],['Market News','●']]},
     {name:'Options',items:[['Options Advisor','◉']]},
     {name:'Finance',items:[['Bills & cards','$'],['Household','♧'],['Liabilities','▥']]},
     {name:'Real Estate',items:[['Real Estate','⌂']]},
     {name:'Alerts',items:[['Alerts','◉']]},
-    {name:'Academy',items:[['Learn','◇']]},
+    {name:'Academy',items:[['Learn','◇'],['Paper Simulator','◎']]},
     {name:'Settings',items:[['Settings','⚙'],['Ask Northstar','✦'],['Help','?']]},
   ];
   const navigationLabels: Record<string, string> = {
     Dashboard: "Home",
     "Trading": "Trading",
-    "Growth Finder": "Long-Term Opportunities",
+    "Growth Finder": "Trading",
     "New Candidates": "New Candidates",
     "Options Advisor": "Options",
     "Professional Charts": "Markets & Charts",
@@ -6401,7 +6402,7 @@ export function NorthstarWorkspace({
             <small>
               Every idea is checked against your rules before you act.
             </small>
-            <button onClick={() => navigate("Prepare Trade")}>
+            <button onClick={() => navigate("Trading")}>
               Review risk rules →
             </button>
           </div>
@@ -7221,7 +7222,7 @@ export function NorthstarWorkspace({
             <RealEstateCommandCenter accessToken={accessToken} />
           )}
           {tab === "Trading" && (
-            <section id="trading-recommendations" className="daily-plan-intro card">
+            <section id="trading-recommendations" className="trading-workspace card">
               <label className="grid gap-2 mb-4"><b>Account</b><select aria-label="Trading account" value={advisorAccountId} onChange={event=>selectAnalysisScope(event.target.value)} className="w-full min-h-11 rounded-lg border border-line p-3">{investmentAccounts.map(account=><option key={String(account.id)} value={String(account.id)}>{String(account.nickname||account.name||account.official_name)} · {accountProfile(account).strategy.replaceAll('_',' ')}{' · '+accountProfile(account).goal}</option>)}</select></label>
               <header><h1>Trading · {marketClock.isOpen ? "Live Market" : "Plan for Next Session"}</h1>{!marketClock.isOpen && marketClock.nextOpen && <p>Next session: {new Date(marketClock.nextOpen).toLocaleString(undefined,{weekday:'long',month:'short',day:'numeric',year:'numeric',hour:'numeric',minute:'2-digit',timeZoneName:'short',timeZone:activeTimezone})}</p>}{accountProfile(advisorAccount||{}).taxWrapper && <p>{accountProfile(advisorAccount||{}).taxWrapper.replaceAll('_',' ')}</p>}</header>
               <ActionGuidancePanel key={advisorAccountId} accountId={advisorAccountId} accessToken={accessToken} mode="today" marketOpen={marketClock.isOpen} sessionOnly options={<SwingOptionsAdvisor accountId={advisorAccountId} accountName={advisorAccountName} accessToken={accessToken} sessionOnly/>}/>
@@ -7277,7 +7278,7 @@ export function NorthstarWorkspace({
             </button>
             <button
               className={tab === "Growth Finder" ? "active" : ""}
-              onClick={() => navigate("Growth Finder")}
+              onClick={() => navigate("Trading")}
             >
               <b>↗</b>
               <span>
@@ -8170,7 +8171,7 @@ export function NorthstarWorkspace({
                 category with new contributions first → verify the available
                 401(k) fund and its fee → review any sale separately. Northstar
                 never places an order.{" "}
-                <button onClick={() => navigate("Growth Finder")}>
+                <button onClick={() => navigate("Trading")}>
                   Compare available holdings →
                 </button>
               </footer>
@@ -8778,7 +8779,7 @@ export function NorthstarWorkspace({
                       accountPurpose: advisorPurpose,
                     }),
                   );
-                  navigate("Prepare Trade");
+                  navigate("Trading");
                 }}
                 onSelect={(symbol) => {
                   sessionStorage.setItem("northstar-chart-symbol", symbol);
@@ -8923,7 +8924,7 @@ export function NorthstarWorkspace({
                     accountPurpose: advisorPurpose,
                   }),
                 );
-                navigate("Prepare Trade");
+                navigate("Trading");
               }}
               onSelect={(symbol) => {
                 sessionStorage.setItem("northstar-chart-symbol", symbol);
@@ -10492,7 +10493,7 @@ export function NorthstarWorkspace({
                             reason: o.setup,
                           }),
                         );
-                        navigate("Prepare Trade");
+                        navigate("Trading");
                       }}
                     >
                       + Add to Prepare

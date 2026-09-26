@@ -9,5 +9,56 @@
 .page-trading #trading-recommendations p { font-size: 14px; line-height: 1.5; overflow-wrap: anywhere; }
 .page-trading #trading-recommendations header { margin-bottom: 16px; }
 .page-trading #trading-recommendations select { max-width: 100%; font-size: 16px; }
-.page-trading .trading-context > div:first-child,
-.page-trading .trading-position > div { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+.page-trading #trading-recommendations .trading-board {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 20px;
+  width: 100%;
+  min-width: 0;
+}
+.page-trading .trading-board > * { min-width: 0; margin: 0; }
+.page-trading .trading-position-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 390px), 1fr));
+  gap: 16px;
+}
+.page-trading .trading-position { background: #fff; padding: 18px; }
+.page-trading .trading-position > b { font-size: 17px; }
+.page-trading .trading-position > p { color: #52675e; margin: 8px 0 14px; }
+.page-trading .trading-facts {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  min-width: 0;
+}
+.page-trading .trading-facts > span {
+  display: block;
+  min-width: 0;
+  padding: 12px;
+  border-radius: 8px;
+  background: #f3f7f5;
+  color: #52675e;
+  font-size: 13px;
+  line-height: 1.45;
+  word-break: normal;
+  overflow-wrap: normal;
+}
+.page-trading .trading-facts b {
+  display: block;
+  margin-top: 6px;
+  color: #162d23;
+  font-size: 15px;
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+}
+.page-trading .trading-context .trading-facts { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.page-trading .trading-position a { color: #17664c; font-size: 14px; }
+@media (max-width: 1100px) {
+  .page-trading .trading-context .trading-facts { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 600px) {
+  .page-trading .trading-facts { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+  .page-trading .trading-facts > span { padding: 10px; }
+  .page-trading .trading-position { padding: 12px; }
+  .page-trading #trading-recommendations .trading-board { gap: 14px; }
+}

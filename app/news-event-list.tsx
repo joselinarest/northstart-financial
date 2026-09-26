@@ -1,3 +1,22 @@
 "use client";
-import {useState} from 'react';
-export default function NewsEventList({symbol,items}:{symbol:string;items:Record<string,any>[]}){const[selected,setSelected]=useState<Record<string,any>|null>(null);const relevant=items.filter(e=>!e.related||String(e.related).split(',').includes(symbol)).sort((a,b)=>(Number(b.importance)||0)-(Number(a.importance)||0)||(Number(b.datetime)||0)-(Number(a.datetime)||0));return <section className="news-event-list"><h3>{symbol} · News &amp; Events</h3>{!relevant.length&&<p>No verified selected-ticker events available.</p>}{relevant.map((e,i)=><article key={e.id||i}><button type="button" onClick={()=>setSelected(e)}>{e.headline||e.title||'Company event'}</button><p>{e.source||'Source unavailable'} · {e.datetime?new Date(e.datetime*1000).toLocaleString():'Time unavailable'} · {e.category||'Company news'}</p></article>)}{selected&&<section className="event-detail" role="region" aria-label="Event detail"><button type="button" onClick={()=>setSelected(null)}>Close event detail</button><h4>{selected.headline||selected.title}</h4><p>{selected.summary||'Summary unavailable'}</p><p>Impact: {selected.impact||'Not assessed'} · Severity: {selected.severity||'Not assessed'}</p><p>Why it matters: {selected.whyItMatters||'Thesis impact has not been assessed.'}</p><p>Recommendation changed: {selected.recommendationChanged==null?'Not assessed':String(selected.recommendationChanged)}</p>{/^https?:\/\//.test(selected.url||'')&&<a href={selected.url} target="_blank" rel="noreferrer">Read source</a>}</section>}</section>}
+import {importantStockNews,newsTimestamp} from '@/lib/stock-news-impact';
+export default function NewsEventList({symbol,items,compact=false,loading=false,error}:{symbol:string;items:Record<string,any>[];compact?:boolean;loading?:boolean;error?:string}) {
+  const relevant=importantStockNews(symbol,items), visible=compact?relevant.slice(0,4):relevant;
+  return <section className="news-event-list stock-impact-news" aria-label={`${symbol} important news`}>
+    <h3>{symbol} · Important news &amp; stock impact</h3>
+    {loading?<p role="status">Loading stock-specific news…</p>:error?<p role="status">News is unavailable: {error}</p>:!visible.length?<p>No verified stock-specific news is available. This does not establish that there are no news risks.</p>:<>
+      <p className="news-impact-note">Potential impact is an interpretation, not a price forecast. Open the source to verify the report.</p>
+      <div className="stock-news-cards">{visible.map((item,index)=>{
+        const timestamp=newsTimestamp(item), validUrl=/^https?:\/\//i.test(item.url||'');
+        return <article key={item.id||item.url||index} className={`stock-news-item impact-${item.assessment.tone}`}>
+          <span className="news-impact-label">{item.assessment.label}</span>
+          <h4>{validUrl?<a href={item.url} target="_blank" rel="noreferrer">{item.headline||item.title||'Company event'} ↗</a>:item.headline||item.title||'Company event'}</h4>
+          <p className="news-source">{typeof item.source==='object'?item.source?.title||'Source unavailable':item.source||'Source unavailable'} · {timestamp?<time dateTime={new Date(timestamp).toISOString()}>{new Date(timestamp).toLocaleString()}</time>:'Time unavailable'}</p>
+          <p><b>Why it matters:</b> {item.assessment.reason}</p>
+          <small>{item.assessment.basis}</small>
+          {(item.summary||item.description)&&<details><summary>Report summary</summary><p>{item.summary||item.description}</p></details>}
+        </article>;
+      })}</div>
+    </>}
+  </section>;
+}

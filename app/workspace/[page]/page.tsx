@@ -16,6 +16,6 @@ const tabs: Record<string,string> = {
 export default async function WorkspacePage({ params, searchParams }: { searchParams: Promise<Record<string,string|string[]|undefined>>; params: Promise<{page:string}> }) {
   const { page } = await params;
 
-  if(page === 'daily-action-plan') { const query = new URLSearchParams(); for(const [key,value] of Object.entries(await searchParams)) { if(Array.isArray(value)) value.forEach(v=>query.append(key,v)); else if(value!==undefined) query.set(key,value); } redirect('/workspace/trading'+(query.size?'?'+query.toString():'')); }
+  if(['daily-action-plan','planner','growth','dividend-growth'].includes(page)) { const query = new URLSearchParams(); for(const [key,value] of Object.entries(await searchParams)) { if(Array.isArray(value)) value.forEach(v=>query.append(key,v)); else if(value!==undefined) query.set(key,value); } redirect('/workspace/trading'+(query.size?'?'+query.toString():'')); }
   return <NorthstarWorkspace initialTab={tabs[page] || "Dashboard"} />;
 }

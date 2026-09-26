@@ -1,7 +1,6 @@
 "use client";
 
 import OptionBrokerIdentity from "./option-broker-identity";
-import {actionTone} from "@/app/ui/action-tone";
 import HoldingCostBadge from "@/app/holding-cost-badge";
 import OptionsVolatilityPanel from "@/app/options-volatility-panel";
 import type {assessOptionVolatility} from "@/lib/options-volatility";
@@ -68,14 +67,6 @@ const money = (value: number | null | undefined) =>
     ? "—"
     : new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(Number(value));
 
-const explainRejection = (reason: string, riskLimit: number) => {
-  const direction = reason.includes(" PUT") ? "PUT" : "CALL";
-  if (reason.includes("No contract passed expiration, quote, liquidity, and maximum-premium filters")) {
-    return `No ${direction} is recommended right now. The available contracts were outside the selected time window, did not have a reliable live price, were too difficult to trade at a fair price, or cost more than your $${riskLimit.toLocaleString()} limit.`;
-  }
-  return `No ${direction} is recommended right now. Northstar could not verify a contract that fits this account and the selected risk limit.`;
-};
-
 export default function SwingOptionsAdvisor({
   accountId,
   accountName,
@@ -102,13 +93,13 @@ export default function SwingOptionsAdvisor({
   onSessionAllocation?: (value:{symbol:string;amountCents:number}|null)=>void;
 }) {
   const [symbol, setSymbol] = useState(initialSymbol);
+  useEffect(()=>{const linked=new URLSearchParams(window.location.search).get('symbol');setSymbol(linked&&/^[A-Z][A-Z0-9.-]{0,9}$/i.test(linked)?linked.toUpperCase():initialSymbol);},[accountId,initialSymbol]);
   const [maxRisk, setMaxRisk] = useState(0);
   const accountGeneration=useRef(0),defaultRiskAccount=useRef("");
   const [targetDte, setTargetDte] = useState(21);
   const [loading, setLoading] = useState(false);
   const [notice, setNotice] = useState("");
   const [results, setResults] = useState<OptionResult[]>([]);
-  const [rejections, setRejections] = useState<Array<{ symbol: string; reason: string }>>([]);
   const [outcomeFilter,setOutcomeFilter]=useState("ALL");
   const [accountPolicy,setAccountPolicy]=useState<Record<string,any>|null>(null);
   const [coverage,setCoverage]=useState<Record<string,any>|null>(null);
@@ -119,10 +110,12 @@ export default function SwingOptionsAdvisor({
     ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
   }), [accessToken]);
 
-  const loadResults=async()=>{if(!accountId)return;const generation=accountGeneration.current;const response=await fetch('/api/market/options/scan?accountId='+encodeURIComponent(accountId),{headers});const body=await response.json();if(generation!==accountGeneration.current)return;if(!response.ok)throw Error(body.error||'Coverage unavailable');setResults(body.results||[]);setCoverage(body.coverage);setAccountPolicy(body.policy);setScreens(body.screens||[]);if(defaultRiskAccount.current!==accountId&&body.policy){setMaxRisk(Math.max(0,Math.floor(body.policy.premiumCap||0)));defaultRiskAccount.current=accountId;}};
+  const loadResults=async()=>{if(!accountId)return;const generation=accountGeneration.current;const response=await fetch('/api/market/options/scan?accountId='+encodeURIComponent(accountId),{headers});const body=await response.json();if(generation!==accountGeneration.current)return;if(!response.ok)throw Error(body.error||'Coverage unavailable');setResults(body.results||[]);setCoverage(body.coverage);setAccountPolicy(body.policy);setScreens(body.screens||[]);if(defaultRiskAccount.current!==accountId&&body.policy){setMaxRisk(Math.max(0,Math.floor(body.policy.premiumCap||0)));setTargetDte(body.policy.suggestedDte||21);defaultRiskAccount.current=accountId;}};
   useEffect(()=>{accountGeneration.current++;setResults([]);setCoverage(null);setScreens([]);setAccountPolicy(null);setNotice('');setMaxRisk(0);defaultRiskAccount.current='';let active=true;const load=()=>{if(active)void loadResults().catch(e=>{if(active)setNotice(e.message)});};load();const timer=setInterval(load,15000);return()=>{active=false;accountGeneration.current++;clearInterval(timer)};},[accountId,headers]);
   const analyze=async()=>{if(!accountId)return;setLoading(true);try{const response=await fetch('/api/market/options/scan',{method:'POST',headers,body:JSON.stringify({accountId,symbol,maxRisk,targetDte})});const body=await response.json();if(!response.ok)throw Error(body.error);setNotice(body.symbol+' · '+body.message);await loadResults();}catch(e){setNotice(e instanceof Error?e.message:'Analysis unavailable')}finally{setLoading(false)}};
-  const reset=()=>{setMaxRisk(Math.floor(accountPolicy?.premiumCap||0));setTargetDte(21);void loadResults().catch(e=>setNotice(e.message));};
+  const reset=()=>{setMaxRisk(Math.floor(accountPolicy?.premiumCap||0));setTargetDte(accountPolicy?.suggestedDte||21);void loadResults().catch(e=>setNotice(e.message));};
+  const setups=results.filter(item=>item.contract&&((item.status==='CANDIDATE'&&item.decision.action==='BUY_IF'&&Number(item.decision.shares)>0)||(item.status==='RESEARCH'&&item.researchQualified)));
+  const visibleSetups=setups.filter(item=>outcomeFilter==='ALL'||item.contract?.type===outcomeFilter);
   const sessionCandidate=results.find(item=>item.contract&&item.status==='CANDIDATE'&&item.decision.action==='BUY_IF'&&Number(item.decision.shares)>0&&Math.ceil(item.contract.premium*Number(item.decision.shares)*100)<=cashLimitCents);
   useEffect(()=>{if(sessionOnly&&onSessionAllocation)onSessionAllocation(sessionCandidate?.contract?{symbol:sessionCandidate.underlying,amountCents:Math.ceil(sessionCandidate.contract.premium*Number(sessionCandidate.decision.shares)*100)}:null);},[sessionOnly,sessionCandidate,onSessionAllocation]);
   if(sessionOnly){const item=sessionCandidate;if(!item?.contract)return null;return <article className="my-3 rounded-lg border border-line p-3"><b>OPTION ACTION · {item.underlying} {item.contract.type}</b><p>{item.decision.shares} contracts · Strike {item.contract.strike} · Expiration {item.contract.expiration}</p><p>Maximum premium {money(item.contract.premium*Number(item.decision.shares))} · {item.decision.interpretation}</p><a href={'/workspace/options?accountId='+encodeURIComponent(accountId)}>Open Options Analysis →</a></article>}
@@ -141,17 +134,16 @@ export default function SwingOptionsAdvisor({
       <label>Stock to analyze<input value={symbol} onChange={event => setSymbol(event.target.value.toUpperCase().replace(/[^A-Z.]/g, "").slice(0, 10))} /></label>
       <label>How much time should it have?<select value={targetDte} onChange={event => setTargetDte(Number(event.target.value))}><option value="14">About 2 weeks</option><option value="21">About 3 weeks</option><option value="30">Up to 30 days · maximum</option></select></label>
       <label>Most I am willing to lose<div className="money-input"><b>$</b><input type="number" min="0" step="1" value={maxRisk} onChange={event => setMaxRisk(Math.max(0, Number(event.target.value) || 0))} /></div></label>
-      <button type="button" disabled={loading || !accountId} onClick={analyze}>{loading ? "Checking options…" : "Find options"}</button><button type="button" className="secondary" disabled={loading} onClick={reset}>Reset</button>
+      <button type="button" disabled={loading || !accountId} onClick={analyze}>{loading ? "Checking options…" : "Find options"}</button><button type="button" className="secondary" disabled={loading} onClick={reset}>Reset to suggested values</button>
     </div>
     <section aria-label="Broad market options scan" className="my-4 rounded-xl border border-line p-4"><h3>Broad-market discovery · server monitored</h3><p>Every supported active stock enters the rotating price/liquidity screen. Deep chain and account research follow qualifying screens. No fixed popular-stock list. Coverage below counts completed work, not promised coverage.</p>{coverage?<div className="flex flex-wrap gap-5">{Object.entries(coverage).filter(([k])=>k!=='last_scan').map(([k,v])=><span key={k}><b>{String(v??'—')}</b> {k.replaceAll('_',' ')}</span>)}<time>Last scan {coverage.last_scan?new Date(coverage.last_scan).toLocaleString():'Not yet run'}</time></div>:<p>Coverage unavailable or awaiting first server scan.</p>}<details><summary>Recent screening outcomes ({screens.length} shown)</summary>{screens.map(row=><p key={row.symbol}><b>{row.symbol} · {row.stage||'NOT_SCANNED'}</b> — {row.reason||'Awaiting screen'}</p>)}</details></section>
     {notice && <div className="option-notice">{notice}</div>}
-    {results.length > 0 && <div className="option-ranking-summary" aria-label="Options scan summary"><span><b>{results.filter(item => item.status === "CANDIDATE" && item.decision.action === "BUY_IF").length}</b>Ready if trigger confirms</span><span><b>{results.filter(item => item.decision.action !== "BUY_IF").length}</b>Watch or wait</span><span><b>{rejections.length}</b>Rejected by safety rules</span></div>}
-    <label className="m-4 block">Research outcome <select value={outcomeFilter} onChange={e=>setOutcomeFilter(e.target.value)}>{['ALL','CALL SETUP','PUT SETUP','SHARES PREFERRED','WAIT','NO OPTION TRADE'].map(v=><option key={v}>{v}</option>)}</select></label>
-    {!results.length&&<p className="m-4" role="status">No completed account-specific option analyses yet. The server is processing the broad-market queue; use Find options to prioritize a ticker. This is pending research, not a conclusion that every stock is unsuitable.</p>}
-    {results.length > 0 && <div className="swing-option-results">{results.filter(r=>outcomeFilter==='ALL'||r.decisionLabel===outcomeFilter).map((result, rank) => {
-      if(!result.contract)return <article className="exact-contract option-recommendation no-trade option-research-card" data-outcome={result.decisionLabel||"NO OPTION TRADE"} key={result.underlying+rank}><header className="option-research-heading"><div><span className="option-outcome"><span aria-hidden="true">{result.decisionLabel==="SHARES PREFERRED"?"↗":"Ⅱ"}</span> {result.decisionLabel||"NO OPTION TRADE"}</span><h3>{result.underlying}</h3><small>{result.account.name}</small></div><span className="option-order-state">No option order</span></header><div className="option-research-body"><p className="option-main-reason">{result.decision.interpretation}</p><HoldingCostBadge symbol={result.underlying} accountId={accountId} currentPrice={result.underlyingPrice}/><section className="option-next-step"><h4>What needs to change?</h4><ul>{[...new Set(result.decision.whatWouldChange)].slice(0,3).map((reason,i)=><li key={i}>{reason}</li>)}</ul></section><details className="option-research-evidence"><summary>Evidence, volatility &amp; risk details</summary><div>{[...new Set(result.rationale)].map((reason,i)=><p key={i}>{reason}</p>)}<OptionsVolatilityPanel assessment={result.volatility}/></div></details><a className="option-underlying-link" href={"/workspace/charts?symbol="+encodeURIComponent(result.underlying)+"&accountId="+encodeURIComponent(accountId)}>Analyze {result.underlying} on chart <span aria-hidden="true">→</span></a></div><footer>Evaluated {new Date(result.asOf).toLocaleString()}</footer></article>;
-      const actionable = result.status === "CANDIDATE" && !["WAIT", "NO_ACTION", "INSUFFICIENT_CONFIRMATION"].includes(result.decision.action);
-      const actionLabel = result.status === "RESEARCH" && result.researchQualified ? `${result.contract.type} NEXT-OPEN WATCH` : actionable ? `${result.contract.type} SETUP` : result.catalystGate?.status === "BLOCKED" || result.catalystGate?.status === "UNAVAILABLE" ? "WAIT FOR CATALYST" : "NO OPTION TRADE";
+    <label className="m-4 block">Setup type <select value={outcomeFilter} onChange={e=>setOutcomeFilter(e.target.value)}><option value="ALL">All setups</option><option value="CALL">Call setups</option><option value="PUT">Put setups</option></select></label>
+    {!visibleSetups.length&&<p className="m-4" role="status">{setups.length ? 'No '+outcomeFilter.toLowerCase()+' setups currently qualify for this account.' : results.length ? 'No high-quality option setup currently meets your account and risk requirements.' : 'Account-specific option analysis is in progress. Use Find options to prioritize a stock.'}</p>}
+    {visibleSetups.length > 0 && <div className="swing-option-results">{visibleSetups.map((result, rank) => {
+      if(!result.contract)return null;
+      const actionable = result.status === "CANDIDATE" && result.decision.action === "BUY_IF";
+      const actionLabel = `${result.contract.type} ${actionable ? "SETUP" : "· PREPARE"}`;
       return <article className={`exact-contract option-recommendation ${actionable ? "candidate" : "no-trade"}`} key={result.contract.contractSymbol}>
         <div className="option-decision-hero">
           <div><span>#{rank + 1} · {result.account.name}</span><strong>{actionLabel}</strong><h3>{result.underlying} {result.contract.type} · {money(result.contract.strike)} strike</h3><p>{result.contract.expiration} · {result.contract.dte} days remaining · underlying {money(result.underlyingPrice)}</p></div>
@@ -187,5 +179,5 @@ export default function SwingOptionsAdvisor({
         </details>
         <footer>Data {new Date(result.asOf).toLocaleString()} · Analysis only; Northstar never sends an order.</footer>
       </article>;
-    })}</div>}    {rejections.length > 0 && <section className="option-rejections"><header><b>NO OPTION TRADE RIGHT NOW</b><span>Northstar checked both directions but did not find a contract that fits your budget and safety rules.</span></header>{rejections.map((item, index) => <article key={`${item.symbol}-${index}`}><b>{item.symbol}</b><p>{explainRejection(item.reason, maxRisk)}</p><details><summary>Technical reason</summary><p>{item.reason}</p></details></article>)}</section>}  </section>;
+    })}</div>}  </section>;
 }

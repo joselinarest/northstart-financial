@@ -229,7 +229,7 @@ export default function LongTermPortfolioPlan({
         title: candidate.isHeld
           ? `Ranked opportunity: consider adding to ${candidate.symbol}`
           : `Ranked opportunity: evaluate ${candidate.symbol}`,
-        detail: `#${rank} from Long-Term Opportunities for this exact account. ${candidate.accountWhy || "It must pass diversification, valuation, quality and account-fit review before inclusion."}`,
+        detail: `#${rank} from account-specific long-term research. ${candidate.accountWhy || "It must pass diversification, valuation, quality and account-fit review before inclusion."}`,
         amount: candidate.sizeAtLimit ? 0 : allocation.total,
         shares: candidate.sizeAtLimit ? null : shares,
         symbol: candidate.symbol,
