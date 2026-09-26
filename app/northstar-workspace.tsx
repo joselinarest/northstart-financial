@@ -1,4 +1,5 @@
 "use client";
+import {accountProfile} from "@/lib/account-profile";
 import BuildVersion from "./build-version";
 import {readApiPayload} from '@/lib/api-client';
 import {QuantDataHealth,LazyFlowEvidence} from '@/app/quant-data-evidence';
@@ -1756,7 +1757,7 @@ export function NorthstarWorkspace({
     "New Candidates": "new-candidates",
     "Bills & cards": "cash-flow",
     "Kids / Goals": "kids-goals",
-    "Daily Action Plan": "daily-action-plan",
+    "Trading": "trading",
     "Options Advisor": "options",
     Liabilities: "debt",
     Household: "household",
@@ -1809,7 +1810,7 @@ export function NorthstarWorkspace({
     const slug =
       pathname.match(/^\/workspace\/([^/]+)\/?$/)?.[1] || "dashboard";
     setResearchDetailOpen(false);
-    setTab(tabByPath[slug] || "Dashboard");
+    setTab(slug === "daily-action-plan" ? "Trading" : tabByPath[slug] || "Dashboard");
   };
   const navigatePath = (
     pathname: string,
@@ -2757,7 +2758,7 @@ export function NorthstarWorkspace({
   const showInvestmentContext = [
     "Dashboard",
     "Portfolio",
-    "Daily Action Plan",
+    "Trading",
     "Options Advisor",
     "Growth Finder",
     "New Candidates",
@@ -5349,7 +5350,7 @@ export function NorthstarWorkspace({
         "Account Transactions",
         "Bill Transactions",
         "Portfolio",
-        "Daily Action Plan",
+        "Trading",
         "Options Advisor",
         "Growth Finder",
         "New Candidates",
@@ -5492,17 +5493,20 @@ export function NorthstarWorkspace({
             ? "checking"
             : "disabled";
   const navigationGroups = [
-    {name:'Today',items:[['Daily Action Plan','☀'],['Dashboard','⌂']]},
+    {name:'Home',items:[['Dashboard','⌂']]},
+    {name:'Trading',items:[['Trading','↗'],['Prepare Trade','↗'],['Journal','▤'],['Paper Simulator','◎']]},
     {name:'Portfolio',items:[['Portfolio','◫'],['Accounts','▣'],['Kids / Goals','◇']]},
-    {name:'Markets / Research',items:[['Professional Charts','⌁'],['New Candidates','◎'],['Growth Finder','↗'],['Market News','●']]},
-    {name:'Trading',items:[['Prepare Trade','↗'],['Options Advisor','◉'],['Journal','▤'],['Paper Simulator','◎']]},
-    {name:'Finance',items:[['Bills & cards','$'],['Household','♧'],['Liabilities','▥'],['Real Estate','⌂']]},
+    {name:'Research',items:[['Professional Charts','⌁'],['New Candidates','◎'],['Growth Finder','↗'],['Market News','●']]},
+    {name:'Options',items:[['Options Advisor','◉']]},
+    {name:'Finance',items:[['Bills & cards','$'],['Household','♧'],['Liabilities','▥']]},
+    {name:'Real Estate',items:[['Real Estate','⌂']]},
     {name:'Alerts',items:[['Alerts','◉']]},
-    {name:'Settings',items:[['Settings','⚙'],['Ask Northstar','✦'],['Learn','◇'],['Help','?']]},
+    {name:'Academy',items:[['Learn','◇']]},
+    {name:'Settings',items:[['Settings','⚙'],['Ask Northstar','✦'],['Help','?']]},
   ];
   const navigationLabels: Record<string, string> = {
     Dashboard: "Home",
-    "Daily Action Plan": "Today",
+    "Trading": "Trading",
     "Growth Finder": "Long-Term Opportunities",
     "New Candidates": "New Candidates",
     "Options Advisor": "Options",
@@ -5526,7 +5530,7 @@ export function NorthstarWorkspace({
         { name: "Paper Simulator", label: "Practice", icon: "◎" },
       ]
     : [
-        { name: "Daily Action Plan", label: "Today", icon: "☀" },
+        { name: "Trading", label: "Trading", icon: "☀" },
         { name: "Portfolio", label: "Portfolio", icon: "◫" },
         { name: "Market Intel", label: "Markets", icon: "⌁" },
         { name: "Bills & cards", label: "Finance", icon: "$" },
@@ -6552,7 +6556,7 @@ export function NorthstarWorkspace({
               </li>
             </ol>
           </nav>
-          {showInvestmentContext && !!investmentAccounts.length && (
+          {showInvestmentContext && tab !== "Trading" && !!investmentAccounts.length && (
             <AccountScopeDashboard
               accounts={investmentAccounts}
               holdings={connectedFinance.holdings}
@@ -6598,10 +6602,10 @@ export function NorthstarWorkspace({
               )}
             </section>
           )}
-          <div className={`hero ${tab === "Options Advisor" ? "options-workspace-hero" : ""}`} id="dashboard-top">
+          <div hidden={tab === "Trading"} className={`hero ${tab === "Options Advisor" ? "options-workspace-hero" : ""}`} id="dashboard-top">
             <div>
               <p className="kicker">
-                {tab === "Daily Action Plan"
+                {tab === "Trading"
                   ? "LIVE MARKET DATA · DAILY ACTION PLAN"
                   : tab === "Options Advisor"
                     ? "LIVE OPTIONS DATA · ACCOUNT-SPECIFIC DECISION SUPPORT"
@@ -6616,8 +6620,8 @@ export function NorthstarWorkspace({
                       ? "Bill history and cost comparison"
                       : tab === "Portfolio"
                         ? "Portfolio — Is my money allocated correctly?"
-                        : tab === "Daily Action Plan"
-                          ? "Today — What should I prepare to do now?"
+                        : tab === "Trading"
+                          ? "Trading"
                           : tab === "Options Advisor"
                             ? "Options — What trade, if any, fits this account now?"
                           : tab === "Growth Finder"
@@ -6647,7 +6651,7 @@ export function NorthstarWorkspace({
                   ? "First review household health. Then open the Daily Action Plan for market candidates, or Portfolio for long-term accounts. Every proposal requires your confirmation."
                   : tab === "Portfolio"
                     ? "Select one long-term account. Northstar compares its holdings with a suggested target, opens the largest gap first, ranks suitable candidates, calculates the approximate dollars needed, and links every real ticker to its complete evaluation."
-                    : tab === "Daily Action Plan"
+                    : tab === "Trading"
                       ? "This is the real provider-backed market workspace—not an Academy exercise or paper simulation. It is built after the close for the next session, then re-ranked as current price, volume, fundamentals, news, and market structure change. Forecasts remain probabilistic."
                       : tab === "Options Advisor"
                         ? "Choose an account and a stock. Northstar checks the stock and market first, then compares CALL and PUT contracts. It shows an exact option only when the direction, price, time remaining, trading quality, and account risk are strong enough. Same-day options are off by default."
@@ -6740,7 +6744,7 @@ export function NorthstarWorkspace({
               </b>
               <span>
                 Growth Finder uses long-term accounts. Swing portfolios remain
-                available in Portfolio and Today.
+                available in Portfolio and Trading.
               </span>
               <button onClick={() => navigate("Accounts")}>
                 Configure long-term account →
@@ -7216,17 +7220,11 @@ export function NorthstarWorkspace({
           {tab === "Real Estate" && (
             <RealEstateCommandCenter accessToken={accessToken} />
           )}
-          {(tab === "Daily Action Plan" || tab === "Prepare Trade") && (
-            <section id="today-recommendations" className="daily-plan-intro card">
-              <header>
-                <span>{marketPhase === "open" ? "CURRENT MARKET SESSION" : "NEXT MARKET OPEN"}</span>
-                <h2>Actions for {advisorAccountName}</h2>
-                <p>{advisorStrategy === "swing" ? "Swing and day trades · options up to 30 days" : "Long-term buys, sells and trims"}. Only proposed actions appear here.</p>
-                {!marketClock.isOpen && clockTargetLabel && <p>Next market open: <b>{clockTargetLabel}</b>. Reconfirm prices and conditions before acting.</p>}
-                <button onClick={() => navigate("Portfolio")}>Full account evaluation →</button>
-              </header>
-              <ActionGuidancePanel key={advisorAccountId} accountId={advisorAccountId} accessToken={accessToken} mode="today" marketOpen={marketPhase === "open"} sessionOnly />
-              <SwingOptionsAdvisor accountId={advisorAccountId} accountName={advisorAccountName} accessToken={accessToken} sessionOnly />
+          {tab === "Trading" && (
+            <section id="trading-recommendations" className="daily-plan-intro card">
+              <label className="grid gap-2 mb-4"><b>Account</b><select aria-label="Trading account" value={advisorAccountId} onChange={event=>selectAnalysisScope(event.target.value)} className="w-full min-h-11 rounded-lg border border-line p-3">{investmentAccounts.map(account=><option key={String(account.id)} value={String(account.id)}>{String(account.nickname||account.name||account.official_name)} · {accountProfile(account).strategy.replaceAll('_',' ')}{' · '+accountProfile(account).goal}</option>)}</select></label>
+              <header><h1>Trading · {marketClock.isOpen ? "Live Market" : "Plan for Next Session"}</h1>{!marketClock.isOpen && marketClock.nextOpen && <p>Next session: {new Date(marketClock.nextOpen).toLocaleString(undefined,{weekday:'long',month:'short',day:'numeric',year:'numeric',hour:'numeric',minute:'2-digit',timeZoneName:'short',timeZone:activeTimezone})}</p>}{accountProfile(advisorAccount||{}).taxWrapper && <p>{accountProfile(advisorAccount||{}).taxWrapper.replaceAll('_',' ')}</p>}</header>
+              <ActionGuidancePanel key={advisorAccountId} accountId={advisorAccountId} accessToken={accessToken} mode="today" marketOpen={marketClock.isOpen} sessionOnly options={<SwingOptionsAdvisor accountId={advisorAccountId} accountName={advisorAccountName} accessToken={accessToken} sessionOnly/>}/>
             </section>
           )}
           {tab === "New Candidates" && (
@@ -12443,7 +12441,7 @@ export function NorthstarWorkspace({
                     <b>Week {academyWeek + 1} practice</b>
                     {academyLessons[academyWeek].assignment}
                   </span>
-                  <button onClick={() => navigate("Daily Action Plan")}>
+                  <button onClick={() => navigate("Trading")}>
                     Open swing market desk
                   </button>
                 </div>

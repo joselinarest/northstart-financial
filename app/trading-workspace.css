@@ -1,0 +1,13 @@
+.workspace-view.page-trading .content > * { display: none !important; }
+.workspace-view.page-trading .content > #trading-recommendations,
+.workspace-view.page-trading .content > .analysis-scope-empty,
+.workspace-view.page-trading .content > .action-toast { display: block !important; }
+.page-trading #trading-recommendations { width: 100%; min-width: 0; padding: clamp(12px, 2vw, 24px); margin: 0; }
+.page-trading #trading-recommendations::before { content: none; }
+.page-trading #trading-recommendations h1 { font-size: clamp(22px, 3vw, 32px); margin: 10px 0; }
+.page-trading #trading-recommendations h2 { font: 700 16px/1.4 var(--font-geist-sans), sans-serif; letter-spacing: .06em; margin: 0 0 12px; }
+.page-trading #trading-recommendations p { font-size: 14px; line-height: 1.5; overflow-wrap: anywhere; }
+.page-trading #trading-recommendations header { margin-bottom: 16px; }
+.page-trading #trading-recommendations select { max-width: 100%; font-size: 16px; }
+.page-trading .trading-context > div:first-child,
+.page-trading .trading-position > div { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }

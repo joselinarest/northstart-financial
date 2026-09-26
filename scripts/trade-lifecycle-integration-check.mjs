@@ -51,6 +51,7 @@ INSERT INTO holdings VALUES('a','nvda',20,10000,140000);
 INSERT INTO investment_theses VALUES('a','nvda','INTACT',current_timestamp);
 INSERT INTO household_members VALUES('h','user','active');
 `);
+await pg.exec("ALTER TABLE investment_account_settings ADD COLUMN goal_name text DEFAULT 'Build wealth', ADD COLUMN horizon_months integer DEFAULT 120, ADD COLUMN share_mode text DEFAULT 'WHOLE'; ALTER TABLE securities ADD COLUMN name text; CREATE TABLE account_allocation_targets(id text PRIMARY KEY,account_id text,category text,target_bps integer,UNIQUE(account_id,category));");
 for(const sql of migrations.find(m=>m.id==='0039_trade_lifecycle').statements)await pg.exec(sql);
 for(const sql of migrations.find(m=>m.id==='0025_ai_decision_engine_options').statements.slice(0,3))await pg.exec(sql);
 for(const sql of migrations.find(m=>m.id==='0040_central_ai_provider').statements)await pg.exec(sql);

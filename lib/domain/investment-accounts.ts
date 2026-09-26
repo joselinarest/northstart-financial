@@ -1,4 +1,6 @@
+import {accountProfile, taxWrappers} from "@/lib/account-profile";
 export const strategyTypes = [
+  "LONG_TERM", "LONG_TERM_ETF", "OPTIONS",
   "SWING",
   "GROWTH_5_7",
   "RETIREMENT",
@@ -32,7 +34,7 @@ export type InvestmentAccountSettingsInput = {
 };
 
 export function parseInvestmentAccountSettings(value: Record<string, unknown>): InvestmentAccountSettingsInput {
-  const strategyType = String(value.strategyType || "").toUpperCase() as StrategyType;
+  const strategyType = accountProfile(value).strategy.toUpperCase() as StrategyType;
   const shareMode = String(value.shareMode || "WHOLE").toUpperCase() as ShareMode;
   const riskProfile = String(value.riskProfile || "BALANCED").toUpperCase() as RiskProfile;
   const benchmark = value.benchmarkSymbol == null ? null : String(value.benchmarkSymbol).trim().toUpperCase();
@@ -45,6 +47,8 @@ export function parseInvestmentAccountSettings(value: Record<string, unknown>): 
     ? value.policy as Record<string, unknown>
     : {};
 
+  if(policy.taxWrapper != null && !taxWrappers.includes(String(policy.taxWrapper))) throw new Error("Invalid tax wrapper");
+  if(strategyType === 'LONG_TERM_ETF') policy.allowedInstruments = ['ETFS'];
   if (!strategyTypes.includes(strategyType)) throw new Error("Invalid investment strategy");
   if (!shareModes.includes(shareMode)) throw new Error("Invalid share mode");
   if (!riskProfiles.includes(riskProfile)) throw new Error("Invalid risk profile");

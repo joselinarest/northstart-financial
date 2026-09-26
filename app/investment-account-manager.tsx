@@ -1,21 +1,11 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import {accountProfile, accountStrategies, taxWrappers} from "@/lib/account-profile";
 import { buildKidGrowthPlan } from "@/lib/domain/kid-growth";
 
 type Account = Record<string, any>;
-const strategies = [
-  ["SWING", "Swing Trading"],
-  ["GROWTH_5_7", "5–7 Year Growth"],
-  ["RETIREMENT", "Retirement"],
-  ["CHILD_GROWTH", "Child Growth"],
-  ["COLLEGE", "College"],
-  ["AGGRESSIVE_GROWTH", "Aggressive Growth"],
-  ["DIVIDEND_INCOME", "Dividend / Income"],
-  ["HOUSE_FUND", "House Fund"],
-  ["CAPITAL_PRESERVATION", "Capital Preservation"],
-  ["CUSTOM", "Custom"],
-];
+const strategies = accountStrategies;
 const transactionTypes = [
   "BUY",
   "SELL",
@@ -41,7 +31,7 @@ export default function InvestmentAccountManager({
     [transactions, setTransactions] = useState<Account[]>([]),
     [busy, setBusy] = useState(false);
   const [settings, setSettings] = useState({
-    strategyType: "GROWTH_5_7",
+    strategyType: "LONG_TERM",
     shareMode: "WHOLE",
     benchmarkSymbol: "SPY",
     goalName: "5–7 year growth",
@@ -64,6 +54,7 @@ export default function InvestmentAccountManager({
     targetReturnPercent: "8",
     cashReserveTarget: "0",
     maximumSectorPercent: "25",
+    taxWrapper: "",
     taxConsiderations: "TAX_DEFERRED",
     tradingFrequency: "LOW",
     allowedInstruments: "ETFS, STOCKS",
@@ -183,7 +174,7 @@ export default function InvestmentAccountManager({
   useEffect(() => {
     if (!selected) return;
     setSettings({
-      strategyType: selected.strategy_type || "GROWTH_5_7",
+      strategyType: accountProfile(selected).strategy,
       shareMode: selected.share_mode || "WHOLE",
       benchmarkSymbol: selected.benchmark_symbol || "SPY",
       goalName:
@@ -227,6 +218,7 @@ export default function InvestmentAccountManager({
       maximumSectorPercent: String(
         Number(policy.maximumSectorBps ?? 2500) / 100,
       ),
+      taxWrapper: String(policy.taxWrapper || ""),
       taxConsiderations: String(policy.taxConsiderations ?? "TAX_DEFERRED"),
       tradingFrequency: String(policy.tradingFrequency ?? "LOW"),
       allowedInstruments: Array.isArray(policy.allowedInstruments)
@@ -253,7 +245,7 @@ export default function InvestmentAccountManager({
     setNotice("Saving account strategy…");
     try {
       const childPolicy =
-        settings.strategyType === "CHILD_GROWTH"
+        /future|child|education|college/i.test(settings.goalName)
           ? {
               childAge: Number(kidPolicy.childAge),
               collegeStartAge: Number(kidPolicy.collegeStartAge),

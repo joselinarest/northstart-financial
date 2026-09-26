@@ -1147,4 +1147,21 @@ export const migrations: readonly Migration[] = [
 `ALTER TABLE market_discovery_candidates ALTER COLUMN business_quality DROP NOT NULL,ALTER COLUMN growth_acceleration DROP NOT NULL,ALTER COLUMN valuation DROP NOT NULL`,
 `UPDATE market_discovery_candidates SET business_quality=NULL,growth_acceleration=NULL,valuation=NULL,scores_json='{}'::jsonb,discovery_confidence=0,status='EARLY_WATCH',why_found='Prior research requires evidence-score revalidation',model_version='AWAITING_EVIDENCE_REVALIDATION' WHERE model_version<>'discovery-v5-evidence'`,
 `UPDATE discovery_queue SET stage='RESEARCH_PENDING',next_research_at=CURRENT_TIMESTAMP WHERE active AND seed_json IS NOT NULL AND last_researched_at IS NOT NULL`,
+]}, {id:"0051_account_strategies",description:"Separate investment strategies from account goals and permit ETF-only portfolios",statements:[
+`ALTER TABLE investment_account_settings DROP CONSTRAINT IF EXISTS investment_account_settings_strategy_type_check`,
+`ALTER TABLE investment_account_settings ADD CONSTRAINT investment_account_settings_strategy_type_check CHECK(strategy_type IN ('SWING','OPTIONS','LONG_TERM','LONG_TERM_ETF','GROWTH_5_7','RETIREMENT','CHILD_GROWTH','COLLEGE','AGGRESSIVE_GROWTH','DIVIDEND_INCOME','HOUSE_FUND','CAPITAL_PRESERVATION','CUSTOM'))`,
+`INSERT INTO account_allocation_targets(id,account_id,category,target_bps)
+ SELECT 'goal_migration:'||s.account_id||':'||t.key,s.account_id,t.key,t.value::integer FROM investment_account_settings s,
+ jsonb_each_text(CASE s.strategy_type
+ WHEN 'RETIREMENT' THEN '{"CORE":5500,"QUALITY":1500,"AGGRESSIVE":500,"INCOME":1500,"BONDS":700,"CASH":300}'::jsonb
+ WHEN 'CHILD_GROWTH' THEN '{"CORE":6500,"QUALITY":2000,"AGGRESSIVE":750,"INCOME":250,"BONDS":250,"CASH":250}'::jsonb
+ WHEN 'COLLEGE' THEN '{"CORE":5000,"QUALITY":1000,"AGGRESSIVE":250,"INCOME":500,"BONDS":2500,"CASH":750}'::jsonb
+ WHEN 'HOUSE_FUND' THEN '{"CORE":2000,"QUALITY":500,"AGGRESSIVE":0,"INCOME":500,"BONDS":3500,"CASH":3500}'::jsonb
+ ELSE '{}'::jsonb END) t
+ WHERE NOT EXISTS (SELECT 1 FROM account_allocation_targets a WHERE a.account_id=s.account_id)
+ ON CONFLICT(account_id,category) DO NOTHING`,
+`UPDATE investment_account_settings SET policy_json=COALESCE(policy_json,'{}'::jsonb)||jsonb_build_object('legacyStrategy',strategy_type),
+ goal_name=CASE WHEN goal_name IN ('Build wealth','Retirement','Child Growth','College','House Fund','CHILD_GROWTH','COLLEGE','HOUSE_FUND','RETIREMENT') THEN CASE strategy_type WHEN 'RETIREMENT' THEN 'Retirement' WHEN 'CHILD_GROWTH' THEN 'Future Wealth' WHEN 'COLLEGE' THEN 'Education' WHEN 'HOUSE_FUND' THEN 'House Purchase' ELSE goal_name END ELSE goal_name END,
+ strategy_type='LONG_TERM' WHERE strategy_type IN ('GROWTH_5_7','RETIREMENT','CHILD_GROWTH','COLLEGE','HOUSE_FUND')`,
+`UPDATE accounts SET investment_purpose='Long-term' WHERE investment_purpose='Retirement'`,
 ]},] as const;

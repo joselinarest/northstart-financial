@@ -1,3 +1,4 @@
+import {contributionAction} from '@/lib/long-term-contribution';
 import {investmentCash} from "@/lib/investment-cash";
 import {detectPatternEvidence} from "@/lib/pattern-evidence";
 import {reviewClosedTrades} from "@/lib/post-trade-review-service";
@@ -41,13 +42,16 @@ async function alert(db:PostgresDatabase, household:string, account:string, key:
 
 /** Scheduled independently of holdings: historical SELL transactions and exit episodes remain in the universe. */
 export async function runTradeLifecycle(db:PostgresDatabase, householdId:string, accountId:string, dependencies: {provider?:ReturnType<typeof marketDataProvider>;research?:typeof authoritativeRecommendation;symbol?:string;aiProvider?:AIProvider} = {}) {
-  const account = await db.prepare(`SELECT a.id,COALESCE(s.strategy_type,a.investment_purpose) strategy,COALESCE(s.available_cash_cents,a.available_balance_cents,0)::text cash_cents,s.maximum_position_bps,s.maximum_risk_bps,s.policy_json FROM accounts a JOIN entities e ON e.id=a.entity_id LEFT JOIN investment_account_settings s ON s.account_id=a.id WHERE a.id=? AND e.household_id=?`).bind(accountId,householdId).first<Row>();
+  const account = await db.prepare(`SELECT a.id,COALESCE(s.strategy_type,a.investment_purpose) strategy,COALESCE(s.available_cash_cents,a.available_balance_cents,0)::text cash_cents,s.maximum_position_bps,s.maximum_risk_bps,s.goal_name,s.horizon_months,s.share_mode,s.policy_json FROM accounts a JOIN entities e ON e.id=a.entity_id LEFT JOIN investment_account_settings s ON s.account_id=a.id WHERE a.id=? AND e.household_id=?`).bind(accountId,householdId).first<Row>();
   if (!account) throw new Error("LIFECYCLE_ACCOUNT_NOT_FOUND");
   const cashMapping=await investmentCash(db,householdId,accountId);account.cash_cents=String(cashMapping.cashCents);
   const policy=json(account.policy_json), provider=dependencies.provider||marketDataProvider(), research=dependencies.research||authoritativeRecommendation;
   const universe = (await db.prepare(`SELECT DISTINCT sec.id security_id,sec.ticker,sec.type FROM securities sec WHERE sec.ticker IS NOT NULL AND sec.id IN (SELECT security_id FROM holdings WHERE account_id=? AND quantity>0 UNION SELECT security_id FROM position_states WHERE account_id=? UNION SELECT security_id FROM investment_transactions WHERE account_id=? AND transaction_type='SELL' UNION SELECT security_id FROM recommendations WHERE account_id=? AND lifecycle IN ('MONITORING','TRIGGERED')) AND (?::text IS NULL OR sec.ticker=?) ORDER BY sec.ticker`).bind(accountId,accountId,accountId,accountId,dependencies.symbol||null,dependencies.symbol||null).all<Row>()).results;
   const value = await db.prepare("SELECT COALESCE(SUM(quantity*price_cents),0)::text value FROM holdings WHERE account_id=?").bind(accountId).first<Row>();
   const risk: AccountRisk = {cash:Number(account.cash_cents)/100,value:Number(account.cash_cents)/100+(Number(value?.value||0)-cashMapping.mappedCents)/100,maxPositionBps:Number(account.maximum_position_bps??1000),maxRiskBps:Number(account.maximum_risk_bps??50),taxRate:policy.taxRatePct==null?null:Number(policy.taxRatePct)/100,slippageBps:Number(policy.slippageBps??15),commission:Number(policy.commissionCents??0)/100,reservedElsewhere:0};
+  const allocationHoldings=(await db.prepare("SELECT s.ticker symbol,s.type,s.name,h.quantity*h.price_cents/100.0 value,h.price_cents/100.0 price FROM holdings h JOIN securities s ON s.id=h.security_id WHERE h.account_id=?").bind(accountId).all<Row>()).results.filter(h=>h.type!=='cash'&&!cashMapping.symbols.includes(h.symbol)).map(h=>({symbol:String(h.symbol),type:String(h.type),name:String(h.name),value:Number(h.value),price:Number(h.price)}));
+  const allocationTargets=(await db.prepare("SELECT category,target_bps FROM account_allocation_targets WHERE account_id=?").bind(accountId).all<Row>()).results;
+  const savedTargets=allocationTargets.length?Object.fromEntries(allocationTargets.map(t=>[t.category,Number(t.target_bps)])):undefined;
   let monitored=0;
   for (const security of universe) {
     if(security.type==="cash"||cashMapping.symbols.includes(security.ticker))continue;
@@ -175,7 +179,8 @@ export async function runTradeLifecycle(db:PostgresDatabase, householdId:string,
       const underperform=Number(measured?.samples)>=5&&Number(measured?.excess)<0&&Number(measured?.wins)/Number(measured?.samples)<.4;
       const penalty=Math.max(underperform?100:0,Math.max(0,Math.min(300,Number(json(review?.evidence_json).tacticalPenaltyBps||0))));
       if(underperform)await tx.prepare("INSERT INTO trade_lifecycle_reviews(id,household_id,account_id,strategy_version,status,evidence_json) VALUES(?,?,?,?,'SAFETY_GATE_APPLIED',?) ON CONFLICT(id) DO NOTHING").bind(`tactical_gate:${accountId}:${STRATEGY_VERSION}:${measured?.samples}`,householdId,accountId,STRATEGY_VERSION,JSON.stringify({...measured,tacticalPenaltyBps:100,policy:"Versioned conservative gate; no model fitting or production parameter mutation. Further changes require review."})).run();
-      const action=reentryAction||evaluatePosition(position,evidence,risk,Date.now(),penalty);
+      let action=reentryAction||evaluatePosition(position,evidence,risk,Date.now(),penalty);
+      if(position.strategy==='LONG_TERM'&&!reentryAction)action=contributionAction({account:{strategy:account.strategy,goal:account.goal_name||'',horizonMonths:Number(account.horizon_months),fractional:account.share_mode==='FRACTIONAL'},holdings:allocationHoldings,targets:savedTargets,security:{symbol:security.ticker,type:security.type},position,evidence,risk,previous:action});
       if(!reentryAction && action.action==="HOLD")position.positionState=shares?"HOLD":position.positionState;
       if(!reentryAction && action.action==="TRIM")position.positionState="TRIM";
       // Proposed trades never mutate holdings, cash, or executed exit history.
@@ -186,7 +191,7 @@ export async function runTradeLifecycle(db:PostgresDatabase, householdId:string,
     if(reasoningSnapshot){
       const snapshot=reasoningSnapshot as {position:PositionState;action:Action};
       checks.patterns=detectPatternEvidence(bars.filter(b=>Date.parse(b.time)+86400000<=Date.now()),{timeframe:"1Day",market:market?(evidence.marketStrong?"UP":"DOWN"):undefined,sector:sectorQuote?(evidence.sectorStrong?"UP":"DOWN"):undefined,newsClear:evidence.newsClear,fundamentalsValid:thesisStatus==="VALID",riskApproved:false,dataFresh:evidence.complete});
-      const decision=await reasonLifecycle(db,householdId,security.security_id,snapshot.position,snapshot.action,evidence,risk,{checks,fundamentals:fund,fundamentalAsOf:checks.sources?.fundamental?.asOf||fund.dataTimestamp,newsAsOf:checks.sources?.news?.asOf,news:checks.news?.state==='UNAVAILABLE'?null:checks.news,valuation:checks.valuation?.state==='UNAVAILABLE'?null:checks.valuation||{score:fund.valuationAttractiveness},technical:checks.technical,marketRegime:market?{market,sector:sectorQuote,sectorStatus:sectorQuote?'AVAILABLE':'UNAVAILABLE'}:null,accountPolicy:policy,researchComplete:evidence.complete},dependencies.aiProvider);
+      const decision=await reasonLifecycle(db,householdId,security.security_id,snapshot.position,snapshot.action,evidence,risk,{checks,fundamentals:fund,fundamentalAsOf:checks.sources?.fundamental?.asOf||fund.dataTimestamp,newsAsOf:checks.sources?.news?.asOf,news:checks.news?.state==='UNAVAILABLE'?null:checks.news,valuation:checks.valuation?.state==='UNAVAILABLE'?null:checks.valuation||{score:fund.valuationAttractiveness},technical:checks.technical,marketRegime:market?{market,sector:sectorQuote,sectorStatus:sectorQuote?'AVAILABLE':'UNAVAILABLE'}:null,accountPolicy:{...policy,strategy:account.strategy,goal:account.goal_name,horizonMonths:account.horizon_months,targetAllocation:savedTargets},researchComplete:evidence.complete},dependencies.aiProvider);
       if(decision.providerStatus==='AVAILABLE'&&decision.action==='REBUY_IF')for(const notification of pendingAlerts)await db.transaction(tx=>alert(tx,householdId,accountId,notification.key,decision.entryPlan?positionAlert(decision,snapshot.position):notification.text,{ticker:snapshot.position.ticker,recommendationId:decision.decisionId,decisionId:decision.decisionId,asOf:decision.dataTimestamp}));
     }
     if(!isOption)await measureCentralDecisionOutcomes(db,accountId,security.ticker,bars);

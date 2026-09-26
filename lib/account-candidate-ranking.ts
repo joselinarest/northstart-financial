@@ -27,7 +27,7 @@ export async function rankCandidatesForAccount(
 ) {
   const account = await db
     .prepare(
-      `SELECT a.id,COALESCE(a.nickname,a.name) account_name,COALESCE(a.investment_purpose,s.strategy_type,'Long-term') strategy,COALESCE(a.current_balance_cents,0)::text balance_cents,COALESCE(s.available_cash_cents,a.available_balance_cents,0)::text cash_cents FROM accounts a JOIN entities e ON e.id=a.entity_id LEFT JOIN investment_account_settings s ON s.account_id=a.id WHERE a.id=? AND e.household_id=?`,
+      `SELECT a.id,COALESCE(a.nickname,a.name) account_name,COALESCE(s.strategy_type,a.investment_purpose,'LONG_TERM') strategy,COALESCE(a.current_balance_cents,0)::text balance_cents,COALESCE(s.available_cash_cents,a.available_balance_cents,0)::text cash_cents FROM accounts a JOIN entities e ON e.id=a.entity_id LEFT JOIN investment_account_settings s ON s.account_id=a.id WHERE a.id=? AND e.household_id=?`,
     )
     .bind(accountId, householdId)
     .first<J>();

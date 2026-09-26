@@ -118,7 +118,7 @@ export async function PATCH(request: Request) {
     const purposes = [
       "Swing",
       "Options",
-      "Long-term",
+      "Long-term", "Long-term ETF",
       "Retirement",
       "Dividend income",
       "Mixed",
@@ -203,7 +203,7 @@ export async function POST(request: Request) {
       purposes = [
         "Swing",
         "Options",
-        "Long-term",
+        "Long-term", "Long-term ETF",
         "Retirement",
         "Dividend income",
         "Mixed",

@@ -23,7 +23,7 @@ export function verifiedFundamentals(facts:Pick<Facts,"fundamentals"|"fundamenta
  return coverage>=4&&Number.isFinite(Date.parse(facts.fundamentalAsOf||''))?fund:null;
 }
 export async function reasonLifecycle(db:PostgresDatabase,householdId:string,securityId:string,p:PositionState,a:Action,e:Evidence,risk:AccountRisk,facts:Facts,aiProvider?:AIProvider):Promise<DecisionOutput>{
-  if(p.entryPlan&&e.entryObservation)p.entryPlan=monitorEntry(p.entryPlan,e.entryObservation);
+  if(p.entryPlan?.confirmationBasis!=="ALLOCATION"&&p.entryPlan&&e.entryObservation)p.entryPlan=monitorEntry(p.entryPlan,e.entryObservation);
   if(["BUY NOW","BUY IF","ADD","REBUY IF"].includes(a.action)){
     const policy=(facts.accountPolicy as {tradingPolicy?:TradingPolicy})?.tradingPolicy||recommendedTradingPolicy({accountType:p.strategy,value:risk.value,cash:risk.cash,largestPositionBps:risk.value?p.shares*e.price/risk.value*10000:0,liquid:e.volumeRatio>=1.2});
     const friday=fridaySwingGate(new Date(),p.strategy==="SWING"?"SWING":"LONG_TERM",policy,{fundamentals:e.thesis==="VALID"&&e.valuationAttractive,trend:e.price>=e.sma20&&e.price>=e.sma50,market:e.marketStrong,sector:e.sectorStrong,technical:e.volumeRatio>=1.5,liquid:e.volumeRatio>=1.5,weekendCatalystClear:(facts.checks.catalysts as {weekendClear?:boolean})?.weekendClear===true,rewardRisk:a.stop&&a.targets[0]?(a.targets[0]-e.price)/(e.price-a.stop):0,confidence:Number(facts.checks.confidence||0)});
@@ -44,6 +44,7 @@ export async function reasonLifecycle(db:PostgresDatabase,householdId:string,sec
     if(!entryOrderReady(plan)){Object.assign(a,{action:"NO ACTION",shares:0,cost:0,proceeds:0,cashAfter:risk.cash,pipeline:"INCOMPLETE",reason:plan.actionAfterConfirmation});}
     else {a.price=plan.orderPrice!;a.shares=plan.shares;a.cost=Math.round((a.price*a.shares*(1+risk.slippageBps/10000)+risk.commission)*100)/100;a.cashAfter=Math.round((risk.cash-a.cost)*100)/100;}
   }
+  if(a.entryPlan?.confirmationBasis==="ALLOCATION")p.entryPlan=a.entryPlan;
   a.entryPlan=p.entryPlan;
   const asOf=p.lastAnalysisAt,source=(label:string,value:unknown,time=asOf,sourceType:EvidenceItem['sourceType']="CALCULATION"):EvidenceItem=>({label,value,asOf:time,sourceType,sourceId:"NORTHSTAR_VERIFIED_SNAPSHOT"});
   const evidence=[source("currentPrice",e.price,e.asOf,"PROVIDER"),source("fundamentals",verifiedFundamentals(facts),facts.fundamentalAsOf||"","PROVIDER"),source("technical",facts.technical,e.asOf),source("patterns",facts.checks.patterns??[],e.asOf),source("portfolio",{shares:p.shares,averageCost:p.basisKnown===false?null:p.averageCost,basisStatus:p.basisKnown===false?'Cost basis unavailable':'AVAILABLE',value:risk.value}),source("accountCash",risk.cash),source("riskLimit",{maxPositionBps:risk.maxPositionBps,maxRiskBps:risk.maxRiskBps,reservedElsewhere:risk.reservedElsewhere}),source("news",facts.news,facts.newsAsOf||e.asOf,"PROVIDER"),source("valuation",facts.valuation,facts.fundamentalAsOf||""),source("marketRegime",facts.marketRegime,e.asOf,"PROVIDER")];
