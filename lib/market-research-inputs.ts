@@ -9,8 +9,9 @@ import {technicalExpectation} from '@/lib/market-expectation';
 import {researchMarketFresh} from '@/lib/research-market-freshness';
 type Row=Record<string,any>;
 export type ResearchStage=(stage:string,status:string,details?:Row,error?:string|null)=>Promise<unknown>;
-export async function marketResearchInputs(db:PostgresDatabase,symbol:string,force=false,stage:ResearchStage=async()=>{}){
- const key='research-v2:'+symbol,saved=force?null:await db.prepare("SELECT payload_json FROM discovery_provider_cache WHERE cache_key=? AND expires_at>CURRENT_TIMESTAMP").bind(key).first<Row>();
+export async function marketResearchInputs(db:PostgresDatabase,symbol:string,force=false,stage:ResearchStage=async()=>{},requestedAt?:string){
+ const key='research-v2:'+symbol,cached=await db.prepare("SELECT payload_json,fetched_at FROM discovery_provider_cache WHERE cache_key=? AND expires_at>CURRENT_TIMESTAMP").bind(key).first<Row>();
+ const saved=cached&&(!force||(requestedAt&&Date.parse(cached.fetched_at)>=Date.parse(requestedAt)&&!Object.keys(cached.payload_json.stageErrors||{}).length))?cached:null;
  if(saved){for(const name of ['UNDERLYING_RESEARCH','TECHNICAL_ANALYSIS','FUNDAMENTAL_ANALYSIS','NEWS_CATALYST','MARKET_SECTOR_REGIME'])await stage(name,saved.payload_json.stageErrors?.[name]?'PARTIAL':'COMPLETE',{asOf:saved.payload_json.asOf,sharedSymbolResearch:true},saved.payload_json.stageErrors?.[name]||null);return saved.payload_json;}
  const provider=marketDataProvider(),start=new Date(Date.now()-180*86400000).toISOString(),errors:Row={};
  if(force)invalidateProviderResponse('alpaca-quotes:'+symbol);

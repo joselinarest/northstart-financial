@@ -14,7 +14,7 @@ export async function runOptionsResearch(db:PostgresDatabase,householdId:string,
  const stage=(name:string,status:string,details:Row={},error:string|null=null)=>optionStage(db,accountId,symbol,name,status,details,error);
  for(const name of OPTION_STAGES)await db.prepare("INSERT INTO options_research_stages(account_id,symbol,research_version,stage) VALUES(?,?,?,?) ON CONFLICT DO NOTHING").bind(accountId,symbol,OPTIONS_RESEARCH_VERSION,name).run();
  await stage('SCREENED','COMPLETE',{source:'Supported universe or explicit ticker request'});
- const research=await marketResearchInputs(db,symbol,Boolean(body.force),stage);
+ const research=await marketResearchInputs(db,symbol,Boolean(body.force),stage,body.requestedAt);
  await stage('VOLATILITY_ANALYSIS','REFRESHING');let chain:Row={snapshots:{},feed:process.env.ALPACA_OPTIONS_FEED||'indicative'},chainError:string|null=null;
  try{chain=await optionsChain(symbol,Boolean(body.force));await stage('CHAIN_QUALIFIED',Object.keys(chain.snapshots||{}).length?'COMPLETE':'PARTIAL',{contracts:Object.keys(chain.snapshots||{}).length},Object.keys(chain.snapshots||{}).length?null:'NO_CONTRACTS_RETURNED');}catch(e){chainError=e instanceof Error?e.message:'CHAIN_PROVIDER_FAILED';await stage('CHAIN_QUALIFIED',/timeout|abort|budget/i.test(chainError)?'TIMED_OUT':'FAILED',{},chainError);}
  await stage('VOLATILITY_ANALYSIS',research.volatility.realized&&Object.keys(chain.snapshots).length?'COMPLETE':'PARTIAL',{...research.volatility,limitations:chain.limitations||[]},chainError||(!research.volatility.realized?'REALIZED_VOLATILITY_MISSING':null));
