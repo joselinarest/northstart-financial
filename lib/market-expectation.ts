@@ -13,14 +13,25 @@ export function technicalExpectation(bars:Row[],market:Row[],price:number,sector
  const reversalUp=complete&&rsi<40&&macd>previousMacd&&price>Number(prior?.close),reversalDown=complete&&rsi>60&&macd<previousMacd&&price<Number(prior?.close);
  const expectation=up?'BULLISH_CONTINUATION':down?'BEARISH_CONTINUATION':reversalUp?'REVERSAL_BULLISH':reversalDown?'REVERSAL_BEARISH':complete?'RANGE_NEUTRAL':'UNRESOLVED';
  const direction=/BULLISH/.test(expectation)?'CALL':/BEARISH/.test(expectation)?'PUT':null;
- const marketTrend=trend(market),sectorTrend=trend(sector),alignment=direction?(marketTrend===(direction==='CALL'?'BULLISH':'BEARISH')?1:-1):0;
- const confidence=complete?Math.min(85,Math.max(20,45+(up||down?15:0)+(relativeVolume&&relativeVolume>=1.5?10:0)+alignment*5+(sectorTrend===marketTrend?5:0))):0;
+ const marketTrend=trend(market),sectorTrend=trend(sector),alignment=direction&&marketTrend!=='UNAVAILABLE'?(marketTrend===(direction==='CALL'?'BULLISH':'BEARISH')?1:-1):0;
+ const confidence=complete?Math.min(85,Math.max(20,45+(up||down?15:0)+(relativeVolume&&relativeVolume>=1.5?10:0)+alignment*5+(sectorTrend!=='UNAVAILABLE'&&sectorTrend===marketTrend?5:0))):0;
  return {expectation,direction,confidence,confidenceBasis:'Deterministic evidence score, not a calibrated win probability',price,sma20,sma50,ema9,ema21,macd,rsi,atr,support,resistance,relativeVolume,marketTrend,sectorTrend,vwap:last?.vwap||null,gapPct:prior?.close?100*(Number(last?.open)/prior.close-1):null,averageDollarVolume:volume*price,complete,trigger:direction==='CALL'?Math.max(price,ema9):direction==='PUT'?Math.min(price,ema9):null,invalidation:direction==='CALL'&&atr?Math.max(Number(support),price-1.5*atr):direction==='PUT'&&atr?Math.min(Number(resistance),price+1.5*atr):null,evidence:[`${expectation.replaceAll('_',' ')}; price ${price}, SMA20 ${sma20.toFixed(2)}, SMA50 ${sma50.toFixed(2)}`,`RSI ${rsi.toFixed(1)}; MACD ${macd.toFixed(3)}; relative volume ${relativeVolume?.toFixed(2)||'unavailable'}`,`Market ${marketTrend}; sector ${sectorTrend}`]};
 }
-export function opportunityExpectancy(t:ReturnType<typeof technicalExpectation>,context:{catalystClear:boolean;fundamentals:boolean;valuation:boolean;liquid:boolean;concentrated?:boolean}){
+/** Opposing CALL/PUT scenarios need their own levels, even while the stock is in a range.
+ * These are observable preparation conditions, never a claim that a direction is confirmed. */
+export function optionUnderlyingPlan(t:Row,type:'CALL'|'PUT'){
+ if(!t.complete||![t.price,t.atr,t.support,t.resistance].every(v=>typeof v==='number'&&Number.isFinite(v)&&v>0))return null;
+ const aligned=t.direction===type;
+ const trigger=aligned?t.trigger:type==='CALL'?Math.max(t.price,t.resistance)+t.atr*.1:Math.min(t.price,t.support)-t.atr*.1;
+ const invalidation=aligned?t.invalidation:type==='CALL'?Math.max(t.support,trigger-1.5*t.atr):Math.min(t.resistance,trigger+1.5*t.atr);
+ const target=type==='CALL'?trigger+3*t.atr:trigger-3*t.atr;
+ if(![trigger,invalidation,target].every(v=>Number.isFinite(v)&&v>0)||!(type==='CALL'?invalidation<trigger&&trigger<target:target<trigger&&trigger<invalidation))return null;
+ return {trigger,invalidation,target,levelBasis:aligned?'Directional trend with ATR invalidation':'Conditional '+(type==='CALL'?'break above 20-session resistance':'break below 20-session support')+' with 0.1 ATR buffer',confirmation:(type==='CALL'?'Hold above ':'Hold below ')+trigger.toFixed(2)+' with volume confirmation; then recheck market/sector, catalyst, live contract and account risk',conditional:!aligned};
+}
+export function opportunityExpectancy(t:ReturnType<typeof technicalExpectation>,context:{entryPrice?:number;catalystClear:boolean;fundamentals:boolean;valuation:boolean;liquid:boolean;concentrated?:boolean}){
  if(!t.complete||!t.direction||!t.invalidation||!t.atr)return {score:null,expectedReturn:null,rewardRisk:null,scenarios:null,reason:'Directional structure and technical invalidation are required'};
- const downside=Math.abs(t.price-t.invalidation),upside=3*t.atr,rewardRisk=downside>0?upside/downside:null;
+ const entry=context.entryPrice||t.price,downside=Math.abs(entry-t.invalidation),upside=3*t.atr+(t.direction==='CALL'?t.price-entry:entry-t.price),rewardRisk=downside>0?upside/downside:null;
  const bull=Math.max(.25,Math.min(.6,t.confidence/100-(context.catalystClear?0:.15))),bear=.3,base=1-bull-bear;
  const expected=bull*upside-bear*downside,penalty=(context.liquid?1:.3)*(context.catalystClear?1:.5)*(context.concentrated?.5:1)*(context.fundamentals?1:.85)*(context.valuation?1:.9);
- return {score:downside?Number((expected/downside*penalty).toFixed(3)):null,expectedReturn:expected/t.price,rewardRisk,scenarios:{bull:{probability:bull,move:upside},base:{probability:base,move:0},bear:{probability:bear,move:-downside}},reason:'Scenario-weighted directional payoff with liquidity, catalyst, concentration, fundamental and valuation penalties. Probabilities are explicit modeling assumptions, not calibrated forecasts.'};
+ return {score:downside?Number((expected/downside*penalty).toFixed(3)):null,expectedReturn:expected/entry,rewardRisk,scenarios:{bull:{probability:bull,move:upside},base:{probability:base,move:0},bear:{probability:bear,move:-downside}},reason:'Scenario-weighted directional payoff with liquidity, catalyst, concentration, fundamental and valuation penalties. Probabilities are explicit modeling assumptions, not calibrated forecasts.'};
 }

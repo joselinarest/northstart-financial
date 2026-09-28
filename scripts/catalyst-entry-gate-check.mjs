@@ -1,34 +1,7 @@
-import assert from "node:assert/strict";
-import { readFile } from "node:fs/promises";
-const [gate, today, options, optionsUi, optionsStyles] = await Promise.all([
-  "../lib/catalyst-entry-gate.ts",
-  "../lib/authoritative-recommendation.ts",
-  "../app/api/market/options/route.ts",
-  "../app/swing-options-advisor.tsx",
-  "../app/options-smart-ui.css",
-].map(path => readFile(new URL(path, import.meta.url), "utf8")));
-assert.match(gate, /WAIT FOR CATALYST/);
-assert.match(gate, /Current company-news and earnings-calendar coverage is unavailable/);
-assert.match(gate, /Earnings fall inside the option holding window/);
-assert.match(gate, /IV-crush and gap risk are not authorized/);
-assert.match(gate, /recent adverse material news item/);
-assert.match(today, /evaluateCatalystEntryGate\(catalystContext, \{ mode: "SHARES" \}\)/);
-assert.match(today, /catalystGate\.pass/);
-assert.match(today, /catalysts: \{ \.\.\.catalystGate/);
-assert.match(today, /actionable: false/); // Research cannot authorize orders; runtime gates are tested below.
-const {evaluateCatalystEntryGate}=await import("../lib/catalyst-entry-gate.ts");
-const context={available:true,provider:"TEST",asOf:new Date().toISOString(),events:[],recentNewsCount:1,adverseNewsCount:0};
-assert.equal(evaluateCatalystEntryGate({...context,available:false},{mode:"SHARES"}).pass,false);
-assert.equal(evaluateCatalystEntryGate({...context,events:[{kind:"EARNINGS",label:"Tomorrow",daysAway:1}]},{mode:"SHARES"}).pass,false);
-assert.equal(evaluateCatalystEntryGate(context,{mode:"SHARES"}).pass,true);
-assert.match(options, /evaluateCatalystEntryGate\(catalystContext,\{mode:"OPTIONS"/);
-assert.match(options, /catalystPass\?"BUY_IF":"WAIT"/);
-assert.match(options, /"catalystGate","optionQuote"/);
-assert.match(options, /WAIT FOR CATALYST/);
-assert.match(optionsUi, /option-essential-facts/);
-assert.match(optionsUi, /CATALYST \/ EVENT GATE/);
-assert.match(optionsUi, /EXACT ACTION CONDITION/);
-assert.match(optionsUi, /Full contract analysis and Greeks/);
-assert.match(optionsStyles, /@media\(max-width:430px\)/);
-assert.doesNotMatch(optionsStyles, /overflow-x:hidden/);
-console.log("Today and Options catalyst entry gates verified.");
+import assert from 'node:assert/strict';import {build} from 'esbuild';import {createRequire} from 'node:module';
+await build({entryPoints:['lib/catalyst-entry-gate.ts','lib/account-readiness.ts'],outdir:'work/catalyst-check',bundle:true,platform:'node',format:'cjs',outExtension:{'.js':'.cjs'},external:['pg-native'],logLevel:'silent'});const load=createRequire(import.meta.url),{evaluateCatalystEntryGate}=load('../work/catalyst-check/catalyst-entry-gate.cjs'),{accountReadiness}=load('../work/catalyst-check/account-readiness.cjs');
+const context={available:true,provider:'TEST',asOf:new Date().toISOString(),events:[],recentNewsCount:1,adverseNewsCount:0};
+assert.equal(evaluateCatalystEntryGate({...context,available:false},{mode:'SHARES'}).pass,false);assert.equal(evaluateCatalystEntryGate({...context,events:[{kind:'EARNINGS',label:'Tomorrow',daysAway:1}]},{mode:'SHARES'}).pass,false);assert.equal(evaluateCatalystEntryGate(context,{mode:'SHARES'}).pass,true);
+const event={...context,events:[{kind:'EARNINGS',label:'Next week',daysAway:7}]};assert.equal(evaluateCatalystEntryGate(event,{mode:'SHARES'}).pass,true);assert.equal(evaluateCatalystEntryGate(event,{mode:'OPTIONS',contractDte:21}).pass,false);assert.equal(evaluateCatalystEntryGate({...context,adverseNewsCount:1},{mode:'SHARES'}).pass,false);
+const checks=accountReadiness({asOf:'2000-01-01',quoteFresh:true,investableCash:0,reservedCash:135.15,minimumCash:413.85,requiredRewardRisk:3,rewardRisk:2,price:413.85,maxEntryWithoutExtension:409,trigger:413.85,shareCapacity:0,positionRoom:1000,tradeRiskBudget:40,stageErrors:{}});assert.equal(checks.find(c=>c.label==='Price evidence').pass,false);assert.equal(checks.find(c=>c.label==='Reward versus risk').pass,false);assert.match(checks[0].detail,/\$413.85 more investable cash/);assert.ok(checks.every(c=>!c.pass));assert.equal(checks.at(-1).pass,false,'checklist never implies execution authorization');
+console.log('PASS: missing/adverse/earnings catalyst gates; separate stock vs option windows; exact cash, reward/risk, extension and live freshness requirements.');

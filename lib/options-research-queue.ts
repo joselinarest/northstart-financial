@@ -1,6 +1,6 @@
 import {id,type PostgresDatabase} from '@/lib/db';
 export const OPTIONS_RESEARCH_VERSION='options-research-v2';
-export const OPTION_STAGES=['SCREENED','CHAIN_QUALIFIED','UNDERLYING_RESEARCH','VOLATILITY_ANALYSIS','TECHNICAL_ANALYSIS','FUNDAMENTAL_ANALYSIS','NEWS_CATALYST','MARKET_SECTOR_REGIME','ACCOUNT_RISK_FIT','CONTRACT_SEARCH','CONTRACT_RANKING','DECISION'];
+export const OPTION_STAGES=['SCREENED','CHAIN_QUALIFIED','UNDERLYING_RESEARCH','PRICE_HISTORY','COMPANY_PROFILE','MARKET_BENCHMARK','VOLATILITY_ANALYSIS','TECHNICAL_ANALYSIS','FUNDAMENTAL_ANALYSIS','NEWS_CATALYST','MARKET_SECTOR_REGIME','ACCOUNT_RISK_FIT','CONTRACT_SEARCH','CONTRACT_RANKING','DECISION'];
 export async function queueOptionResearch(db:PostgresDatabase,householdId:string,accountId:string,symbol:string,manual=false,priority=0){
  return db.transaction(async tx=>{
   const account=await tx.prepare('SELECT a.id FROM accounts a JOIN entities e ON e.id=a.entity_id WHERE a.id=? AND e.household_id=? AND a.hidden=0 FOR UPDATE OF a').bind(accountId,householdId).first();if(!account)throw Error('ACCOUNT_NOT_FOUND');

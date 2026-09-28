@@ -29,7 +29,7 @@ export async function loadCatalystContext(symbol: string, db: PostgresDatabase,f
   const token = process.env.FINNHUB_API_KEY;
   if (!token) return { available: false, provider: "FINNHUB_NOT_CONFIGURED", asOf: null, events: [], recentNewsCount: 0, adverseNewsCount: 0 };
   const today = new Date(), from = new Date(Date.now() - 30 * day), to = new Date(Date.now() + 120 * day);
-  const get = (path: string) => discoveryFinnhub(db,path,force?0:900);
+  const get = (path: string) => discoveryFinnhub(db,path,force?60:900);
   try {
     const [newsResponse, earningsResponse] = await Promise.all([
       researchNews(db,symbol,dateOnly(from),dateOnly(today),force),
