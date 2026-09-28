@@ -38,7 +38,7 @@ async function enrich(db:PostgresDatabase,symbol:string){
  return{profile:profile.data as Record<string,any>,metric:metric.data.metric as Record<string,number>,news:news.data.slice(0,20) as Array<{headline?:string;summary?:string;datetime?:number}>,fundamentalsAsOf:metric.asOf,newsAsOf:news.asOf};
 }
 
-function technicalSeed(asset:Asset,bars:Bar[],ipoDate:string|null){
+export function technicalSeed(asset:Asset,bars:Bar[],ipoDate:string|null){
  if(bars.length<12)return null;const last=bars.at(-1)!,previous=bars.at(-2)!,recent=bars.slice(-21),prior=bars.slice(-42,-21),avgVol=average(recent.slice(0,-1).map(x=>x.v)),priorVol=average(prior.map(x=>x.v)),relVol=avgVol?last.v/avgVol:0,volumeAcceleration=priorVol?avgVol/priorVol:1,high20=Math.max(...recent.slice(0,-1).map(x=>x.h)),low20=Math.min(...recent.map(x=>x.l)),sma20=average(recent.map(x=>x.c)),return20=recent[0]?.c?(last.c/recent[0].c-1)*100:0,dayChange=previous.c?(last.c/previous.c-1)*100:0;
  const liquidity=avgVol*last.c,technical=clamp(45+(last.c>sma20?13:-8)+(last.c>high20?15:0)+(relVol>=1.5?12:0)+(return20>8?8:return20<-12?-8:0)),extension=sma20?((last.c/sma20)-1)*100:0,hotness=clamp((return20>25?30:return20>15?18:0)+(relVol>3?25:relVol>2?14:0)+(extension>18?25:extension>10?12:0)+(Math.abs(dayChange)>10?15:0));
  const buckets={swing:technical+(relVol>=1.25?12:0),oversold:clamp(65-return20+(last.c>=low20*1.02?8:0)),momentum:clamp(technical+Math.max(0,return20)-hotness*.4),quiet:clamp(55+(liquidity>=2_000_000&&liquidity<75_000_000?20:0)+(relVol<1.2?10:0)-Math.max(0,return20)),ipo:ipoDate?75:0,breadth:clamp(50+(liquidity>=2_000_000?15:0)-hotness*.25)};

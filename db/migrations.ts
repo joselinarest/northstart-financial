@@ -1,3 +1,15 @@
+const nextSessionMigration={id:'0055_next_session_intelligence',description:'Durable close-cycle universe coverage, sourced macro context and causal research edges',statements:[
+`CREATE TABLE next_session_cycles(id TEXT PRIMARY KEY,close_at TIMESTAMPTZ NOT NULL UNIQUE,status TEXT NOT NULL DEFAULT 'QUEUED',stage TEXT NOT NULL DEFAULT 'MARKET_CLOSE_SNAPSHOT',context_json JSONB NOT NULL DEFAULT '{}',counts_json JSONB NOT NULL DEFAULT '{}',context_at TIMESTAMPTZ,revision INTEGER NOT NULL DEFAULT 0,last_error TEXT,created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP)`,
+`CREATE TABLE next_session_symbols(cycle_id TEXT NOT NULL REFERENCES next_session_cycles(id),symbol TEXT NOT NULL,status TEXT NOT NULL DEFAULT 'QUEUED',priority NUMERIC NOT NULL DEFAULT 0,score NUMERIC,seed_json JSONB,reason TEXT,sector TEXT,cap_bucket TEXT,screened_at TIMESTAMPTZ,PRIMARY KEY(cycle_id,symbol))`,
+`CREATE INDEX next_session_screen_queue ON next_session_symbols(cycle_id,status,priority DESC,symbol)`,
+`CREATE TABLE next_session_edges(cycle_id TEXT NOT NULL REFERENCES next_session_cycles(id),event_id TEXT NOT NULL,symbol TEXT NOT NULL,evidence_json JSONB NOT NULL,PRIMARY KEY(cycle_id,event_id,symbol))`,
+`CREATE TABLE next_session_accounts(cycle_id TEXT NOT NULL REFERENCES next_session_cycles(id),account_id TEXT NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,revision INTEGER NOT NULL DEFAULT -1,run_id TEXT,status TEXT NOT NULL DEFAULT 'RESEARCH_PENDING',updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,PRIMARY KEY(cycle_id,account_id))`,
+// Preserve every previously supported job kind while adding the dedicated cycle consumer.
+`ALTER TABLE background_jobs DROP CONSTRAINT IF EXISTS background_jobs_job_type_check`,
+`ALTER TABLE background_jobs ADD CONSTRAINT background_jobs_job_type_check CHECK(job_type IN ('PLAID_SYNC','PLAID_INVESTMENT_SYNC','NOTIFICATION_DELIVERY','MARKET_INTELLIGENCE','MARKET_DISCOVERY','DAILY_CLOSE_REVIEW','OVERNIGHT_OUTLOOK_REFRESH','TACTICAL_REENTRY_MONITOR','OPTIONS_FLOW','INVESTMENT_COVERAGE_AUDIT','ACCOUNT_INTELLIGENCE_LOOP','KIDS_PLAN_REVIEW','AI_EVENT_REVIEW','QUANT_FLOW','OPTIONS_DISCOVERY','OPTIONS_ACCOUNT_REVIEW','ACCOUNT_OPPORTUNITY_REVIEW','NEXT_SESSION_RESEARCH'))`,
+`CREATE UNIQUE INDEX next_session_active_job ON background_jobs((payload_json->>'cycleId')) WHERE job_type='NEXT_SESSION_RESEARCH' AND status IN ('QUEUED','RUNNING','FAILED') AND attempts<6`
+]};
+
 export type Migration = {
   id: string;
   description: string;
@@ -1178,4 +1190,4 @@ export const migrations: readonly Migration[] = [
 `CREATE TABLE account_search_candidates(run_id TEXT NOT NULL REFERENCES account_search_runs(id) ON DELETE CASCADE,symbol TEXT NOT NULL,status TEXT NOT NULL DEFAULT 'QUEUED',rank_score NUMERIC NOT NULL DEFAULT 0,decision_json JSONB NOT NULL DEFAULT '{}',last_error TEXT,updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,PRIMARY KEY(run_id,symbol))`,
 `ALTER TABLE background_jobs DROP CONSTRAINT IF EXISTS background_jobs_job_type_check`,
 `ALTER TABLE background_jobs ADD CONSTRAINT background_jobs_job_type_check CHECK(job_type IN ('PLAID_SYNC','PLAID_INVESTMENT_SYNC','NOTIFICATION_DELIVERY','MARKET_INTELLIGENCE','MARKET_DISCOVERY','DAILY_CLOSE_REVIEW','OVERNIGHT_OUTLOOK_REFRESH','TACTICAL_REENTRY_MONITOR','OPTIONS_FLOW','INVESTMENT_COVERAGE_AUDIT','ACCOUNT_INTELLIGENCE_LOOP','KIDS_PLAN_REVIEW','AI_EVENT_REVIEW','QUANT_FLOW','OPTIONS_DISCOVERY','OPTIONS_ACCOUNT_REVIEW','ACCOUNT_OPPORTUNITY_REVIEW'))`,
-]},] as const;
+]},nextSessionMigration] as const;

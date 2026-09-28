@@ -1,0 +1,33 @@
+"use client";
+import {chartSetupLink} from '@/lib/chart-setup-link';
+type Row=Record<string,any>;
+const usd=(v:unknown)=>v==null||!Number.isFinite(Number(v))?'Unavailable':Number(v).toLocaleString('en-US',{style:'currency',currency:'USD'});
+const date=(v:unknown)=>v?new Date(String(v)).toLocaleString():'Not yet completed';
+const labels:Record<string,string>={universe:'Market universe',screened:'Screened',shortlisted:'Shortlisted',deepResearched:'Deep researched',partial:'Missing evidence',pending:'In progress',rejected:'Screen rejections',stale:'Stale',failed:'Failed',unavailable:'Unavailable'};
+export function rankResearchCandidates(candidates:Row[]=[]){
+ const score=(r:Row)=>{const n=Number(r.rank_score);return r.rank_score!=null&&Number.isFinite(n)?n:-Infinity;};
+ return candidates.filter(r=>r.decision_json?.symbol).slice().sort((a,b)=>score(b)-score(a)||String(a.symbol).localeCompare(String(b.symbol)));
+}
+export default function AccountResearchResults({search,accountId,cashCents}:{search?:Row|null;accountId:string;cashCents:number}){
+ const ranked=rankResearchCandidates(search?.candidates),counts=search?.counts_json||{},done=Number(counts.deepResearched||0),total=Number(counts.shortlisted||0);
+ return <details open className="account-research-results"><summary><span><span className="research-eyebrow">ACCOUNT INTELLIGENCE</span><b>Account research · progress and ranked alternatives</b></span><span className="research-count">{ranked.length} researched alternatives</span></summary>
+ <div className="research-panel-body"><div className="research-progress-heading"><div><strong>{search?.status==='RUNNING'?'Research in progress':search?.status==='PARTIAL'?'Research available · some evidence missing':search?'Latest account research':'Research not started'}</strong><p>Started {date(search?.created_at)} · last completed {date(search?.lastCompletedAt)}</p></div><span>{done} / {total} shortlisted</span></div>
+ <progress aria-label="Shortlisted companies researched" value={Math.min(done,total)} max={total||1}/>
+ <div className="research-metrics">{Object.entries(labels).filter(([key])=>counts[key]!=null).map(([key,label])=><div key={key}><strong>{Number(counts[key]).toLocaleString()}</strong><span>{label}</span></div>)}</div>
+ <p className="research-footnote">{search?.counts_json?.source||'Refresh Account Intelligence to begin.'} Coverage is evidence of work performed, not proof that no market opportunity exists.</p>
+ {search?.wholeShareCashBlocked&&<div className="research-cash-note"><b>No executable whole-share setup within the current investable budget.</b><p>Brokerage cash {usd(cashCents/100)}. Reserves and account limits may leave less available; each alternative shows its own constraint.</p></div>}
+ <div className="research-list-heading"><h3>Ranked opportunities &amp; near misses</h3><span>Highest modeled expectancy first · not simultaneous orders</span></div>
+ <ol className="research-ranked-list">{ranked.map((r,index)=>{const d=r.decision_json,blocked=(d.evidenceAgainst||[]).length>0||!(d.shares>0),missing=Object.keys(d.stageErrors||{}).length>0,owned=Number(d.ownedShares)>0;
+ const state=owned?String(d.decision||'Holding review').replaceAll('_',' '):blocked?'Near miss':'Prepare if confirmed';
+ const link=chartSetupLink({symbol:r.symbol,accountId,trigger:Number(d.trigger)||0,high:0,pullback:0,stop:Number(d.stop)||0,target1:Number(d.targets?.[0])||0,target2:Number(d.targets?.[1])||0}).replace('timeframe=5m','timeframe=1D');
+ const facts=[['Entry trigger',usd(d.trigger)],['Invalidation',usd(d.stop)],['Target 1',usd(d.targets?.[0])],['Target 2',usd(d.targets?.[1])],['Conditional shares',d.shares==null?'Unavailable':String(d.shares)],['Estimated cost',usd(d.totalCost)],['Investable cash',usd(d.investableCash)],['Last regular close',usd(d.lastRegularClose)],['Extended price',usd(d.extendedPrice)],['Maximum planned loss',usd(d.maximumPlannedLoss)],['Cash after purchase',usd(d.estimatedCashRemaining)],['Reward / risk',Number.isFinite(Number(d.rewardRisk))&&d.rewardRisk!=null?Number(d.rewardRisk).toFixed(2)+':1':'Unavailable']];
+ return <li key={r.symbol}><article className={'research-candidate '+(blocked?'is-near-miss':'is-prepared')}><header className="research-candidate-heading"><span className="research-rank" aria-label={'Rank '+(index+1)}>#{index+1}</span><div className="research-candidate-title"><h4><a href={link}>{r.symbol}</a></h4><span className="research-status">{state}</span><span className="research-evidence-status">{missing?'Evidence incomplete':r.status==='COMPLETE'?'Research complete':'Revalidation required'}</span></div><div className="research-score"><span>Modeled expectancy</span><strong>{d.expectancy?.score??'—'}</strong></div></header>
+ <p className="research-candidate-reason">{d.reason}</p>{d.discoveredBy&&<p className="research-footnote">Found through: {d.discoveredBy}</p>}<dl className="research-price-grid">{facts.map(([label,value])=><div key={label}><dt>{label}</dt><dd>{value}</dd></div>)}</dl>
+ <div className="research-confirmation"><b>What would make this actionable</b><p>{d.confirmation||'Fresh account, price and risk confirmation is required.'}</p></div>
+ <div className="research-candidate-actions"><a className="research-chart-link" href={link} aria-label={'Open '+r.symbol+' chart and full analysis'}>Open chart &amp; full analysis <span aria-hidden="true">↗</span></a><span>{d.fractional?'Fractional shares permitted':'Whole shares only'} · {d.holdingPeriod}</span></div>
+ <details className="research-evidence"><summary>Evidence, cash requirements &amp; cancellation</summary><p>Minimum purchase cash {usd(d.minimumCash)} · cash reserved {usd(d.reservedCash)}. Minimum purchase cash is the purchase increment, not proof that every account limit passes.</p>{d.evidenceFor?.map((text:string)=><p key={text}>{text}</p>)}<p>{d.expectancy?.reason}</p>{d.macroEvidence?.map((e:Row)=><p key={e.eventId}>{e.reason} <a href={e.source} target="_blank" rel="noreferrer">Source event ↗</a></p>)}<p><b>Cancel if:</b> {d.cancelConditions?.join('; ')}</p><p>Confidence {d.confidence??'Unavailable'} · {d.confidenceBasis}</p></details>
+ <footer>Evidence as of {date(d.asOf)} · quantities remain conditional until all checks pass.</footer></article></li>;})}</ol>
+ {!ranked.length&&<p>Research results will appear here as jobs complete. Existing account guidance remains above.</p>}
+ </div></details>;
+}
+
