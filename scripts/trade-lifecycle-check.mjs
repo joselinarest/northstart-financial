@@ -1,5 +1,7 @@
 import assert from 'node:assert/strict';
-import {evaluatePosition,monitorReentry,sizeReentry,compareCapital,evaluateOutcome} from '../lib/trade-lifecycle.ts';
+import {build} from 'esbuild';import {createRequire} from 'node:module';
+await build({entryPoints:['lib/trade-lifecycle.ts'],outfile:'work/trade-lifecycle-unit.cjs',bundle:true,platform:'node',format:'cjs',logLevel:'silent'});
+const {evaluatePosition,monitorReentry,sizeReentry,compareCapital,evaluateOutcome}=createRequire(import.meta.url)('../work/trade-lifecycle-unit.cjs');
 const now=Date.now();
 const p={investmentAccountId:'swing',ticker:'NVDA',strategy:'SWING',shares:20,averageCost:70,currentPrice:100,thesisStatus:'VALID',positionState:'OPEN',recommendationId:null,sellReason:null,exitPrice:null,exitDate:null,proceeds:0,reservedReentryCash:0,reentryLow:null,reentryHigh:null,reentryTrigger:null,reentryInvalidation:null,target1:120,target2:130,stop:80,lastAnalysisAt:new Date(now).toISOString(),strategyVersion:'test',modelVersion:'test'};
 const e={asOf:new Date(now).toISOString(),complete:true,thesis:'VALID',price:100,support:85,resistance:110,sma20:93,sma50:90,atr:5,volumeRatio:1,relativeStrength:2,marketStrong:true,sectorStrong:true,newsClear:true,valuationAttractive:true,majorValuationRisk:false,momentumBroken:false,goalChanged:false,targetReached:false,sellConfirmations:0};

@@ -17,3 +17,10 @@ const fashionable=scored({...asset,name:'Artificial Intelligence Cloud Semicondu
 assert.equal(fashionable.catalyst,complete.catalyst);assert.equal(fashionable.discoveryConfidence,complete.discoveryConfidence);
 const negativePe=scored(asset,seed,{...enrichment,metric:{...metrics,forwardPE:-5}},null,new Date().toISOString());assert.equal(negativePe.valuation,null);assert.notEqual(negativePe.status,'POSSIBLE_BUY_SETUP');
 console.log('PASS: absent evidence stays unscored, complete metrics score, negative P/E blocks valuation qualification, thematic names confer no ranking bonus.');
+
+const {normalizedFundamentalMetrics}=await import('../lib/fundamental-metrics.ts');
+const providerShape={...metrics,freeCashFlowPerShareTTM:undefined,totalDebtToEquityQuarterly:undefined,pfcfShareTTM:20,'totalDebt/totalEquityQuarterly':.55};
+const normalized=normalizedFundamentalMetrics(providerShape);assert.equal(normalized.freeCashFlowPerShare,null);assert.equal(normalized.cashFlowPositive,true);assert.ok(Math.abs(normalized.debtEquityPct-55)<1e-9);
+const normalizedScore=scored(asset,seed,{...enrichment,metric:providerShape},null,new Date().toISOString());assert.ok(normalizedScore.scores.businessQuality>70);assert.equal(normalizedScore.metrics.freeCashFlowPerShare,null);
+assert.equal(normalizedFundamentalMetrics({pfcfShareTTM:-10}).cashFlowPositive,false);assert.equal(normalizedFundamentalMetrics({pfcfShareTTM:0}).cashFlowPositive,null);
+console.log('PASS real-provider P/FCF and debt ratio mapping without fabricated cash-flow amounts.');

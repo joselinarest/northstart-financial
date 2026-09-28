@@ -1,5 +1,6 @@
 "use client";
 import ChartOptionResearch from "./chart-option-research";
+import CoreDecisionSummary from './core-decision-summary';
 import ChartExitReview from "./chart-exit-review";
 import HoldingCostBadge from "@/app/holding-cost-badge";
 
@@ -253,6 +254,7 @@ export default function ChartDecisionWorkspace(props: Props) {
       "Loading the latest account-specific recommendation record.",
     finalConfidence = Number(finalRecommendation?.confidence || 0),
     checks = authoritative?.checks || {},
+    core = checks.coreDecision,
     dataIssues = Array.isArray(checks.freshness?.issues)
       ? (checks.freshness.issues as string[])
       : [],
@@ -272,7 +274,8 @@ export default function ChartDecisionWorkspace(props: Props) {
   return <section className="chart-decision-workspace professional-security-workspace">
     <SecurityHeader symbol={props.symbol} company={research?.profile?.name||props.symbol} price={props.price} market={props.marketOpen?'Market open · verify quote freshness':'Market closed · last available price'} account={props.accountName} strategy={props.strategy} shares={props.ownedShares} action={optionContract?(optionPlan?.decision||'OPTION RESEARCH'):finalAction} onPlan={()=>setPanel('plan')}/>
     {optionContract&&<ChartOptionResearch key={props.accountId+props.symbol+optionContract} accountId={props.accountId} symbol={props.symbol} contractSymbol={optionContract} onPlan={receiveOptionPlan}/>}
-    <ChartEngine optionContext={Boolean(optionContract)} accountId={props.accountId} accountValue={props.accountValue} cashAvailable={props.cashAvailable} symbol={props.symbol} strategy={props.strategy} action={optionContract?(optionPlan?.decision||'OPTION RESEARCH'):finalAction} confidence={finalConfidence} support={props.support} resistance={props.resistance} entryLow={optionContract?Number(optionPlan?.trigger||0):props.entryLow} entryHigh={optionContract?Number(optionPlan?.trigger||0):props.entryHigh} stop={optionContract?Number(optionPlan?.invalidation||0):props.stop} target1={optionContract?Number(optionPlan?.target||0):props.target1} target2={optionContract?0:props.target2}
+    {!optionContract&&<CoreDecisionSummary decision={checks.aiEvidence} review={checks.secondaryAI}/>}
+    <ChartEngine coreLevels={!optionContract&&core?.scenarioBasis?[{price:Number(core.bull.priceZone),label:"CORE BULL",color:"#69d2a5"},{price:Number(core.base.priceZone),label:"CORE BASE",color:"#f4cb62"},{price:Number(core.bear.priceZone),label:"CORE BEAR",color:"#ee7468"}]:[]} optionContext={Boolean(optionContract)} accountId={props.accountId} accountValue={props.accountValue} cashAvailable={props.cashAvailable} symbol={props.symbol} strategy={props.strategy} action={optionContract?(optionPlan?.decision||'OPTION RESEARCH'):finalAction} confidence={finalConfidence} support={props.support} resistance={props.resistance} entryLow={optionContract?Number(optionPlan?.trigger||0):Number(core?.entry??core?.entryPlan?.trigger??props.entryLow)} entryHigh={optionContract?Number(optionPlan?.trigger||0):Number(core?.entry??core?.entryPlan?.trigger??props.entryHigh)} stop={optionContract?Number(optionPlan?.invalidation||0):Number(core?.stop??props.stop)} target1={optionContract?Number(optionPlan?.target||0):Number(core?.targets?.[0]??props.target1)} target2={optionContract?0:Number(core?.targets?.[1]??props.target2)}
       renderPanels={(planner,evidence)=><div className="security-workspace-panels">
         <WorkspaceTabs tabs={[{id:'analysis',label:'Analysis'},{id:'news',label:'News & Events'},{id:'fundamentals',label:'Fundamentals'},{id:'options',label:'Options'},{id:'plan',label:'Trade Plan'}]} active={panel} onChange={setPanel}/>
         <div role="tabpanel" aria-label={panel} className="workspace-panel">

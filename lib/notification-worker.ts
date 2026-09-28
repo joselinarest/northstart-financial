@@ -24,6 +24,8 @@ import {evaluateOptionsFlow} from "@/lib/options-flow-engine";
 import {refreshInvestmentNotificationCoverage} from "@/lib/investment-notification-coverage";
 import {runAccountIntelligenceLoop} from "@/lib/continuous-intelligence-loop";
 import {authoritativeRecommendation} from "@/lib/authoritative-recommendation";
+import {aiRetrySeconds,requireCompletedDecision} from './ai-service-status';
+import {reviewCoreDecision} from './secondary-ai-review';
 import {reviewKidsPlans} from "@/lib/kids-planning";
 
 
@@ -85,7 +87,7 @@ async function processNotifications(request: Request,limits:{totalMs:number;jobM
       SELECT id FROM background_jobs
       WHERE job_type NOT IN ('MARKET_DISCOVERY','OPTIONS_DISCOVERY','OPTIONS_ACCOUNT_REVIEW','ACCOUNT_OPPORTUNITY_REVIEW','NEXT_SESSION_RESEARCH') AND attempts<6 AND available_at<=CURRENT_TIMESTAMP
         AND (status IN ('QUEUED','FAILED') OR (status='RUNNING' AND locked_at<CURRENT_TIMESTAMP-INTERVAL '10 minutes'))
-      ORDER BY CASE WHEN job_type IN ('PLAID_SYNC','PLAID_INVESTMENT_SYNC','NOTIFICATION_DELIVERY') THEN 0 ELSE 1 END,CASE WHEN ?::boolean AND (job_type=?::text OR (?::text='MAINTENANCE' AND job_type IN ('DAILY_CLOSE_REVIEW','OVERNIGHT_OUTLOOK_REFRESH','TACTICAL_REENTRY_MONITOR','INVESTMENT_COVERAGE_AUDIT','KIDS_PLAN_REVIEW'))) THEN 0 ELSE 1 END,CASE WHEN job_type='OPTIONS_ACCOUNT_REVIEW' AND payload_json->>'manual'='true' THEN 0 ELSE 1 END,CASE WHEN job_type='OPTIONS_ACCOUNT_REVIEW' THEN COALESCE((payload_json->>'priority')::numeric,0)+LEAST(200,EXTRACT(EPOCH FROM (CURRENT_TIMESTAMP-created_at))/300) ELSE 0 END DESC,CASE WHEN created_at<CURRENT_TIMESTAMP-INTERVAL '10 minutes' THEN 0 ELSE 1 END,CASE job_type WHEN 'AI_EVENT_REVIEW' THEN 0 WHEN 'PLAID_INVESTMENT_SYNC' THEN 1 WHEN 'PLAID_SYNC' THEN 1 WHEN 'NOTIFICATION_DELIVERY' THEN 2 WHEN 'ACCOUNT_INTELLIGENCE_LOOP' THEN 3 WHEN 'MARKET_DISCOVERY' THEN 4 WHEN 'OPTIONS_DISCOVERY' THEN 4 WHEN 'OPTIONS_ACCOUNT_REVIEW' THEN 4 WHEN 'MARKET_INTELLIGENCE' THEN 5 ELSE 5 END,created_at FOR UPDATE SKIP LOCKED LIMIT 1
+      ORDER BY CASE WHEN payload_json->>'mode'='AI_SECONDARY' THEN 1 ELSE 0 END,CASE WHEN job_type IN ('PLAID_SYNC','PLAID_INVESTMENT_SYNC','NOTIFICATION_DELIVERY') THEN 0 ELSE 1 END,CASE WHEN ?::boolean AND (job_type=?::text OR (?::text='MAINTENANCE' AND job_type IN ('DAILY_CLOSE_REVIEW','OVERNIGHT_OUTLOOK_REFRESH','TACTICAL_REENTRY_MONITOR','INVESTMENT_COVERAGE_AUDIT','KIDS_PLAN_REVIEW'))) THEN 0 ELSE 1 END,CASE WHEN job_type='OPTIONS_ACCOUNT_REVIEW' AND payload_json->>'manual'='true' THEN 0 ELSE 1 END,CASE WHEN job_type='OPTIONS_ACCOUNT_REVIEW' THEN COALESCE((payload_json->>'priority')::numeric,0)+LEAST(200,EXTRACT(EPOCH FROM (CURRENT_TIMESTAMP-created_at))/300) ELSE 0 END DESC,CASE WHEN created_at<CURRENT_TIMESTAMP-INTERVAL '10 minutes' THEN 0 ELSE 1 END,CASE job_type WHEN 'AI_EVENT_REVIEW' THEN 0 WHEN 'PLAID_INVESTMENT_SYNC' THEN 1 WHEN 'PLAID_SYNC' THEN 1 WHEN 'NOTIFICATION_DELIVERY' THEN 2 WHEN 'ACCOUNT_INTELLIGENCE_LOOP' THEN 3 WHEN 'MARKET_DISCOVERY' THEN 4 WHEN 'OPTIONS_DISCOVERY' THEN 4 WHEN 'OPTIONS_ACCOUNT_REVIEW' THEN 4 WHEN 'MARKET_INTELLIGENCE' THEN 5 ELSE 5 END,created_at FOR UPDATE SKIP LOCKED LIMIT 1
     ) UPDATE background_jobs j SET status='RUNNING',attempts=j.attempts+1,
       locked_at=CURRENT_TIMESTAMP,updated_at=CURRENT_TIMESTAMP
       FROM claimable c WHERE j.id=c.id RETURNING j.*`).bind(preferBroad,preferredLane,preferredLane).all<Record<string, any>>();
@@ -122,7 +124,7 @@ async function processNotifications(request: Request,limits:{totalMs:number;jobM
       if(job.job_type==='OPTIONS_DISCOVERY')await runOptionsDiscovery(db);
       if(job.job_type==='OPTIONS_ACCOUNT_REVIEW'){const review=await runOptionsResearch(db,String(job.household_id),json(job.payload_json));if(review.retryable)throw Error('OPTIONS_RESEARCH_PARTIAL');}
       if(job.job_type==="MARKET_DISCOVERY")await runMarketDiscovery(db);
-      if(job.job_type==="AI_EVENT_REVIEW"){const payload=json(job.payload_json);await authoritativeRecommendation(db,{householdId:String(job.household_id),accountId:String(payload.accountId),symbol:String(payload.symbol),force:true});}
+      if(job.job_type==="AI_EVENT_REVIEW"){const payload=json(job.payload_json);if(payload.mode==='AI_SECONDARY')await reviewCoreDecision(db,String(job.household_id),String(payload.decisionId));else{const result=await authoritativeRecommendation(db,{householdId:String(job.household_id),accountId:String(payload.accountId),symbol:String(payload.symbol),force:true});requireCompletedDecision(result.checks);}}
       if(job.job_type==="QUANT_FLOW")await monitorQuantFlow(db,String(json(job.payload_json).symbol));
       if(job.job_type==="OPTIONS_FLOW")await evaluateOptionsFlow(db);
       if(job.job_type==="KIDS_PLAN_REVIEW"){const householdId=String(job.household_id||"");if(!householdId)throw new Error("KIDS_REVIEW_HOUSEHOLD_REQUIRED");await reviewKidsPlans(db,householdId,"MONTHLY");}
@@ -145,7 +147,7 @@ async function processNotifications(request: Request,limits:{totalMs:number;jobM
       if(job.job_type==='OPTIONS_ACCOUNT_REVIEW'){const payload=json(job.payload_json);await db.prepare("UPDATE options_research_stages SET status='TIMED_OUT',freshness='TIMED_OUT',last_error=?,next_retry_at=CURRENT_TIMESTAMP+INTERVAL '1 minute',updated_at=CURRENT_TIMESTAMP WHERE account_id=? AND symbol=? AND status='REFRESHING'").bind(String(error instanceof Error?error.message:'RESEARCH_FAILED').slice(0,200),payload.accountId,payload.symbol).run();}
       const attempt = Number(job.attempts || 0),
         dead = attempt >= 6,
-        delay = Math.min(3600, 30 * 2 ** Math.max(0, attempt - 1));
+        delay = Math.max(aiRetrySeconds(error instanceof Error?error.message:''),Math.min(3600, 30 * 2 ** Math.max(0, attempt - 1)));
       await db
         .prepare(
           "UPDATE background_jobs SET status=?,available_at=CURRENT_TIMESTAMP+(? * INTERVAL '1 second'),error_code=?,updated_at=CURRENT_TIMESTAMP WHERE id=?",

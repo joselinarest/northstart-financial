@@ -1,4 +1,5 @@
 import type {EntryPlan,EntryObservation} from "@/lib/entry-plan";
+import {researchMarketFresh} from '@/lib/research-market-freshness';
 /** Deterministic, versioned policy. Money in dollars; stock sizing in whole shares. */
 export const STRATEGY_VERSION = "lifecycle-1.0.0";
 export const SELL_REASONS = ["THESIS BROKEN", "TECHNICAL EXIT", "STOP/INVALIDATION", "TARGET REACHED", "OVERVALUED/TRIM", "CONCENTRATION REDUCTION", "CAPITAL ROTATION", "TACTICAL SELL FOR EXPECTED PULLBACK", "GOAL/REBALANCE"] as const;
@@ -36,7 +37,7 @@ export type Action = {
   supporting: string[]; opposing: string[]; pipeline: "COMPLETE" | "INCOMPLETE"; strategyVersion: string;
 };
 const money = (n: number) => Math.round(n * 100) / 100;
-export const fresh = (e: Evidence, now: number, strategy: Strategy) => e.complete && Number.isFinite(Date.parse(e.asOf)) && now >= Date.parse(e.asOf) && now - Date.parse(e.asOf) <= (strategy === "LONG_TERM" ? 86400000 : 20 * 60000);
+export const fresh = (e: Evidence, now: number, strategy: Strategy) => e.complete && researchMarketFresh(e.asOf,strategy === "LONG_TERM" ? 86400000 : 20 * 60000,now);
 export function sizeReentry(cash: number, price: number, stop: number, p: PositionState, a: AccountRisk) {
   if (![cash,price,stop,a.value,a.cash,a.maxRiskBps,a.maxPositionBps].every(Number.isFinite) || price <= 0 || stop <= 0 || stop >= price) return 0;
   const budget = Math.max(0, Math.min(cash, a.cash - a.reservedElsewhere - a.value*(a.cashReserveBps??0)/10000) - a.commission);
@@ -103,6 +104,10 @@ export function evaluatePosition(p: PositionState, e: Evidence, a: AccountRisk, 
     const stop = e.support - e.atr*.5, shares = sizeReentry(a.cash,e.price,stop,p,a);
     if (shares > 0) return {...result,action:p.shares ? "ADD":"BUY NOW",shares,remainingShares:p.shares+shares,cost:money(shares*e.price*(1+a.slippageBps/10000)+a.commission),cashAfter:money(a.cash-shares*e.price*(1+a.slippageBps/10000)-a.commission),stop,reason:"Thesis, valuation, trend, volume, regime and account risk agree."};
   }
+  const entryBlockers=[...(e.thesis!=='VALID'?['Fundamental thesis has not qualified']:[]),...(!trend?['Price/trend confirmation has not passed']:[]),...(!e.valuationAttractive?['Valuation does not meet the entry threshold']:[]),...(!e.newsClear?['News/catalyst review has not cleared entry']:[]),...(!e.marketStrong||!e.sectorStrong?['Market or sector confirmation is unfavorable']:[]),...(e.relativeStrength<=0?['Relative strength is not positive']:[]),...(e.volumeRatio<1.2?[`Relative volume ${e.volumeRatio.toFixed(2)}× is below 1.2×`]:[])];
+  const deployable=Math.max(0,a.cash-a.reservedElsewhere-a.value*(a.cashReserveBps??0)/10000);
+  if(deployable<e.price)entryBlockers.push(`Whole-share entry needs at least $${money(e.price)} before costs; $${money(deployable)} is deployable after reserves.`);
+  if(entryBlockers.length){result.reason=(p.shares?'HOLD existing exposure; no addition approved. ':'HOLD CASH; no entry approved. ')+entryBlockers.join('; ');result.opposing.push(...entryBlockers);}
   return result;
 }
 export function monitorReentry(plan: ReentryPlan, p: PositionState, e: Evidence, a: AccountRisk, now = Date.now()) {

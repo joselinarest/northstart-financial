@@ -1,3 +1,4 @@
+import {normalizedFundamentalMetrics} from '@/lib/fundamental-metrics';
 import {researchNews} from './research-news';
 import {researchMarketFresh} from "@/lib/research-market-freshness";
 import {accountRiskSettings} from "@/lib/account-risk-settings";
@@ -167,18 +168,15 @@ export async function researchRecommendation(
           ? "BEARISH"
           : "NEUTRAL";
   const m = fundamental.metrics,
+    normalized = normalizedFundamentalMetrics(m),
     revenueGrowth = metric(m, "revenueGrowthTTMYoy", "revenueGrowth5Y"),
     epsGrowth = metric(m, "epsGrowthTTMYoy", "epsGrowth5Y"),
     grossMargin = metric(m, "grossMarginTTM"),
     operatingMargin = metric(m, "operatingMarginTTM"),
     netMargin = metric(m, "netProfitMarginTTM"),
-    fcfPerShare = metric(m, "freeCashFlowPerShareTTM"),
+    fcfPerShare = normalized.freeCashFlowPerShare,
     roe = metric(m, "roeTTM"),
-    debtEquity = metric(
-      m,
-      "totalDebtToEquityQuarterly",
-      "totalDebt/totalEquityQuarterly",
-    ),
+    debtEquity = normalized.debtEquityPct,
     forwardPe = metric(m, "forwardPE"),
     trailingPe = metric(m, "peTTM", "peBasicExclExtraTTM"),
     marketCap = metric(fundamental.profile, "marketCapitalization"),
@@ -204,7 +202,7 @@ export async function researchRecommendation(
           : operatingMargin !== null && operatingMargin < 0
             ? -15
             : 0) +
-        (fcfPerShare !== null && fcfPerShare > 0 ? 12 : -8) +
+        (normalized.cashFlowPositive === true ? 12 : -8) +
         (debtEquity !== null && debtEquity < 150
           ? 8
           : debtEquity !== null && debtEquity > 300
@@ -248,7 +246,7 @@ export async function researchRecommendation(
     earningsQuality = clamp(
       35 +
         (operatingMargin !== null && operatingMargin > 0 ? 20 : -10) +
-        (fcfPerShare !== null && fcfPerShare > 0 ? 20 : -10),
+        (normalized.cashFlowPositive === true ? 20 : -10),
     ),
     competitivePosition = clamp(coverage >= 6 ? 65 : 45),
     fundamentalRisks = [
@@ -459,7 +457,7 @@ export async function researchRecommendation(
         balanceSheetQuality:debtEquity!==null?balanceSheetQuality:null,
         valuationAttractiveness:valuation==='UNAVAILABLE'?null:valuationAttractiveness,
         capitalEfficiency: roe,
-        earningsQuality:operatingMargin!==null&&fcfPerShare!==null?earningsQuality:null,
+        earningsQuality:operatingMargin!==null&&normalized.cashFlowPositive!==null?earningsQuality:null,
         competitivePosition:null,
         fundamentalRisks,
         bullCase:
@@ -467,6 +465,7 @@ export async function researchRecommendation(
         baseCase: "Execution continues near current provider estimates.",
         bearCase:
           "Growth slows, margins compress, or debt/capital intensity reduces future returns.",
+        cashFlowBasis:normalized.cashFlowBasis,
         thesisStatus,
         dataTimestamp: fundamental.asOf,
         metrics: {
@@ -631,7 +630,7 @@ export async function researchRecommendation(
         confidence,
         reason,
         JSON.stringify(checks),
-        false, // Research facts are published only after the central AI gate.
+        false, // Research facts are published only after the deterministic core evidence and risk gate.
         modelVersion,
         marketAsOf,
         expiresAt.toISOString(),
@@ -675,11 +674,11 @@ export async function researchRecommendation(
 /** All user-facing surfaces consume the same account-scoped published decision. */
 export async function authoritativeRecommendation(db:PostgresDatabase,input:{householdId:string;accountId:string;symbol:string;force?:boolean}){
   const existing=await db.prepare("SELECT r.*,s.ticker FROM recommendations r JOIN securities s ON s.id=r.security_id WHERE r.household_id=? AND r.account_id=? AND s.ticker=? AND r.checks_json->'aiEvidence' IS NOT NULL AND r.lifecycle IN ('MONITORING','TRIGGERED') AND r.expires_at>CURRENT_TIMESTAMP ORDER BY r.created_at DESC LIMIT 1").bind(input.householdId,input.accountId,input.symbol.toUpperCase()).first<Json>();
-  if(existing&&!input.force)return {recommendation:existing,checks:parse(existing.checks_json),source:"CENTRAL_AI_PERSISTED"};
+  if(existing&&!input.force)return {recommendation:existing,checks:parse(existing.checks_json),source:"CORE_DECISION_PERSISTED"};
   await researchRecommendation(db,input);
   const {runTradeLifecycle}=await import("@/lib/trade-lifecycle-service");
   await runTradeLifecycle(db,input.householdId,input.accountId,{symbol:input.symbol.toUpperCase()});
   const published=await db.prepare("SELECT r.*,s.ticker FROM recommendations r JOIN securities s ON s.id=r.security_id WHERE r.household_id=? AND r.account_id=? AND s.ticker=? AND r.checks_json->'aiEvidence' IS NOT NULL AND r.lifecycle IN ('MONITORING','TRIGGERED') ORDER BY r.created_at DESC LIMIT 1").bind(input.householdId,input.accountId,input.symbol.toUpperCase()).first<Json>();
   if(!published)throw new Error("CENTRAL_DECISION_UNAVAILABLE");
-  return {recommendation:published,checks:parse(published.checks_json),source:"CENTRAL_AI"};
+  return {recommendation:published,checks:parse(published.checks_json),source:"CORE_DECISION"};
 }

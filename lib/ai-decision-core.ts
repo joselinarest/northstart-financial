@@ -1,41 +1,14 @@
 import {nextOpenResearch} from "@/lib/options-next-open";
+import {aiServiceStatus,aiFailureMessage} from './ai-service-status';
 import {researchMarketFresh} from "@/lib/research-market-freshness";
 import {flowForStrategy,flowDecisionSummary,type FlowEvidence} from "@/lib/flow-evidence";
 import {QuantDataProvider} from "@/lib/providers/quant-data";
-import {entryOrderReady} from "@/lib/entry-plan";
-import {createHash} from "node:crypto";
+import {createHash} from 'node:crypto';
+import {strictDecisionQuality,decisionSnapshotId,redactDecisionData,candidateIsSafe} from './decision-validation';
+export {strictDecisionQuality,decisionSnapshotId,redactDecisionData,candidateIsSafe} from './decision-validation';
 import {id,type PostgresDatabase} from "@/lib/db";
 import {safeDecision,type DecisionInput,type DecisionOutput,type DecisionCandidate,type DecisionModelAdapter} from "@/lib/ai-investment-decision-engine";
 import {AI_SCHEMA_VERSION,configuredAIProvider,validateAIReasoning,type AIProvider,type AIRequest,type AIReasoning} from "@/lib/ai-provider";
-const commonFacts=["currentPrice","fundamentals","technical","portfolio","accountCash","riskLimit","news","valuation","marketRegime"];
-export function strictDecisionQuality(input:DecisionInput){
-  const required=[...new Set([...commonFacts,...input.requiredFacts,...(input.strategy==="OPTIONS"?["underlyingThesis","optionQuote","greeks","liquidity"]:[])])];
-  const labels=new Set(input.evidence.filter(e=>e.value!==null&&e.value!==undefined&&e.value!==""&&!(typeof e.value==="number"&&!Number.isFinite(e.value))&&!(typeof e.value==="object"&&!Array.isArray(e.value)&&!Object.keys(e.value as object).length)).map(e=>e.label));
-  const missing=required.filter(x=>!labels.has(x));
-  const stale=input.evidence.filter(e=>required.includes(e.label)).filter(e=>{const age=Date.now()-Date.parse(e.asOf||"");const limit=["fundamentals","valuation"].includes(e.label)?7*86400000:input.strategy==="LONG_TERM_SHARES"?86400000:20*60000;return (["currentPrice","technical","marketRegime"].includes(e.label)||(input.requestType==="OPTIONS_NEXT_OPEN_RESEARCH"&&nextOpenResearch()&&["underlyingPrice","optionQuote","greeks","liquidity"].includes(e.label)))?!researchMarketFresh(e.asOf||"",limit):!Number.isFinite(age)||age<0||age>limit;}).map(e=>e.label);
-  if(!Number.isFinite(Date.parse(input.dataTimestamp)))stale.push("snapshotTimestamp");
-  const conflicts=[...(input.conflicts||[]),...input.evidence.flatMap(e=>e.conflicts||[])];
-  return {score:Math.max(0,100-missing.length*14-stale.length*8-conflicts.length*10),missing,stale,conflicts};
-}
-export function redactDecisionData(value:unknown):unknown{
-  if(Array.isArray(value))return value.map(redactDecisionData);
-  if(value&&typeof value==="object")return Object.fromEntries(Object.entries(value).filter(([key])=>!/(secret|token|password|api.?key|authorization|email|address|account.?number|routing|accountName|nickname|userId|householdId)/i.test(key)).map(([key,v])=>[key,redactDecisionData(v)]));
-  return value;
-}
-const stable=(v:unknown):string=>Array.isArray(v)?`[${v.map(stable).join(',')}]`:v&&typeof v==="object"?`{${Object.entries(v).sort(([a],[b])=>a.localeCompare(b)).map(([k,x])=>`${JSON.stringify(k)}:${stable(x)}`).join(',')}}`:JSON.stringify(v)??"null";
-export function decisionSnapshotId(input:DecisionInput){return createHash('sha256').update(stable(redactDecisionData({accountId:input.accountId,ticker:input.ticker,strategy:input.strategy,features:input.features,evidence:input.evidence,candidates:input.candidates,dataTimestamp:input.dataTimestamp}))).digest('hex');}
-export function candidateIsSafe(c:DecisionCandidate){
-  const sale=["SELL_NOW","SELL_IF","TRIM"].includes(c.action),buy=["BUY_NOW","BUY_IF","ADD","REBUY_IF","ROTATE_CAPITAL"].includes(c.action);
-  if(!c.eligible||![c.shares,c.cost,c.proceeds,c.cashBefore,c.cashAfter,...c.targets].every(Number.isFinite)||c.shares<0||c.cost<0||c.proceeds<0||c.cashAfter<0)return false;
-  if((sale||buy)&&(!(c.shares>0)||!c.entry||c.entry<=0))return false;
-  const option=c.instrument==="CALL"||c.instrument==="PUT";
-  if(buy&&option){if(c.action!=="BUY_IF"||!c.contractSymbol||!Number.isInteger(c.shares)||Math.abs(c.cost-c.shares*Number(c.entry)*100)>.02)return false;}
-  else if(buy&&(!entryOrderReady(c.entryPlan)||c.entryPlan?.orderPrice!==c.entry||c.entryPlan?.shares!==c.shares))return false;
-  if(buy&&(!c.stop||c.stop>=Number(c.entry)||c.stop<=0||c.cost>c.cashBefore+.01||Math.abs(c.cashBefore-c.cost-c.cashAfter)>.02))return false;
-  if(sale&&(!c.sellReason||c.cashAfter>c.cashBefore+c.proceeds+.01))return false;
-  if(sale&&c.instrument==="SHARES"&&!["THESIS BROKEN","GOAL/REBALANCE","CAPITAL ROTATION"].includes(c.sellReason||"")&&!c.reentryPlan)return false;
-  return true;
-}
 export async function runCentralDecision(input:DecisionInput,{db,persist=true,aiProvider}:{db?:PostgresDatabase;persist?:boolean;adapter?:DecisionModelAdapter;aiProvider?:AIProvider}={}):Promise<DecisionOutput>{
   if(db){
     const flow=await new QuantDataProvider(db).getEvidence(input.ticker).then(f=>flowForStrategy(f,input.strategy)).catch(()=>null);
@@ -47,17 +20,19 @@ export async function runCentralDecision(input:DecisionInput,{db,persist=true,ai
   let result:DecisionOutput={...safeDecision(input,q,modelVersion,strategyVersion),confidence:0,providerFacts:input.evidence.filter(e=>e.sourceType!=="MODEL_INFERENCE").map(e=>`${e.label}: ${JSON.stringify(redactDecisionData(e.value))}`),interpretation:"AI recommendations unavailable. Deterministic portfolio facts remain available.",modelInferences:[],snapshotId:decisionSnapshotId(input),schemaVersion:AI_SCHEMA_VERSION,providerStatus:"UNAVAILABLE",cashBefore:null,cashAfter:null,thesisStatus:"RESEARCH_REQUIRED",sellReason:null,reentryPlan:null,evidenceSources:input.evidence,executionAllowed:false,deterministicCandidates:input.candidates||[]};
   let errorCode:string|null=null,request:AIRequest|null=null,response:AIReasoning|null=null,requestId:string|null=null;
   const candidates=(input.candidates||[]).filter(candidateIsSafe);
+  const service=db&&provider?await aiServiceStatus(db,provider.name):null;
   if(q.missing.length||q.stale.length||q.conflicts.length)errorCode="INSUFFICIENT_DATA";
   else if(!champion||!model)errorCode="MODEL_OR_STRATEGY_NOT_APPROVED";
   else if(!provider)errorCode="AI_NOT_CONFIGURED";
   else if(champion.provider!==provider.name)errorCode="AI_PROVIDER_VERSION_MISMATCH";
   else if(!candidates.length)errorCode="NO_VERIFIED_CANDIDATES";
+  else if(service?.coolingDown)errorCode=service.code;
   else {
     const fullFlow=input.features.marketStructure as FlowEvidence|undefined;
     const compactFlow=fullFlow?.prints?flowDecisionSummary(fullFlow):fullFlow;
     const modelFeatures={...input.features,marketStructure:compactFlow},modelEvidence=input.evidence.map(e=>e.label==='marketStructure'?{...e,value:compactFlow}:e);
     const snapshot=redactDecisionData({schemaVersion:AI_SCHEMA_VERSION,snapshotId:result.snapshotId,account:{id:createHash('sha256').update(input.accountId).digest('hex').slice(0,16),strategy:input.strategy},ticker:input.ticker,features:modelFeatures,evidence:modelEvidence,candidates}) as Record<string,unknown>;
-    request={snapshotId:result.snapshotId!,schemaVersion:AI_SCHEMA_VERSION,model,snapshot,candidateIds:candidates.map(c=>c.id),evidenceIds:input.evidence.map(e=>e.label)};
+    request={reviewMode:input.requestType==='SECONDARY_EXPLANATION',snapshotId:result.snapshotId!,schemaVersion:AI_SCHEMA_VERSION,model,snapshot,candidateIds:candidates.map(c=>c.id),evidenceIds:input.evidence.map(e=>e.label)};
     try {
       const raw=await provider.analyze(request);requestId=raw.requestId;response=validateAIReasoning(raw.output,request);
       const scenarios=input.features.rotationScenarios as {horizonDays:number;price:number;bull:number;base:number;bear:number}|null;
@@ -66,10 +41,10 @@ export async function runCentralDecision(input:DecisionInput,{db,persist=true,ai
       if(response.evidenceIds.length===0||response.evidenceIds.every(e=>/flow|marketStructure/i.test(e)))throw new Error("AI_FLOW_ONLY_REASONING");
       if(c.instrument!==response.instrument)throw new Error("AI_INSTRUMENT_MISMATCH");
       const confidence=Math.round(response.confidence*Math.max(.5,Math.min(1,Number(champion.calibration_factor)))*q.score/100);
-      result={...result,entryPlan:c.entryPlan,action:c.action,shares:c.shares,entry:c.entry,trigger:c.trigger,stop:c.stop,targets:c.targets,cashBefore:c.cashBefore,cashAfter:c.cashAfter,expectedCostProceeds:c.proceeds||c.cost,thesisStatus:c.thesisStatus,sellReason:c.sellReason,reentryPlan:c.reentryPlan,instrument:c.instrument,contractSymbol:c.contractSymbol,candidateId:c.id,confidence,confidenceBand:confidence>=85?"VERY_HIGH":confidence>=70?"HIGH":confidence>=50?"MEDIUM":"LOW",interpretation:response.interpretation,reasoningFactors:response.reasonsFor,contradictingEvidence:response.reasonsAgainst,whatWouldChange:response.whatWouldChange,risk:response.risks.join("; "),invalidation:c.stop?`Invalid below ${c.stop}; invalidate on thesis change.`:"Thesis or evidence changes",modelInferences:[response.interpretation],providerStatus:"AVAILABLE",bull:{probability:response.scenarios.bull,priceZone:c.targets.join(" – ")||"No deterministic target",confirmation:c.reason,invalidation:"Thesis or confirmation fails"},base:{probability:response.scenarios.base,priceZone:c.entry?String(c.entry):"No action",confirmation:c.reason,invalidation:"Evidence changes"},bear:{probability:response.scenarios.bear,priceZone:c.stop?String(c.stop):"Risk not priced",confirmation:"Stop or thesis invalidation",invalidation:"Recovery confirmed"}};
+      result={...result,aiReviewPosition:response.reviewPosition,entryPlan:c.entryPlan,action:c.action,shares:c.shares,entry:c.entry,trigger:c.trigger,stop:c.stop,targets:c.targets,cashBefore:c.cashBefore,cashAfter:c.cashAfter,expectedCostProceeds:c.proceeds||c.cost,thesisStatus:c.thesisStatus,sellReason:c.sellReason,reentryPlan:c.reentryPlan,instrument:c.instrument,contractSymbol:c.contractSymbol,candidateId:c.id,confidence,confidenceBand:confidence>=85?"VERY_HIGH":confidence>=70?"HIGH":confidence>=50?"MEDIUM":"LOW",interpretation:response.interpretation,reasoningFactors:response.reasonsFor,contradictingEvidence:response.reasonsAgainst,whatWouldChange:response.whatWouldChange,risk:response.risks.join("; "),invalidation:c.stop?`Invalid below ${c.stop}; invalidate on thesis change.`:"Thesis or evidence changes",modelInferences:[response.interpretation],providerStatus:"AVAILABLE",bull:{probability:response.scenarios.bull,priceZone:c.targets.join(" – ")||"No deterministic target",confirmation:c.reason,invalidation:"Thesis or confirmation fails"},base:{probability:response.scenarios.base,priceZone:c.entry?String(c.entry):"No action",confirmation:c.reason,invalidation:"Evidence changes"},bear:{probability:response.scenarios.bear,priceZone:c.stop?String(c.stop):"Risk not priced",confirmation:"Stop or thesis invalidation",invalidation:"Recovery confirmed"}};
     }catch(error){errorCode=error instanceof Error&&/^AI_[A-Z0-9_]+$/.test(error.message)?error.message:"AI_PROVIDER_FAILED";response=null;}
   }
-  if(errorCode){result.providerStatus=errorCode;result.reasoningFactors.push(errorCode);}
+  if(errorCode){result.providerStatus=errorCode;result.reasoningFactors.push(errorCode);if(errorCode.startsWith('AI_')){result.action='INSUFFICIENT_CONFIRMATION';result.interpretation=aiFailureMessage(errorCode);result.whatWouldChange=[errorCode==='AI_QUOTA_EXHAUSTED'?'Restore production API credits, then rerun fresh account analysis.':'Retry account analysis after the provider recovers.'];}}
   if(persist&&db){
     const decisionId=id("decision"),status=errorCode?(request?"FAILED":"REJECTED_BY_GATE"):"COMPLETED";result.decisionId=decisionId;
     await db.transaction(async tx=>{
