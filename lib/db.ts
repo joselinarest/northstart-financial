@@ -111,12 +111,12 @@ export async function workspace(request: Request) {
   if (requested && !membership) throw new Response(JSON.stringify({error:"You do not have access to this household"}),{status:403,headers:{"Content-Type":"application/json"}});
   if (!membership) membership = await db.prepare("SELECT household_id,role FROM household_members WHERE user_id=? AND status='active' ORDER BY CASE WHEN household_id=? THEN 1 ELSE 0 END, CASE role WHEN 'owner' THEN 0 WHEN 'co_owner' THEN 1 ELSE 2 END, household_id LIMIT 1").bind(user.userId,personalHouseholdId).first<{household_id:string;role:string}>();
   const householdId = membership?.household_id || personalHouseholdId;
-  const requestPath=new URL(request.url).pathname,studentAllowed=requestPath==="/api/household"||requestPath.startsWith("/api/learning")||requestPath.startsWith("/api/documents")||requestPath.startsWith("/api/paper-trades");
+  const requestPath=new URL(request.url).pathname,academyRequest=requestPath==="/api/academy",studentAllowed=academyRequest||requestPath==="/api/household"||requestPath.startsWith("/api/learning")||requestPath.startsWith("/api/documents")||requestPath.startsWith("/api/paper-trades");
   if(membership?.role==="student"&&!studentAllowed)throw new Response(JSON.stringify({error:"Student accounts are limited to Northstar Academy and educational simulation"}),{status:403,headers:{"Content-Type":"application/json"}});
   const mutation=!['GET','HEAD','OPTIONS'].includes(request.method.toUpperCase());
-  if(mutation&&['observer','viewer'].includes(membership?.role||''))throw new Response(JSON.stringify({error:"Your household role is read-only"}),{status:403,headers:{"Content-Type":"application/json"}});
-  if(mutation&&membership?.role==='student'&&!requestPath.startsWith('/api/paper-trades'))throw new Response(JSON.stringify({error:"Student accounts may only save Academy and simulation activity"}),{status:403,headers:{"Content-Type":"application/json"}});
-  if(mutation&&membership?.role==='account_connector'&&!requestPath.startsWith('/api/connections/plaid'))throw new Response(JSON.stringify({error:"Account connectors may only link and synchronize their own financial institutions"}),{status:403,headers:{"Content-Type":"application/json"}});
+  if(mutation&&!academyRequest&&['observer','viewer'].includes(membership?.role||''))throw new Response(JSON.stringify({error:"Your household role is read-only"}),{status:403,headers:{"Content-Type":"application/json"}});
+  if(mutation&&!academyRequest&&membership?.role==='student'&&!requestPath.startsWith('/api/paper-trades'))throw new Response(JSON.stringify({error:"Student accounts may only save Academy and simulation activity"}),{status:403,headers:{"Content-Type":"application/json"}});
+  if(mutation&&!academyRequest&&membership?.role==='account_connector'&&!requestPath.startsWith('/api/connections/plaid'))throw new Response(JSON.stringify({error:"Account connectors may only link and synchronize their own financial institutions"}),{status:403,headers:{"Content-Type":"application/json"}});
   const entity = await db.prepare("SELECT id FROM entities WHERE household_id=? ORDER BY CASE type WHEN 'personal' THEN 0 ELSE 1 END,id LIMIT 1").bind(householdId).first<{id:string}>();
   return { db, householdId, entityId: entity?.id || personalEntityId, role: membership?.role || "owner", ...user };
 }

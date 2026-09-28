@@ -269,7 +269,7 @@ export default function ChartDecisionWorkspace(props: Props) {
       renderPanels={(planner,evidence)=><div className="security-workspace-panels">
         <WorkspaceTabs tabs={[{id:'analysis',label:'Analysis'},{id:'news',label:'News & Events'},{id:'fundamentals',label:'Fundamentals'},{id:'options',label:'Options / Flow'},{id:'plan',label:'Trade Plan'}]} active={panel} onChange={setPanel}/>
         <div role="tabpanel" aria-label={panel} className="workspace-panel">
-          {panel==='analysis'&&<><h3>Evidence and risks</h3><p>{finalReason}</p>{dataIssues.length>0&&<ul>{dataIssues.map(issue=><li key={issue}>{issue}</li>)}</ul>}<button disabled={refreshingDecision} onClick={refreshDecision}>{refreshingDecision?'Refreshing…':'Refresh evidence'}</button>{evidence}<QuantDataEvidence symbol={props.symbol} compact/></>}
+          {panel==='analysis'&&<><h3>Evidence and risks</h3><a href="/workspace/academy?module=indicators">Explain &amp; Practice indicators →</a><p>{finalReason}</p>{dataIssues.length>0&&<ul>{dataIssues.map(issue=><li key={issue}>{issue}</li>)}</ul>}<button disabled={refreshingDecision} onClick={refreshDecision}>{refreshingDecision?'Refreshing…':'Refresh evidence'}</button>{evidence}<QuantDataEvidence symbol={props.symbol} compact/></>}
           {panel==='news'&&<NewsEventList symbol={props.symbol} items={Array.isArray(research?.news)?research.news:[]} loading={loading} error={research?.error||(!Array.isArray(research?.news)?(research?.news as any)?.error:undefined)}/>}
           {panel==='fundamentals'&&<FundamentalPanel profile={research?.profile} metrics={research?.metrics}/>}
           {panel==='options'&&<OptionsPanel symbol={props.symbol} accountId={props.accountId} interpretation={finalReason}/>}
