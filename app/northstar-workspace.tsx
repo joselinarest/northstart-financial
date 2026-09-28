@@ -12159,7 +12159,7 @@ export function NorthstarWorkspace({
             </div>
           </section>
           <section className="academy-hub card" id="academy-course">
-            <AcademyLab accessToken={accessToken} />
+            {tab === "Learn" && <AcademyLab accessToken={accessToken} />}
           </section>
           <footer>
             {["Learn", "Paper Simulator"].includes(tab)
