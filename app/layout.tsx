@@ -41,6 +41,7 @@ import './professional-workspace.css';
 import './trading-workspace.css';
 import { ConfirmProvider } from './confirmation-modal';
 import PwaManager from './pwa-manager';
+import ReleaseUpdateNotice from './release-update-notice';
 import MobileOverflowDebug from './mobile-overflow-debug';
 
 const geistSans = Geist({
@@ -83,7 +84,7 @@ export default function RootLayout({
         suppressHydrationWarning
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
-        <ConfirmProvider><PwaManager/><MobileOverflowDebug/>{children}</ConfirmProvider>
+        <ConfirmProvider><PwaManager/><ReleaseUpdateNotice/><MobileOverflowDebug/>{children}</ConfirmProvider>
       </body>
     </html>
   );

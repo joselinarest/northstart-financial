@@ -30,5 +30,7 @@ try{
  const market=require('../work/always-on-check/lib/market-research-inputs.cjs');
  await pg.query("INSERT INTO discovery_provider_cache(cache_key,payload_json,fetched_at,expires_at) VALUES('research-v2:SHARED',$1,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP+INTERVAL '5 minutes')",[{symbol:'SHARED',asOf:new Date().toISOString(),stageErrors:{},shared:true}]);
  const fresh=await market.marketResearchInputs(db,'SHARED',true,undefined,new Date(Date.now()-60000).toISOString());assert.equal(fresh.shared,true,'forced account requests share research fetched after the request instead of refetching providers');
+ await pg.query("INSERT INTO account_search_candidates(run_id,symbol,status,decision_json) VALUES($1,'S00','COMPLETE',$2) ON CONFLICT(run_id,symbol) DO UPDATE SET decision_json=EXCLUDED.decision_json",[accountRun.runId,{symbol:'S00',price:20,fractional:false,minimumCash:20,investableCash:0}]);
+ const named=await search.accountSearchStatus(db,'h','a');assert.equal(named.candidates.find(c=>c.symbol==='S00').companyName,'Company 0','saved candidates resolve company identity without rerunning research');assert.equal(await search.accountSearchStatus(db,'different-household','a'),null,'research names do not bypass account scope');
  console.log('PASS: durable rotations, failed/retired coverage, fair background slots, autonomous queue dedupe, no overlapping account runs, Options backpressure/manual priority, strategy-specific scores, allocation/fractional sizing, default-open proof.');
 }finally{await pg.close();}

@@ -1,0 +1,3 @@
+import React from 'react';import {createRoot} from 'react-dom/client';import Advisor from '../app/swing-options-advisor';import Chart from '../app/chart-decision-workspace';
+const q=new URLSearchParams(location.search);
+createRoot(document.getElementById('root')!).render(q.has('optionContract')?<Chart accountId={q.get('accountId')!} symbol={q.get('symbol')!} strategy="swing" accountName="Options Test Account" accountValue={10000} cashAvailable={500} ownedShares={0} ownedValue={0} price={100} bid={99} ask={101} relativeVolume={1} confidence={0} support={95} resistance={110} entryLow={99} entryHigh={101} stop={94} target1={115} target2={120} fresh={false}/>:<Advisor accountId="options-account" accountName="Options Test Account" initialSymbol="TSLA"/>);

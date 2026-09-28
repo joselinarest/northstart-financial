@@ -1780,7 +1780,7 @@ export function NorthstarWorkspace({
   );
   const applyWorkspacePath = (pathname: string, search = "") => {
     const linkedSetup=pathname==='/workspace/charts'?readChartSetup(search):null;
-    if(linkedSetup){setChartSymbol(linkedSetup.symbol);setTimeframe('5m');}
+    if(linkedSetup){setChartSymbol(linkedSetup.symbol);setTimeframe(new URLSearchParams(search).get('timeframe')==='1D'?'1D':'5m');}
     const billMatch = pathname.match(/^\/workspace\/bills\/([^/]+)\/?$/);
     if (billMatch) {
       const accountId = new URLSearchParams(search).get("accountId");
@@ -2520,7 +2520,8 @@ export function NorthstarWorkspace({
   );
   useEffect(() => {
     const linked=location.pathname==="/workspace/charts"?readChartSetup(location.search):null;
-    const saved = linked?.accountId||localStorage.getItem("northstar-analysis-scope");
+    const requestedAccount=(location.pathname==="/workspace/charts"||location.pathname.startsWith("/workspace/research/"))?new URLSearchParams(location.search).get("accountId"):null;
+    const saved = linked?.accountId||requestedAccount||localStorage.getItem("northstar-analysis-scope");
     if (
       saved === ALL_ACCOUNTS_SCOPE ||
       investmentAccounts.some((account) => String(account.id) === saved)

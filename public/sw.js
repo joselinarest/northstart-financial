@@ -1,5 +1,5 @@
 /* Northstar PWA worker. Private financial pages and API payloads are never cached. */
-const VERSION = "northstar-pwa-v8";
+const VERSION = "northstar-pwa-v9";
 const STATIC_CACHE = `${VERSION}-static`;
 const OFFLINE_URL = "/offline";
 const PRECACHE = [OFFLINE_URL,"/manifest.webmanifest","/favicon.svg","/icons/northstar-192.png","/icons/northstar-512.png","/icons/northstar-maskable-192.png","/icons/northstar-maskable-512.png","/icons/apple-touch-icon.png"];

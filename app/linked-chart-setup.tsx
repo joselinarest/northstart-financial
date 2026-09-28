@@ -5,7 +5,7 @@ import {setupValidationClock} from '@/lib/setup-validation-clock';
 export default function LinkedChartSetup({symbol}:{symbol:string}){
  const [setup,setSetup]=useState<ChartSetup|null>(null);
  const [now,setNow]=useState(Date.now()),[data,setData]=useState<any>(null),[error,setError]=useState(''),[checked,setChecked]=useState<number|null>(null);
- useEffect(()=>{setSetup(readChartSetup(location.search))},[symbol]);
+ useEffect(()=>{setSetup(new URLSearchParams(location.search).has('optionContract')?null:readChartSetup(location.search))},[symbol]);
  useEffect(()=>{if(!setup||setup.symbol!==symbol)return;let active=true;const controller=new AbortController();setData(null);setChecked(null);setError('');const load=async()=>{try{const r=await fetch(`/api/market/bars?symbol=${encodeURIComponent(symbol)}&range=5m`,{signal:controller.signal,cache:'no-store'}),body=await r.json();if(!r.ok||!Array.isArray(body.bars))throw new Error(body.error||'Candles unavailable');if(active){setData(body);setChecked(Date.now());setError('')}}catch(e){if(active)setError(e instanceof Error?e.message:'Validation unavailable')}};void load();const poll=setInterval(load,60000),clock=setInterval(()=>setNow(Date.now()),1000);return()=>{active=false;controller.abort();clearInterval(poll);clearInterval(clock)}},[setup,symbol]);
  if(!setup||setup.symbol!==symbol)return null;
  const price=(v:number)=>v>0?`$${v.toFixed(2)}`:'Requires fresh analysis';

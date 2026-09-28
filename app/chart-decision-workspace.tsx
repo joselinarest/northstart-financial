@@ -1,8 +1,9 @@
 "use client";
+import ChartOptionResearch from "./chart-option-research";
 import ChartExitReview from "./chart-exit-review";
 import HoldingCostBadge from "@/app/holding-cost-badge";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useCallback } from "react";
 import ChartEngine from "./chart-engine";
 import WorkspaceTabs from "./workspace-tabs";
 import SecurityHeader from "./security-header";
@@ -64,6 +65,10 @@ const metric = (data: Record<string, any> | undefined, ...keys: string[]) => {
 
 export default function ChartDecisionWorkspace(props: Props) {
   const [panel,setPanel]=useState("analysis");
+  const [optionContract,setOptionContract]=useState(''),[optionPlan,setOptionPlan]=useState<Record<string,any>|null>(null);
+  const receiveOptionPlan=useCallback((plan:Record<string,any>|null)=>setOptionPlan(plan),[]);
+  useEffect(()=>{const q=new URLSearchParams(location.search),selected=q.get('symbol')?.toUpperCase()===props.symbol.toUpperCase()&&q.get('accountId')===props.accountId?q.get('optionContract')||'':'';setOptionContract(selected);setOptionPlan(null);if(selected)setPanel('options');},[props.accountId,props.symbol]);
+
   const [research, setResearch] = useState<Research | null>(null),
     [authoritative, setAuthoritative] = useState<Authoritative | null>(null),
     [loading, setLoading] = useState(true),
@@ -265,16 +270,17 @@ export default function ChartDecisionWorkspace(props: Props) {
     ),
     news = Array.isArray(research?.news) ? research!.news!.slice(0, 3) : [];
   return <section className="chart-decision-workspace professional-security-workspace">
-    <SecurityHeader symbol={props.symbol} company={research?.profile?.name||props.symbol} price={props.price} market={props.marketOpen?'Market open · verify quote freshness':'Market closed · last available price'} account={props.accountName} strategy={props.strategy} shares={props.ownedShares} action={finalAction} onPlan={()=>setPanel('plan')}/>
-    <ChartEngine accountId={props.accountId} accountValue={props.accountValue} cashAvailable={props.cashAvailable} symbol={props.symbol} strategy={props.strategy} action={finalAction} confidence={finalConfidence} support={props.support} resistance={props.resistance} entryLow={props.entryLow} entryHigh={props.entryHigh} stop={props.stop} target1={props.target1} target2={props.target2}
+    <SecurityHeader symbol={props.symbol} company={research?.profile?.name||props.symbol} price={props.price} market={props.marketOpen?'Market open · verify quote freshness':'Market closed · last available price'} account={props.accountName} strategy={props.strategy} shares={props.ownedShares} action={optionContract?(optionPlan?.decision||'OPTION RESEARCH'):finalAction} onPlan={()=>setPanel('plan')}/>
+    {optionContract&&<ChartOptionResearch key={props.accountId+props.symbol+optionContract} accountId={props.accountId} symbol={props.symbol} contractSymbol={optionContract} onPlan={receiveOptionPlan}/>}
+    <ChartEngine optionContext={Boolean(optionContract)} accountId={props.accountId} accountValue={props.accountValue} cashAvailable={props.cashAvailable} symbol={props.symbol} strategy={props.strategy} action={optionContract?(optionPlan?.decision||'OPTION RESEARCH'):finalAction} confidence={finalConfidence} support={props.support} resistance={props.resistance} entryLow={optionContract?Number(optionPlan?.trigger||0):props.entryLow} entryHigh={optionContract?Number(optionPlan?.trigger||0):props.entryHigh} stop={optionContract?Number(optionPlan?.invalidation||0):props.stop} target1={optionContract?Number(optionPlan?.target||0):props.target1} target2={optionContract?0:props.target2}
       renderPanels={(planner,evidence)=><div className="security-workspace-panels">
-        <WorkspaceTabs tabs={[{id:'analysis',label:'Analysis'},{id:'news',label:'News & Events'},{id:'fundamentals',label:'Fundamentals'},{id:'options',label:'Options / Flow'},{id:'plan',label:'Trade Plan'}]} active={panel} onChange={setPanel}/>
+        <WorkspaceTabs tabs={[{id:'analysis',label:'Analysis'},{id:'news',label:'News & Events'},{id:'fundamentals',label:'Fundamentals'},{id:'options',label:'Options'},{id:'plan',label:'Trade Plan'}]} active={panel} onChange={setPanel}/>
         <div role="tabpanel" aria-label={panel} className="workspace-panel">
-          {panel==='analysis'&&<><h3>Evidence and risks</h3><ChartLearningLinks/><p>{finalReason}</p>{dataIssues.length>0&&<ul>{dataIssues.map(issue=><li key={issue}>{issue}</li>)}</ul>}<button disabled={refreshingDecision} onClick={refreshDecision}>{refreshingDecision?'Refreshing…':'Refresh evidence'}</button>{evidence}<QuantDataEvidence symbol={props.symbol} compact/></>}
+          {panel==='analysis'&&<><h3>Evidence and risks</h3><ChartLearningLinks/><p>{optionContract?(optionPlan?.whyContract||"Loading saved option-contract evidence…"):finalReason}</p>{!optionContract&&dataIssues.length>0&&<ul>{dataIssues.map(issue=><li key={issue}>{issue}</li>)}</ul>}{!optionContract&&<button disabled={refreshingDecision} onClick={refreshDecision}>{refreshingDecision?'Refreshing…':'Refresh evidence'}</button>}{evidence}<QuantDataEvidence symbol={props.symbol} compact/></>}
           {panel==='news'&&<NewsEventList symbol={props.symbol} items={Array.isArray(research?.news)?research.news:[]} loading={loading} error={research?.error||(!Array.isArray(research?.news)?(research?.news as any)?.error:undefined)}/>}
           {panel==='fundamentals'&&<FundamentalPanel profile={research?.profile} metrics={research?.metrics}/>}
-          {panel==='options'&&<OptionsPanel symbol={props.symbol} accountId={props.accountId} interpretation={finalReason}/>}
-          {panel==='plan'&&<><NewsEventList symbol={props.symbol} items={Array.isArray(research?.news)?research.news:[]} loading={loading} error={research?.error||(!Array.isArray(research?.news)?(research?.news as any)?.error:undefined)} compact/><TradePlan recommendation={finalRecommendation} checks={checks} cash={props.cashAvailable}><HoldingCostBadge symbol={props.symbol} accountId={props.accountId} currentPrice={props.price} stop={props.stop}/><details><summary>Manual price scenario and saved plan</summary>{planner}</details><div id="sell-trim-analysis"><ChartExitReview key={props.accountId+':'+props.symbol} symbol={props.symbol} accountId={props.accountId} price={props.price} support={props.support} resistance={props.resistance} stop={props.stop} target={props.target1} relativeVolume={props.relativeVolume} fresh={props.fresh} recommendation={finalRecommendation} error={authoritative?.error}/></div><FlowValidation symbol={props.symbol} thesis="UNKNOWN"/><QuantDataEvidence symbol={props.symbol} compact/></TradePlan></>}
+          {panel==='options'&&<OptionsPanel symbol={props.symbol} accountId={props.accountId} linkedContract={optionContract}/>}
+          {panel==='plan'&&optionContract&&<OptionsPanel symbol={props.symbol} accountId={props.accountId} linkedContract={optionContract}/>}{panel==='plan'&&!optionContract&&<><NewsEventList symbol={props.symbol} items={Array.isArray(research?.news)?research.news:[]} loading={loading} error={research?.error||(!Array.isArray(research?.news)?(research?.news as any)?.error:undefined)} compact/><TradePlan recommendation={finalRecommendation} checks={checks} cash={props.cashAvailable}><HoldingCostBadge symbol={props.symbol} accountId={props.accountId} currentPrice={props.price} stop={props.stop}/><details><summary>Manual price scenario and saved plan</summary>{planner}</details><div id="sell-trim-analysis"><ChartExitReview key={props.accountId+':'+props.symbol} symbol={props.symbol} accountId={props.accountId} price={props.price} support={props.support} resistance={props.resistance} stop={props.stop} target={props.target1} relativeVolume={props.relativeVolume} fresh={props.fresh} recommendation={finalRecommendation} error={authoritative?.error}/></div><FlowValidation symbol={props.symbol} thesis="UNKNOWN"/><QuantDataEvidence symbol={props.symbol} compact/></TradePlan></>}
         </div>
       </div>}/>
   </section>;

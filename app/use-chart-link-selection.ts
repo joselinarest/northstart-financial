@@ -8,7 +8,7 @@ export function useChartLinkSelection(tab:string,setSymbol:(value:string)=>void,
   const saved=sessionStorage.getItem('northstar-chart-symbol');
   const symbol=linked?.symbol||saved;
   if(symbol){setSymbol(symbol);setLookup(symbol)}
-  if(linked)setTimeframe('5m');
+  if(linked)setTimeframe(new URLSearchParams(window.location.search).get('timeframe')==='1D'?'1D':'5m');
   if(saved)sessionStorage.removeItem('northstar-chart-symbol');
  },[tab,setSymbol,setLookup,setTimeframe]);
 }

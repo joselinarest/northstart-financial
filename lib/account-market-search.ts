@@ -69,5 +69,7 @@ export async function accountSearchStatus(db:PostgresDatabase,householdId:string
  else if(candidates.filter(c=>c.decision_json?.symbol).length<24)candidates.push({...row,status:'SAVED - REVALIDATION REQUIRED',decision_json:previous});
  }
 
+ const identities=(await db.prepare("SELECT q.symbol,COALESCE(NULLIF(q.asset_json->>'name',''),NULLIF(p.payload_json->'fundamentals'->'profile'->>'name','')) AS company_name FROM discovery_queue q LEFT JOIN discovery_provider_cache p ON p.cache_key='research-v2:'||q.symbol WHERE q.symbol=ANY(?::text[])").bind(candidates.map(c=>c.symbol)).all<Row>()).results;
+ for(const candidate of candidates){candidate.companyName=candidate.decision_json?.companyName||identities.find(i=>i.symbol===candidate.symbol)?.company_name||null;}
  return {...run,lastCompletedAt:previous?.completed_at,candidates,wholeShareCashBlocked:candidates.some(c=>c.decision_json.price>0&&!c.decision_json.fractional)&&candidates.filter(c=>c.decision_json.price>0&&!c.decision_json.fractional).every(c=>c.decision_json.minimumCash>c.decision_json.investableCash)};
 }
