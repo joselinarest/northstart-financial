@@ -24,7 +24,9 @@ export async function marketResearchInputs(db:PostgresDatabase,symbol:string,for
  };
  // Price, history, profile and benchmarks are independent: one failed source must not erase another.
  const [quoteResult,history,profile,metrics,catalysts,index,asset]=await Promise.all([
-  attempt('UNDERLYING_RESEARCH',async()=>{const r=await provider.getQuotes([symbol]),q=r.quotes[symbol];if(!q||!Number.isFinite(q.last)||Number(q.last)<=0||!researchMarketFresh(q.timestamp||'',120000))throw Error('UNDERLYING_QUOTE_STALE_OR_INVALID');return {quote:q,asOf:q.timestamp};},prior?{quote:prior.quote,asOf:prior.asOf}:{quote:{},asOf:null},'Alpaca quote'),
+  attempt('UNDERLYING_RESEARCH',async()=>{const r=await provider.getQuotes([symbol]);let q=r.quotes[symbol];
+   if(q&&!researchMarketFresh(q.timestamp||'',120000)&&researchMarketFresh(q.quoteTimestamp||'',120000)&&Number(q.bid)>0&&Number(q.ask)>=Number(q.bid)&&(Number(q.ask)-Number(q.bid))/Number(q.bid)<=.01)q={...q,last:(Number(q.bid)+Number(q.ask))/2,timestamp:q.quoteTimestamp||null,priceBasis:'QUOTE_MID',marketLabel:'Fresh bid/ask midpoint; not a traded price'};
+   if(!q||!Number.isFinite(q.last)||Number(q.last)<=0||!Number.isFinite(Date.parse(q.timestamp||''))||Date.parse(q.timestamp||'')>Date.now())throw Error('UNDERLYING_QUOTE_INVALID');return {quote:q,asOf:q.timestamp};},prior?{quote:prior.quote,asOf:prior.asOf}:{quote:{},asOf:null},'Alpaca quote'),
   attempt('PRICE_HISTORY',async()=>{const r=await provider.getBars(symbol,{timeframe:'1Day',start,limit:200}),bars=validateDailyHistory(r.bars);return {bars,asOf:bars.at(-1)!.time};},prior?{bars:prior.bars,asOf:prior.bars?.at(-1)?.time}:{bars:[],asOf:null},'Alpaca validated daily OHLCV'),
   attempt('COMPANY_PROFILE',async()=>{const r=await discoveryFinnhub(db,'/stock/profile2?symbol='+symbol,force?60:86400);return {profile:r.data,asOf:r.asOf};},prior?{profile:prior.fundamentals.profile,asOf:prior.fundamentals.profileAsOf}:{profile:{},asOf:null},'Finnhub company profile'),
   attempt('FUNDAMENTAL_ANALYSIS',async()=>{const r=await discoveryFinnhub(db,'/stock/metric?symbol='+symbol+'&metric=all',force?60:21600),metrics=r.data?.metric||{};if(Object.values(metrics).filter(v=>typeof v==='number'&&Number.isFinite(v)).length<4)throw Error('FUNDAMENTALS_NUMERIC_EVIDENCE_INSUFFICIENT');return {metrics,asOf:r.asOf};},prior?{metrics:prior.fundamentals.metrics,asOf:prior.fundamentals.asOf}:{metrics:{},asOf:null},'Finnhub financial metrics'),
@@ -32,6 +34,7 @@ export async function marketResearchInputs(db:PostgresDatabase,symbol:string,for
   attempt('MARKET_BENCHMARK',()=>benchmarkHistory(db,'SPY',start,force?requestedAt:undefined),{bars:[],asOf:null},'SPY daily market benchmark'),
   db.prepare('SELECT asset_json FROM discovery_queue WHERE symbol=?').bind(symbol).first<Row>()
  ]);
+ if(quoteResult.asOf&&!researchMarketFresh(quoteResult.asOf,120000)){errors.UNDERLYING_RESEARCH='LATEST_PRICE_REQUIRES_EXECUTION_REFRESH';evidence.UNDERLYING_RESEARCH={...evidence.UNDERLYING_RESEARCH,status:'RETRY_REQUIRED',error:errors.UNDERLYING_RESEARCH};await stage('UNDERLYING_RESEARCH','PARTIAL',evidence.UNDERLYING_RESEARCH,errors.UNDERLYING_RESEARCH);}
  const fund={profile:profile.profile,metrics:metrics.metrics,asOf:metrics.asOf,profileAsOf:profile.asOf};
  const benchmark=researchBenchmark(symbol,profile.profile?.finnhubIndustry,asset?.asset_json?.name||profile.profile?.name||'');
  const sector=await attempt('MARKET_SECTOR_REGIME',async()=>{

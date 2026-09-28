@@ -13,12 +13,15 @@ export function researchBenchmark(symbol:string,industry:unknown,assetName=''){
   QQQ:['QQQM','Nasdaq-100 equities'],QQQM:['QQQ','Nasdaq-100 equities'],SCHD:['VYM','US dividend equities'],
   BND:['AGG','Aggregate US bonds'],AGG:['BND','Aggregate US bonds'],SPHY:['HYG','High-yield corporate bonds'],SGOV:['BIL','Short-term US Treasury bills'],
   IAU:['GLD','Gold'],GLD:['IAU','Gold'],DRAM:['SOXX','Semiconductor equities'],
+  FNDB:['VTI','Broad US equities'],FNDX:['IWB','Large-cap US equities'],FFLC:['SPY','Large-cap US equities'],
+  SEIX:['BKLN','Senior leveraged loans'],MINT:['JPST','Ultra-short investment-grade bonds'],
   XLK:['VGT','Technology equities'],XLF:['VFH','Financial equities'],XLV:['VHT','Health-care equities'],XLE:['VDE','Energy equities'],
   XLU:['VPU','Utility equities'],XLRE:['VNQ','Real-estate equities'],XLI:['VIS','Industrial equities'],XLC:['VOX','Communication equities'],
   XLP:['VDC','Consumer-staples equities'],XLY:['VCR','Consumer-discretionary equities'],XLB:['VAW','Materials equities'],
  };
  const fund=funds[symbol.toUpperCase()];
  if(fund)return {symbol:fund[0],kind:'ASSET_EXPOSURE',classification:fund[1],source:'Explicit fund exposure classification'};
+ if(symbol.toUpperCase()==='KVUE')return {symbol:'XLP',kind:'SECTOR',classification:'Consumer staples: household and personal care',source:'Kenvue business exposure classification'};
  const sector=sectorBenchmarkForIndustry(industry);
  if(sector)return {symbol:sector,kind:'SECTOR',classification:String(industry),source:'Company profile industry'};
  // Only unambiguous exposure in the supplied asset identity is accepted.
