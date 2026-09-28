@@ -24,7 +24,6 @@ export default function TradingDecisionBoard({search,data, portfolio, risk, stat
       <TradingFacts><span>Brokerage cash <b>{money(plan.cashCents)}</b></span><span>Buying power <b>{risk.buyingPowerCents == null ? 'Not supplied by broker' : money(risk.buyingPowerCents)}</b></span><span>Risk <b>{incomplete ? 'Analysis needs refresh' : 'Account limits applied'}</b></span><span>Goal <b>{data.goalName} · {data.horizonMonths} months</b></span></TradingFacts>
       {search&&<p role="status">{search.status} · {search.stage.replaceAll('_',' ')} · {search.counts_json?.deepResearched||0}/{search.counts_json?.shortlisted||0} shortlisted stocks researched</p>}<div className="mt-3 flex flex-wrap gap-2"><Button onClick={onAnalyze}>Refresh Account Intelligence</Button><Button onClick={onAnalyze}>Retry research</Button><a className="p-2" href="/workspace/accounts">Account settings →</a></div>
     </div>
-    <NextSessionResearch accountId={data.accountId}/>
     <section aria-labelledby="trading-actions" className="rounded-xl border border-line bg-surface p-4"><h2 id="trading-actions">ACTIONS</h2>
       <article role="status" className="rounded-lg border border-line bg-soft p-4"><h3>{String(current.action).replaceAll('_',' ')}{current.symbol?' · '+current.symbol:''}</h3><p>{current.reason}</p><p><b>Next trigger:</b> {current.trigger}</p><p><b>What changes the decision:</b> {current.change}</p><small>{current.asOf?'Last account analysis '+new Date(current.asOf).toLocaleString():'No completed account analysis recorded'} · {marketOpen?'Live session; reconfirm before execution':'Next-session plan; live confirmation required before execution'}</small></article>
       <AccountResearchResults search={search} accountId={data.accountId} cashCents={plan.cashCents}/>
@@ -43,5 +42,6 @@ export default function TradingDecisionBoard({search,data, portfolio, risk, stat
       {longTerm && <><p>Contributions follow portfolio targets and drift, valuation, risk and the {data.horizonMonths}-month {data.goalName} goal.</p><div className="flex flex-wrap gap-3">{(portfolio.categories || []).filter((c:Row)=>c.category!=='CASH' && c.status==='UNDERWEIGHT').map((c:Row)=><span key={c.category}>{c.category}: {(c.currentBps/100).toFixed(1)}% → {(c.targetBps/100).toFixed(1)}% target · gap {money(c.gapCents)}</span>)}</div></>}
       <small>Conditional reserves remain cash until execution. Unexecuted sale proceeds and future contributions are excluded.</small>
     </section>
+    <NextSessionResearch accountId={data.accountId}/>
   </div>;
 }

@@ -1,3 +1,4 @@
+import {intelligenceProof} from '@/lib/market-intelligence-queue';
 import {workspace} from '@/lib/db';
 import {scheduleNextSession,nextSessionStatus} from '@/lib/next-session-intelligence';
 import {startAccountSearch} from '@/lib/account-market-search';
@@ -5,7 +6,7 @@ import {queueDiscoveryRefresh} from '@/lib/discovery-queue';
 import {queueOptionResearch} from '@/lib/options-research-queue';
 export const dynamic='force-dynamic';
 async function context(request:Request,accountId:string){const ctx=await workspace(request);if(!await ctx.db.prepare("SELECT a.id FROM accounts a JOIN entities e ON e.id=a.entity_id WHERE a.id=? AND e.household_id=? AND a.type='investment' AND a.hidden=0").bind(accountId,ctx.householdId).first())throw Response.json({error:'Account not found'},{status:404});return ctx;}
-export async function GET(request:Request){try{const accountId=new URL(request.url).searchParams.get('accountId')||'',{db}=await context(request,accountId);return Response.json({cycle:await nextSessionStatus(db,accountId)},{headers:{'Cache-Control':'private, no-store'}});}catch(e){if(e instanceof Response)return e;return Response.json({error:'Next-session research unavailable; saved plans are preserved'},{status:503});}}
+export async function GET(request:Request){try{const accountId=new URL(request.url).searchParams.get('accountId')||'',{db}=await context(request,accountId);return Response.json({cycle:await nextSessionStatus(db,accountId),proof:await intelligenceProof(db,accountId).catch(()=>null)},{headers:{'Cache-Control':'private, no-store'}});}catch(e){if(e instanceof Response)return e;return Response.json({error:'Next-session research unavailable; saved plans are preserved'},{status:503});}}
 export async function POST(request:Request){try{const body=await request.json(),accountId=String(body.accountId||''),{db,householdId}=await context(request,accountId),action=String(body.action||'REFRESH_MARKET');if(!['REFRESH_MARKET','REFRESH_ACCOUNT','RETRY','PRIORITIZE','REFRESH_TICKER'].includes(action))return Response.json({error:'Unsupported research action'},{status:400});
  const cycleId=await scheduleNextSession(db,Date.now(),true);if(!cycleId)return Response.json({error:'No supported completed exchange session'},{status:503});
  if(action==='REFRESH_MARKET')await db.transaction(async tx=>{const row=await tx.prepare('SELECT status FROM next_session_cycles WHERE id=? FOR UPDATE').bind(cycleId).first<any>();if(row?.status==='SCREENED'){await tx.prepare("UPDATE next_session_symbols SET status='QUEUED' WHERE cycle_id=?").bind(cycleId).run();await tx.prepare("UPDATE next_session_cycles SET status='QUEUED',context_at=NULL,revision=revision+1 WHERE id=?").bind(cycleId).run();}});

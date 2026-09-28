@@ -11,6 +11,7 @@ export async function registerDiscoveryUniverse(db:PostgresDatabase,assets:any[]
 }
 export async function prioritizeDiscovery(db:PostgresDatabase){
  await db.prepare(`UPDATE discovery_queue SET priority=150 WHERE priority<150 AND symbol IN(SELECT s.ticker FROM holdings h JOIN securities s ON s.id=h.security_id WHERE h.quantity>0)`).run();
+ await db.prepare(`UPDATE discovery_queue SET priority=180,next_screen_at=LEAST(next_screen_at,CURRENT_TIMESTAMP),next_research_at=LEAST(next_research_at,CURRENT_TIMESTAMP) WHERE priority<180 AND symbol IN(SELECT s.ticker FROM recommendations r JOIN securities s ON s.id=r.security_id WHERE r.lifecycle IN ('MONITORING','TRIGGERED') AND r.expires_at>CURRENT_TIMESTAMP) AND last_screened_at<CURRENT_TIMESTAMP-INTERVAL '5 minutes'`).run();
  // Watchlist schema is shared by all households; priority never exposes household data.
  await db.prepare(`UPDATE discovery_queue SET priority=120 WHERE priority<120 AND symbol IN(SELECT symbol FROM market_watchlist)`).run();
 }
