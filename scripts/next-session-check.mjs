@@ -23,7 +23,7 @@ try{
  for(let i=0;i<3;i++)assert.equal((await engine.runNextSessionBatch(db,cycleId)).more,true);
  const coverage=await engine.nextSessionCounts(db,cycleId);assert.equal(coverage.universe,205);assert.equal(coverage.screened,205);assert.equal(coverage.pending,0);assert.equal(coverage.unavailable,1);
  assert.equal((await engine.runNextSessionBatch(db,cycleId)).more,true);assert.equal((await engine.runNextSessionBatch(db,cycleId)).more,false);
- const status=await engine.nextSessionStatus(db,'a');assert.ok(status.run_id);assert.equal(status.status,'SCREENED');assert.equal(status.counts_json.screened,205);assert.equal((await pg.query("SELECT count(*)::int n FROM background_jobs WHERE job_type='OPTIONS_ACCOUNT_REVIEW'")).rows[0].n,8);
+ const status=await engine.nextSessionStatus(db,'a');assert.ok(status.run_id);assert.equal(status.status,'SCREENED');assert.equal(status.counts_json.screened,205);assert.equal((await pg.query('SELECT counts_json FROM account_search_runs WHERE id=$1',[status.run_id])).rows[0].counts_json.universe,205);assert.equal((await pg.query("SELECT count(*)::int n FROM background_jobs WHERE job_type='OPTIONS_ACCOUNT_REVIEW'")).rows[0].n,8);
  console.log('PASS: complete 205-symbol pass across batches, per-symbol unavailable evidence, idempotent scheduling, account/Options fan-out, causal hypotheses, macro changes, open ranked cards and account-specific chart links.');
 }catch(e){console.error(e.message,e.query||e.stack);process.exitCode=1;}finally{globalThis.fetch=originalFetch;await pg.close();}
 

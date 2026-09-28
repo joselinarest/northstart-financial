@@ -23,9 +23,9 @@ export function eventHypotheses(events:Row[],universe:Row[]){
 }
 export function materialContextChange(previous:Row,next:Row){
  const changes:string[]=[];
- for(const row of next.series||[]){const old=previous.series?.find((v:Row)=>v.id===row.id);if(!old||row.value==null||old.value==null||row.date===old.date)continue;
+ for(const row of next.series||[]){const old=previous.series?.find((v:Row)=>v.id===row.id);if(!old||row.value==null||old.value==null||Date.parse(row.date)<=Date.parse(old.date))continue;
  const delta=row.value-old.value,threshold=/DGS|T10YIE/.test(row.id)?.08:row.id==='VIXCLS'?2:Math.abs(old.value)*.02;if(Math.abs(delta)>=threshold)changes.push(`${row.label}: ${old.value} → ${row.value} (${row.date})`);}
- for(const row of next.markets||[]){const old=previous.markets?.find((v:Row)=>v.symbol===row.symbol);if(old?.price>0&&row.price>0&&row.asOf!==old.asOf&&Math.abs(row.price/old.price-1)>=.01)changes.push(`${row.symbol} changed at least 1% since the previous research snapshot`);}
+ for(const row of next.markets||[]){const old=previous.markets?.find((v:Row)=>v.symbol===row.symbol);if(old?.price>0&&row.price>0&&Date.parse(row.asOf)>Date.parse(old.asOf)&&Math.abs(row.price/old.price-1)>=.01)changes.push(`${row.symbol} changed at least 1% since the previous research snapshot`);}
  const prior=new Set((previous.events||[]).map((e:Row)=>e.id));for(const event of next.events||[])if(!prior.has(event.id)&&/earnings|guidance|deal|contract|downgrade|upgrade|inflation|tariff|war|oil|yield/i.test(event.headline))changes.push(event.headline);
  return changes.slice(0,20);
 }
