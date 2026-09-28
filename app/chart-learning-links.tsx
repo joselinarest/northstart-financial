@@ -1,0 +1,21 @@
+const concepts=[
+ ['ema','EMA','Media exponencial: da más peso a precios recientes. Su pendiente aporta contexto; cruces pueden fallar en un rango.'],
+ ['vwap','VWAP','Precio medio ponderado por volumen. Define la sesión o ventana; un VWAP diario agregado no confirma una entrada intradía.'],
+ ['rsi','RSI','Oscilador de momentum. Overbought no equivale a SELL; una tendencia fuerte puede mantener RSI alto.'],
+ ['macd','MACD','Compara medias exponenciales para estudiar momentum. La señal tiene retraso y requiere contexto.'],
+ ['atr','ATR','Rango verdadero medio: mide volatilidad, no dirección. Úsalo para distancia y sizing sin prometer fills.'],
+ ['rvol','Relative Volume','Compara volumen con una base y hora equivalentes. La participación apoya una ruptura, pero no la garantiza.'],
+ ['support','Support','Zona donde apareció demanda. Es una hipótesis que puede romperse; define invalidation.'],
+ ['resistance','Resistance','Zona donde apareció oferta. Evalúa cierre, retest, volumen y espacio hasta el próximo nivel.'],
+ ['bos','BOS','Break of Structure describe ruptura de un swing previo. Debes definir el swing antes de observar el resultado.'],
+ ['choch','CHOCH','Cambio potencial de carácter. Una ruptura aislada no confirma una nueva tendencia.'],
+ ['order-block','Order Block','Zona candidata de Price Action previa a un desplazamiento; no demuestra intención institucional.'],
+ ['fvg','FVG','No solapamiento entre primera y tercera vela de una secuencia. Puede permanecer sin rellenar.'],
+ ['sweep','Liquidity sweep','Barrido de un nivel seguido por recuperación. Verifica aceptación/rechazo y no supongas quién operó.'],
+ ['false-break','False breakout','Salida de un rango que no sostiene el cierre. Espera confirmación y compara volumen.'],
+ ['engulf','Engulfing','Patrón de dos cuerpos. Su significado depende del nivel, tendencia y volumen.'],
+ ['doji','Doji','Open cercano al Close. Describe equilibrio relativo, no una reversión garantizada.'],
+ ['delta','Delta','Sensibilidad local de la prima al subyacente; cambia con Gamma, tiempo y volatilidad.'],
+ ['iv','Implied Volatility','Volatilidad implícita en precios de opciones. Compara plazo, historia y catalysts antes de juzgarla.'],
+] as const;
+export default function ChartLearningLinks(){return <details className="chart-learning-links"><summary>Explain &amp; Practice · indicators and patterns</summary><div>{concepts.map(([id,name,explanation])=><details key={id}><summary>{name} · Explain</summary><p>{explanation}</p><a href={'/workspace/academy?concept='+id}>Practice {name} →</a></details>)}</div></details>}

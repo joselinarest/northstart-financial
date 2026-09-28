@@ -1,6 +1,6 @@
 import type {PostgresDatabase} from '@/lib/db';
 import {randomUUID} from 'node:crypto';
-import {academyModules,academyReferences,makeExercise,publicExercise,gradeExercise,type Exercise,type AcademyBar} from '@/lib/academy-curriculum';
+import {academyModules,academyReferences,makeExercise,makeMarketCase,publicExercise,gradeExercise,type Exercise,type AcademyBar} from '@/lib/academy-curriculum';
 type Row=Record<string,any>;
 export function skillProgress(rows:Row[],threshold=80,now=Date.now()){
  return [...new Set(academyModules.flatMap(m=>[...m[3]]))].map(concept=>{
@@ -27,12 +27,14 @@ export function historicalExercise(symbol:string,input:AcademyBar[],cutoff?:stri
 }
 export async function startAcademy(db:PostgresDatabase,household:string,user:string,b:Row){
  let e:Exercise;
- if(b.source==='market'||b.source==='trade'){
+ if(b.source==='case'){e=makeMarketCase(Number(b.step||0));}else if(b.source==='market'||b.source==='trade'){
  let trade:Row|null=null;
  if(b.source==='trade'){trade=await db.prepare('SELECT p.input_json,p.review_json,s.ticker FROM post_trade_reviews p JOIN trade_lifecycle_exits e ON e.id=p.exit_id JOIN securities s ON s.id=e.security_id WHERE e.id=? AND e.household_id=?').bind(String(b.tradeId||''),household).first<Row>();if(!trade?.input_json?.entryAt)throw Error('No hay una entrada confirmada con fecha para este trade. No se fabricará un gráfico previo.');}
  const cache=trade?(await db.prepare('SELECT cache_key,payload_json FROM discovery_provider_cache WHERE cache_key=?').bind('research-v2:'+trade.ticker).all()).results:(await db.prepare("SELECT cache_key,payload_json FROM discovery_provider_cache WHERE cache_key LIKE 'research-v2:%' AND fetched_at>CURRENT_TIMESTAMP-INTERVAL '7 days' ORDER BY fetched_at DESC LIMIT 40").all()).results;
  let found:Exercise|undefined;
- for(const row of cache as Row[]){try{const bars=row.payload_json?.bars;if(!Array.isArray(bars))continue;found=historicalExercise(row.cache_key.slice(12),bars,trade?.input_json.entryAt);break;}catch{}}
+ const past=await db.prepare("SELECT COUNT(*) AS n FROM academy_sessions WHERE household_id=? AND user_id=? AND exercise_json->>'id' LIKE 'historical:%'").bind(household,user).first<Row>();
+ const offset=cache.length?Number(past?.n||0)%cache.length:0,rotated=[...cache.slice(offset),...cache.slice(0,offset)];
+ for(const row of rotated as Row[]){try{const bars=row.payload_json?.bars;if(!Array.isArray(bars))continue;found=historicalExercise(row.cache_key.slice(12),bars,trade?.input_json.entryAt);break;}catch{}}
  if(!found)throw Error('No hay un escenario histórico con barras suficientes en el scanner. La práctica original sigue disponible.');
  e=found;if(trade)e.outcome={...(e.outcome as Row),originalRecommendation:trade.input_json.predicted,actualOutcome:trade.review_json};
  }else{
